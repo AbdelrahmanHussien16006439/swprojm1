@@ -1,0 +1,32 @@
+AI PROMPT LOG — Travel Planning and Booking Platform (Software Project I, Winter 2026)
+
+Every team member adds entries at the BOTTOM of this file for prompts that materially
+contributed to the project. Use this format:
+
+================================================
+Date: YYYY-MM-DD
+Student: Student Name
+Tool: ChatGPT / Claude / Copilot / ...
+Related Requirement: e.g. FLT-22
+Prompt:
+<what you asked>
+How the output was used:
+<what you kept, changed, or rejected>
+================================================
+
+================================================
+Date: 2026-11-16
+Student: Abdelrahman Hussien (Member 1)
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ACC-01, ACC-04, ACC-05, ACC-06, ACC-07a, ACC-08, ACC-09, ACC-11, ACC-12, ACC-13, ACC-14, ACC-15, ACC-16, ACC-18, ACC-19, GEN-02, GEN-05, GEN-13
+Prompt:
+"Read Team_Plan.md and proj_description.md. I am Member 1 — implement all of
+Member 1's requirements and make the folder structure well organized."
+How the output was used:
+Generated the NestJS backend skeleton (all team modules registered, main.ts with
+/api prefix, Swagger at /api/docs, global validation and error filter), the shared
+src/common/ layer (guards, decorators, pagination, ObjectId pipe), User/Session/
+AuditLog schemas, auth (register, login with lockout, refresh, logout, me,
+change-password), profile endpoints, admin account endpoints and the admin seed.
+Reviewed the code and tested every endpoint against a local MongoDB before committing.
+================================================
