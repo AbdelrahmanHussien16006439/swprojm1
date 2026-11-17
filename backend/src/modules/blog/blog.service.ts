@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -19,13 +20,19 @@ import { UserStatus } from '../../common/enums/user-status.enum';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { User } from '../users/schemas/user.schema';
 import type { UserDocument } from '../users/schemas/user.schema';
+import { UploadsService } from '../uploads/uploads.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { ListPostsQueryDto } from './dto/list-posts-query.dto';
 import { CommentTextDto } from './dto/comment-text.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { Comment, CommentDocument } from './schemas/comment.schema';
 import { Like } from './schemas/like.schema';
-import { Post, PostDocument, PostStatus } from './schemas/post.schema';
+import {
+  Post,
+  PostDocument,
+  PostImage,
+  PostStatus,
+} from './schemas/post.schema';
 
 interface PublicPostSummary {
   _id: Types.ObjectId;
@@ -51,6 +58,7 @@ export class BlogService {
     @InjectModel(Comment.name) private readonly commentModel: Model<Comment>,
     @InjectModel(Like.name) private readonly likeModel: Model<Like>,
     @InjectModel(User.name) private readonly userModel: Model<User>,
+    private readonly uploadsService: UploadsService,
   ) {}
 
   async createPost(user: JwtUser, dto: CreatePostDto) {
@@ -270,6 +278,101 @@ export class BlogService {
     return this.toPostResponse(post);
   }
 
+  async addPostImage(id: string, userId: string, file: Express.Multer.File) {
+    const post = await this.findOwnedPost(id, userId);
+    if ((post.images ?? []).length >= 5) {
+      throw new BadRequestException('A post can have at most 5 images');
+    }
+
+    const image = await this.uploadsService.saveImage(file);
+    let updatedPost: PostDocument | null;
+    try {
+      updatedPost = await this.postModel
+        .findOneAndUpdate(
+          {
+            _id: post._id,
+            authorId: new Types.ObjectId(userId),
+            $expr: {
+              $lt: [{ $size: { $ifNull: ['$images', []] } }, 5],
+            },
+          } as FilterQuery<Post>,
+          { $push: { images: image } },
+          { new: true, runValidators: true },
+        )
+        .exec();
+    } catch (error) {
+      await this.discardUploadedImage(image.id);
+      throw error;
+    }
+
+    if (!updatedPost) {
+      await this.discardUploadedImage(image.id);
+      const currentPost = await this.findOwnedPost(id, userId);
+      if ((currentPost.images ?? []).length >= 5) {
+        throw new BadRequestException('A post can have at most 5 images');
+      }
+      throw new NotFoundException('Post not found');
+    }
+
+    return {
+      post: this.toPostResponse(updatedPost),
+      image,
+    };
+  }
+
+  async deletePostImage(id: string, imageId: string, userId: string) {
+    if (!this.isUploadId(imageId)) {
+      throw new BadRequestException('Invalid image id');
+    }
+    const post = await this.findOwnedPost(id, userId);
+    const image = (post.images ?? []).find((entry) =>
+      typeof entry === 'string'
+        ? entry === `/uploads/${imageId}.jpg` ||
+          entry === `/uploads/${imageId}.png`
+        : entry.id === imageId,
+    );
+    if (!image) throw new NotFoundException('Post image not found');
+    const imageUrl = typeof image === 'string' ? image : image.url;
+    const imageMatch =
+      typeof image === 'string' ? imageUrl : { $elemMatch: { id: imageId } };
+    const imagePull = typeof image === 'string' ? imageUrl : { id: imageId };
+
+    const updatedPost = await this.postModel
+      .findOneAndUpdate(
+        {
+          _id: post._id,
+          authorId: new Types.ObjectId(userId),
+          images: imageMatch,
+        },
+        { $pull: { images: imagePull } },
+        { new: true, runValidators: true },
+      )
+      .exec();
+    if (!updatedPost) {
+      await this.findOwnedPost(id, userId);
+      throw new NotFoundException('Post image not found');
+    }
+
+    // An image URL may also have been attached to another post through the
+    // existing create/edit DTOs. Keep that shared file intact.
+    const imageStillUsed = await this.postModel
+      .exists({
+        $or: [
+          { images: imageUrl },
+          { images: { $elemMatch: { url: imageUrl } } },
+        ],
+      })
+      .exec();
+    if (!imageStillUsed) {
+      await this.uploadsService.deleteImage(imageId);
+    }
+
+    return {
+      message: 'Post image deleted',
+      post: this.toPostResponse(updatedPost),
+    };
+  }
+
   async addComment(postId: string, user: JwtUser, dto: CommentTextDto) {
     const post = await this.findInteractablePost(postId);
     const comment = await this.commentModel.create({
@@ -423,6 +526,22 @@ export class BlogService {
     return post;
   }
 
+  private isUploadId(id: string): boolean {
+    return /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(
+      id,
+    );
+  }
+
+  private async discardUploadedImage(id: string): Promise<void> {
+    try {
+      await this.uploadsService.deleteImage(id);
+    } catch {
+      this.logger.warn(
+        'Could not remove an uploaded image after post update failure',
+      );
+    }
+  }
+
   private async findInteractablePost(id: string) {
     const post = await this.postModel.findById(id).exec();
     if (!post || post.status !== PostStatus.PUBLISHED || post.isHidden) {
@@ -468,20 +587,30 @@ export class BlogService {
     };
   }
 
-  private async removeUploadedImages(images: string[]): Promise<void> {
+  private async removeUploadedImages(
+    images: Array<string | PostImage>,
+  ): Promise<void> {
     const uploadsDirectory = resolve(__dirname, '../../../uploads');
     const safeImageUrls = new Set(
-      images.filter((url) =>
-        /^\/uploads\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.(?:jpg|png)$/i.test(
-          url,
+      images
+        .map((image) => (typeof image === 'string' ? image : image.url))
+        .filter((url) =>
+          /^\/uploads\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.(?:jpg|png)$/i.test(
+            url,
+          ),
         ),
-      ),
     );
 
     await Promise.all(
       [...safeImageUrls].map(async (url) => {
         // Keep files that another post still references.
-        if (await this.postModel.exists({ images: url })) return;
+        if (
+          await this.postModel.exists({
+            $or: [{ images: url }, { images: { $elemMatch: { url } } }],
+          })
+        ) {
+          return;
+        }
         const filename = url.slice('/uploads/'.length);
         try {
           await unlink(resolve(uploadsDirectory, filename));

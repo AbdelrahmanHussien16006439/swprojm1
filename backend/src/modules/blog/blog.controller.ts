@@ -6,20 +6,27 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBadRequestResponse,
+  ApiBody,
   ApiCookieAuth,
   ApiConflictResponse,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiQuery,
+  ApiPayloadTooLargeResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -104,6 +111,57 @@ export class BlogController {
     @CurrentUser() user: JwtUser,
   ) {
     return this.blogService.unlikePost(id, user.sub);
+  }
+
+  @Post(':id/images')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  @ApiCookieAuth('access_token')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+    }),
+  )
+  @ApiOperation({ summary: 'Add a JPG or PNG image to my post (BLG-10)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiCreatedResponse({ description: 'Image attached to the post' })
+  @ApiBadRequestResponse({
+    description: 'Invalid post id, image, or image limit',
+  })
+  @ApiPayloadTooLargeResponse({ description: 'Image exceeds the 5 MB limit' })
+  @ApiUnauthorizedResponse({ description: 'Login required' })
+  @ApiNotFoundResponse({ description: 'Post not found or not owned by user' })
+  addPostImage(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @CurrentUser() user: JwtUser,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.blogService.addPostImage(id, user.sub, file);
+  }
+
+  @Delete(':id/images/:imageId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  @ApiCookieAuth('access_token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Remove an image from my post (BLG-10)' })
+  @ApiOkResponse({ description: 'Image reference removed from the post' })
+  @ApiBadRequestResponse({ description: 'Invalid post or image id' })
+  @ApiUnauthorizedResponse({ description: 'Login required' })
+  @ApiNotFoundResponse({ description: 'Post or image not found' })
+  deletePostImage(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Param('imageId', new ParseUUIDPipe({ version: '4' })) imageId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.blogService.deletePostImage(id, imageId, user.sub);
   }
 
   @Get()

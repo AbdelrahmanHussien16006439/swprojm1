@@ -69,3 +69,13 @@ Prompt:
 How the output was used:
 Added POST /api/uploads with Swagger multipart documentation, Multer file-size limits, MIME and image-signature validation, random UUID filenames, and a reusable exported UploadsService. Verified a PNG upload returned 201 and an id/URL, the saved file was retrievable at its /uploads URL with matching SHA-256, a non-image returned 400, and a file over 5 MB returned 413. The Nest build passed. The start:dev script failed in this workspace because incremental compilation did not recreate dist, so the runtime checks used the same Nest entry point with ts-node and temporary local environment values.
 ================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: BLG-10, GEN-08
+Prompt:
+"Implement post image upload and removal routes using the existing BlogService and UploadsService. Enforce author ownership, JPG/PNG and 5 MB limits, a five-image cap, safe database/file cleanup, UUID image IDs, Swagger documentation, and focused tests."
+How the output was used:
+Added authenticated Blog endpoints to upload an image to an owned post and remove an image by upload ID. Reused UploadsService validation/storage through saveImage(), added safe UUID-based deletion, atomically updated post image references, and cleaned up newly uploaded files if the database write failed. Added Blog and Uploads service tests.
