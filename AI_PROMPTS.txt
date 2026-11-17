@@ -30,3 +30,14 @@ AuditLog schemas, auth (register, login with lockout, refresh, logout, me,
 change-password), profile endpoints, admin account endpoints and the admin seed.
 Reviewed the code and tested every endpoint against a local MongoDB before committing.
 ================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: ITN-18
+Prompt:
+"Implement the Member 2 ITN-18 exchange-rate service per TEAM_PLAN.md, with the FXRatesAPI daily cache, scheduled and startup refresh, conversion, public latest endpoint, cached fallback, and unsupported-currency handling. Keep changes within the exchange-rates module and document/testing the Member 5 currency dependency."
+How the output was used:
+Implemented the ExchangeRate schema, service, public endpoint, cron/startup refresh, conversion, and cache fallback. The Member 5 validator integration remains isolated because ReferenceDataService is not yet present; current validation checks membership in the FX rate cache. Seven focused tests and the backend build passed.
+================================================
