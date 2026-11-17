@@ -1,6 +1,17 @@
 import { Module } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
+import { ExchangeRatesController } from './exchange-rates.controller';
+import { ExchangeRatesService } from './exchange-rates.service';
+import { ExchangeRate, ExchangeRateSchema } from './schemas/exchange-rate.schema';
 
-// Owner: Member 2 — see docs/TEAM_PLAN.md Section 7.
-// Remember to export your service(s) AND MongooseModule (TEAM_PLAN 3.2).
-@Module({})
+@Module({
+  imports: [
+    MongooseModule.forFeature([
+      { name: ExchangeRate.name, schema: ExchangeRateSchema },
+    ]),
+  ],
+  controllers: [ExchangeRatesController],
+  providers: [ExchangeRatesService],
+  exports: [ExchangeRatesService, MongooseModule],
+})
 export class ExchangeRatesModule {}
