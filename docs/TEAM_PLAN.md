@@ -628,3 +628,89 @@ npm run start:dev
     Requirement ID in the commit message and PR.
     AI prompts logged in AI_PROMPTS.txt.
     You can explain the code yourself.
+
+12. MEMBER 2 INTEGRATION HANDOFF — MERGED STUBS AND REQUIRED FOLLOW-UP
+
+Status note (17/11/2026): Member 2's PRs #1–#9 have been merged into develop. The merged work includes GEN-08 Uploads, ITN-18 Exchange Rates, BLG-01–09 blog core, GEN-09 Reports, GEN-10 Admin Moderation, GEN-07 Audit Log Viewer, BLG-10 Post Images, BLG-12 Author Profile, and ACC-15 Provider Status endpoints. A merged PR means the code/interface is in develop; it does NOT mean an endpoint that currently returns a pending-integration response is functionally complete.
+
+IMPORTANT INSTRUCTION FOR EVERY MEMBER AND THEIR AI:
+Before changing or implementing any integration listed below, pull the latest develop and inspect the actual Member 2 files and exported interfaces. Do not recreate, rename, duplicate, or guess an interface from this document. The source code on develop is authoritative for the exact current stub names, method signatures, response shape, and HTTP behavior. Preserve Member 2's ownership boundaries. The owning member implements and exports their own service/schema/query in their own folder; Member 2 then replaces/adapts the stub inside Member 2 folders. Coordinate the exact method signature in the PR before coding if the existing owner service does not expose what is needed.
+
+12.1 Shared rule for pending integration stubs
+- A stub is an explicit compile-safe integration boundary, not completed business logic.
+- Never return fabricated records, fake recipients, fake success, or a success HTTP status when the underlying operation did not happen.
+- Keep current fail-closed behavior until the required owner service is available. For write operations, preserve the current not-applied/audit semantics and pending response (for example HTTP 501 where the current endpoint uses it); do not silently change this to success.
+- When replacing a stub, add tests for the real integration and retain tests proving authorization, validation, error handling, and no cross-owner folder changes.
+- Do not edit another member's module to make integration easier. Ask that owner to export the required service method/model through their module. Do not add another copy of their schema or service.
+- Update Swagger and this handoff section when an integration changes from pending to implemented. Remove a pending marker only after real behavior and tests pass against the actual owner module.
+
+12.2 M5 — ReferenceDataService currency validation for M2 ITN-18
+Current state: M2's ExchangeRatesService, ExchangeRate schema/cache, daily 1 AM refresh, latest-rate endpoint, and conversion service are implemented and merged. The supported-currency check is still pending M5's ReferenceDataService.
+M5 must:
+- Implement and export ReferenceDataService from ReferenceDataModule, including the agreed method `isSupportedCurrency(code: string): Promise<boolean>` and `listCurrencies()`.
+- Ensure its supported currency set comes from the project's seeded reference data, not a hard-coded list duplicated in M2.
+M2 must, after M5's service is merged:
+- Import ReferenceDataModule into ExchangeRatesModule (or the owning M2 module that performs the validation) and inject ReferenceDataService.
+- Validate both source and target currency codes before conversion; unsupported codes must produce HTTP 400 as required by Section 6.6.
+- Keep FXRatesAPI keys server-side and keep using cached rates when the provider API is unavailable.
+- Add tests for supported codes, unsupported source/target codes, and the cached-rate fallback.
+M7 must use the exported ExchangeRatesService `convert(amount, from, to)` for itinerary budget conversion; it must not call FXRatesAPI directly or duplicate the exchange-rate cache.
+
+12.3 M6 — Review moderation integration for M2 GEN-09 / GEN-10
+Current state: M2's Reports module accepts report target types post/comment/review/itinerary. M2's admin moderation implementation handles posts/comments. Review moderation/report actions are pending M6's Reviews module and its real model/service. The current M2 integration boundary must remain fail-closed until that service is available.
+M6 must:
+- Own and implement the Review schema and ReviewsService in `modules/reviews`; export the service and model from ReviewsModule.
+- Coordinate with M2 and expose/reconfirm the real operations needed for M2 to find a review by id, set/unset `isHidden`, and delete a review. Do not let M2 duplicate the Review schema.
+- When a review is deleted by moderation, provide/reuse the M6-owned rating recalculation behavior so the hotel's `averageRating` and `ratingsCount` remain correct. M2 must call the M6 service rather than update hotel rating fields itself.
+- Ensure public review queries exclude hidden reviews and deactivated authors are represented as "Deleted user", per Section 3.9.
+M2 must, after M6's service is merged:
+- Replace only the review-related pending adapter/stub in `modules/admin-moderation` and report-target validation in `modules/reports` with calls to M6's exported service.
+- Wire report resolve actions (dismiss/hide/delete) and direct hide/unhide/delete for reviews to the real M6 operations.
+- Keep admin authorization and audit logging in M2's existing controllers/services. Audit only the actual result; do not log a successful hide/delete if M6's operation failed.
+- Add integration tests for existing/missing review, hide, unhide, delete, report resolution, and rating recalculation. Keep all M6-owned files unchanged.
+
+12.4 M7 — Itinerary moderation and public author itineraries for M2 GEN-10 / BLG-12
+Current state: M2's `GET /api/authors/:id` is public and returns the author's public profile plus published/visible posts with page-size-10 pagination. The itinerary field is currently `null` through a documented compile-safe reader stub because M7's ItinerariesModule was an empty placeholder when M2 implemented BLG-12. M2's report schema accepts itinerary targets; moderation actions for itineraries are pending M7's real service/model.
+M7 must:
+- Implement and export ItinerariesService and its model from ItinerariesModule.
+- Expose/confirm service operations for M2 to: (a) list an author's public itineraries, (b) find an itinerary by id for report validation/moderation, (c) set/unset `isHidden`, and (d) delete an itinerary. Agree exact signatures with M2 before integration; do not make M2 query or duplicate the Itinerary schema.
+- Public itinerary listing must include only `isPublic=true`, `isHidden=false`, and itineraries whose owner is not deactivated. Private/hidden itineraries must never leak through author profiles or public endpoints.
+- Keep ownership checks on M7's private itinerary endpoints. Export the module/service needed by M2 without asking M2 to edit M7 files.
+M2 must, after M7's service is merged:
+- Replace the current `public-itinerary-reader` pending stub with the real M7 service call. Preserve the author profile's existing response contract, but return the real public itinerary collection instead of `null` (agree whether this collection is paginated and its exact shape with M7 before coding; do not invent a second itinerary DTO).
+- Replace itinerary moderation/report pending adapters in `modules/admin-moderation` and `modules/reports` with M7 service calls.
+- Preserve admin authorization, audit logging, 404 behavior, and fail-closed handling. Add tests for public/private/hidden/deactivated-owner visibility, report target existence, hide/unhide/delete, and author profile response.
+M7 must not implement Member 2's report or admin moderation controllers; M2 owns those endpoints. M2 must not implement M7's itinerary business logic or edit `modules/itineraries`.
+
+12.5 M3 + M5 + M6 — Real provider deactivate/reactivate for M2 ACC-15
+Current state: M2 owns and has merged the admin-only routes:
+- `PATCH /api/admin/providers/:type/:id/deactivate`
+- `PATCH /api/admin/providers/:type/:id/reactivate`
+Allowed type values are `airline` and `hotel`. The controller validates admin role, provider type, and ObjectId. Because provider/booking/notification dependencies were placeholders, the integration currently fails closed (HTTP 501) and records an audit attempt with `outcome: not_applied`. It does NOT change provider state, hide search results, block bookings, or send notifications yet.
+M3 must:
+- Implement/export AirlinesService operations for provider lookup and active-state changes. The shared contract already lists `findById(id)`, `setActive(id, isActive)`, and `getModeratorPolicies(airlineId)` in Section 4. Confirm the actual moderator-recipient lookup contract with M2; do not assume policy data is a user-id list unless the service explicitly defines it.
+- Ensure flight search and new-booking eligibility exclude inactive airlines/flights as required, without invalidating existing confirmed bookings.
+M5 must:
+- Implement/export HotelsService provider lookup and `setActive(id, isActive)` as listed in Section 4.
+- Ensure hotel search and new-booking eligibility exclude inactive hotels, without invalidating existing confirmed hotel bookings.
+M6 must:
+- Implement/export NotificationsService with `notify()` and `notifyMany()` exactly as in Section 4.
+- Coordinate the real query/contract for users with upcoming confirmed flight/hotel bookings and provider moderator recipients. Notifications must target the provider's moderator(s) and users with upcoming confirmed bookings only; do not invent recipients or notify users with merely pending/unconfirmed bookings.
+- Coordinate with M3/M5/M4 as needed to expose recipient discovery through the owning booking/provider service. Existing booking modules remain owned by M4/M6; M2 must not query or duplicate their schemas.
+M2 must, after M3/M5/M6 have exported the agreed contracts:
+- Replace the pending provider integration adapter in `modules/admin-moderation` with calls to AirlinesService or HotelsService for lookup and `setActive`.
+- Perform the state change only once, handle missing providers with 404, and handle already-active/already-inactive cases consistently with the agreed API behavior.
+- Send notifications using M6 NotificationsService to the agreed moderator and upcoming-confirmed-booking recipient IDs. Do not change or cancel existing confirmed bookings.
+- Record successful audit logs only after the provider state change succeeds; preserve `not_applied`/failure behavior when it does not.
+- Add integration tests for airline/hotel deactivate/reactivate, missing provider, invalid type/id, moderator and upcoming-confirmed-booking notifications, no notification to unrelated users, search/new-booking exclusion, and preservation of existing confirmed bookings.
+M3/M5/M6 own their provider, booking, and notification business logic. M2 owns the admin endpoints and orchestration. M2 must not edit `modules/airlines`, `modules/hotels`, `modules/notifications`, `modules/flight-bookings`, or `modules/hotel-bookings`.
+
+12.6 M2 — final integration checklist after dependencies merge
+- Pull latest develop before each integration branch; inspect the actual exported owner service and current M2 adapter before coding.
+- Integrate one dependency group at a time: M5 currency validation; M6 review moderation; M7 itinerary moderation + author itineraries; M3/M5/M6 provider operations.
+- Keep each integration in a separate feature branch/PR with the relevant requirement IDs. Do not amend already merged PRs; submit follow-up integration PRs.
+- Run backend build and the affected module tests, then the cross-module integration tests. Verify Swagger routes and response schemas.
+- Confirm no pending stub returns fake success or fabricated data. Update the status in this section and in the affected Swagger descriptions only after real tests pass.
+
+12.7 Instructions for AI assistants receiving this TEAM_PLAN.md
+When helping any member, first identify their member number and only work in their owned folders. For the integrations in Section 12, inspect the latest develop code and the exact existing M2 stub before proposing code. Tell the member explicitly which part belongs to their member and which part belongs to another owner. Do not ask a member to implement another member's business logic. Do not claim a requirement is complete merely because its endpoint/controller or stub is merged; distinguish implemented behavior, pending integration, and merged status. If an owner module is still a placeholder, leave the M2 stub fail-closed and move to another independent task.
