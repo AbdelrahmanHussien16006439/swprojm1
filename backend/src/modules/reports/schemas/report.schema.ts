@@ -23,12 +23,18 @@ export class Report {
   reporterId: Types.ObjectId;
 
   @Prop({ type: String, enum: Object.values(ReportTargetType), required: true })
+  @Prop({
+    type: String,
+    enum: Object.values(ReportTargetType),
+    required: true,
+  })
   targetType: ReportTargetType;
 
   @Prop({ type: Types.ObjectId, required: true })
   targetId: Types.ObjectId;
 
   @Prop({ required: true, trim: true })
+  @Prop({ type: String, required: true, trim: true })
   reason: string;
 
   @Prop({
@@ -50,6 +56,7 @@ export class Report {
 }
 
 export const ReportSchema = SchemaFactory.createForClass(Report);
+
 ReportSchema.index(
   { reporterId: 1, targetType: 1, targetId: 1 },
   { unique: true },
