@@ -45,7 +45,12 @@ async function bootstrap() {
       'Milestone 1 backend. Log in with POST /api/auth/login — the browser keeps the httpOnly cookies and sends them on later requests.',
     )
     .setVersion('1.0')
-    .addCookieAuth(ACCESS_TOKEN_COOKIE)
+    // Scheme name must match @ApiCookieAuth('access_token') used in the controllers
+    .addCookieAuth(
+      ACCESS_TOKEN_COOKIE,
+      { type: 'apiKey', in: 'cookie' },
+      ACCESS_TOKEN_COOKIE,
+    )
     .build();
   SwaggerModule.setup('api/docs', app, () =>
     SwaggerModule.createDocument(app, swaggerConfig),
