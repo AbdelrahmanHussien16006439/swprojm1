@@ -7,8 +7,6 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, Model, PipelineStage, Types } from 'mongoose';
-import { unlink } from 'fs/promises';
-import { resolve } from 'path';
 import {
   PAGE_SIZE,
   paginate,
@@ -648,26 +646,31 @@ export class BlogService {
   private async removeUploadedImages(
     images: Array<string | PostImage>,
   ): Promise<void> {
-    const uploadsDirectory = resolve(__dirname, '../../../uploads');
-    const safeImageUrls = new Set(
+    const managedImageIds = new Set(
       images
         .filter((image): image is PostImage => this.isManagedPostImage(image))
-        .map((image) => image.url),
+        .map((image) => image.id),
     );
 
     await Promise.all(
-      [...safeImageUrls].map(async (url) => {
+      [...managedImageIds].map(async (id) => {
+        const possibleUrls = [`/uploads/${id}.jpg`, `/uploads/${id}.png`];
         // Keep files that another post still references.
         if (
-          await this.postModel.exists({
-            $or: [{ images: url }, { images: { $elemMatch: { url } } }],
-          })
+          await this.postModel
+            .exists({
+            $or: [
+              { images: { $in: possibleUrls } },
+              { images: { $elemMatch: { id } } },
+              { images: { $elemMatch: { url: { $in: possibleUrls } } } },
+            ],
+            })
+            .exec()
         ) {
           return;
         }
-        const filename = url.slice('/uploads/'.length);
         try {
-          await unlink(resolve(uploadsDirectory, filename));
+          await this.uploadsService.deleteImage(id);
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
             this.logger.warn(

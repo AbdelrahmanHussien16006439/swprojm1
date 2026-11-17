@@ -32,7 +32,7 @@ export class Report {
   @Prop({ type: Types.ObjectId, required: true })
   targetId: Types.ObjectId;
 
-  @Prop({ type: String, required: true, trim: true })
+  @Prop({ type: String, required: true, trim: true, maxlength: 500 })
   reason: string;
 
   @Prop({

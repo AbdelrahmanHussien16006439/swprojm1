@@ -7,7 +7,6 @@ import { ConfigService } from '@nestjs/config';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { Model, Types } from 'mongoose';
-import { unlink } from 'fs/promises';
 import { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { UserStatus } from '../../common/enums/user-status.enum';
 import { CommentTextDto } from './dto/comment-text.dto';
@@ -18,11 +17,6 @@ import { Post, PostStatus } from './schemas/post.schema';
 import { User } from '../users/schemas/user.schema';
 import { UploadsService } from '../uploads/uploads.service';
 import { CreatePostDto } from './dto/create-post.dto';
-
-jest.mock('fs/promises', () => ({
-  ...jest.requireActual('fs/promises'),
-  unlink: jest.fn().mockResolvedValue(undefined),
-}));
 
 const imageId = '550e8400-e29b-41d4-a716-446655440000';
 const imageUrl = `/uploads/${imageId}.png`;
@@ -574,16 +568,54 @@ describe('BlogService post images (BLG-10)', () => {
       images: [imageUrl],
       deleteOne: jest.fn().mockResolvedValue(undefined),
     };
-    const { service } = makeService({
+    const { service, uploadsService } = makeService({
       postModel: {
         findById: jest.fn().mockReturnValue(execResult(post)),
       },
     });
-    const unlinkMock = unlink as jest.MockedFunction<typeof unlink>;
-    unlinkMock.mockClear();
+      expect((service as any).isManagedPostImage(post.images[0])).toBe(false);
 
     await service.deletePost(postId.toString(), userId.toString());
 
-    expect(unlinkMock).not.toHaveBeenCalled();
+    expect(uploadsService.deleteImage).not.toHaveBeenCalled();
+  });
+
+  it('unlinks a canonical upload attached to the deleted post when unused elsewhere', async () => {
+    const post = {
+      _id: postId,
+      authorId: userId,
+      images: [{ id: imageId, url: imageUrl }],
+      deleteOne: jest.fn().mockResolvedValue(undefined),
+    };
+    const { service, uploadsService } = makeService({
+      postModel: {
+        findById: jest.fn().mockReturnValue(execResult(post)),
+        exists: jest.fn().mockReturnValue(execResult(null)),
+      },
+    });
+
+    await service.deletePost(postId.toString(), userId.toString());
+
+    expect(uploadsService.deleteImage).toHaveBeenCalledTimes(1);
+    expect(uploadsService.deleteImage).toHaveBeenCalledWith(imageId);
+  });
+
+  it('preserves a canonical upload still referenced by another post', async () => {
+    const post = {
+      _id: postId,
+      authorId: userId,
+      images: [{ id: imageId, url: imageUrl }],
+      deleteOne: jest.fn().mockResolvedValue(undefined),
+    };
+    const { service, uploadsService } = makeService({
+      postModel: {
+        findById: jest.fn().mockReturnValue(execResult(post)),
+        exists: jest.fn().mockReturnValue(execResult({ _id: otherUserId })),
+      },
+    });
+
+    await service.deletePost(postId.toString(), userId.toString());
+
+    expect(uploadsService.deleteImage).not.toHaveBeenCalled();
   });
 });

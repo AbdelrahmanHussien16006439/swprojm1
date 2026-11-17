@@ -231,6 +231,18 @@ describe('ReportsService', () => {
     );
   });
 
+  it('rejects report reasons longer than 500 characters', async () => {
+    const invalid = plainToInstance(CreateReportDto, {
+      targetType: ReportTargetType.POST,
+      targetId: targetId.toString(),
+      reason: 'x'.repeat(501),
+    });
+    const errors = await validate(invalid);
+
+    expect(errors.map((error) => error.property)).toContain('reason');
+    expect(ReportSchema.path('reason').options.maxlength).toBe(500);
+  });
+
   it('uses the required target/status enums and unique compound index', () => {
     expect(ReportSchema.path('targetType').enumValues).toEqual(
       Object.values(ReportTargetType),
