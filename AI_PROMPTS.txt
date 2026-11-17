@@ -69,3 +69,12 @@ Prompt:
 How the output was used:
 Added POST /api/uploads with Swagger multipart documentation, Multer file-size limits, MIME and image-signature validation, random UUID filenames, and a reusable exported UploadsService. Verified a PNG upload returned 201 and an id/URL, the saved file was retrievable at its /uploads URL with matching SHA-256, a non-image returned 400, and a file over 5 MB returned 413. The Nest build passed. The start:dev script failed in this workspace because incremental compilation did not recreate dist, so the runtime checks used the same Nest entry point with ts-node and temporary local environment values.
 ================================================
+
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: GEN-07
+Prompt:
+"Implement GET /api/admin/audit-logs using the existing AuditLog model, admin guards, DTO validation, date/actor/action filters, shared page-size-10 pagination, Swagger docs, and focused tests. Do not modify Member 1's AuditLogsService or other files."
+How the output was used:
+Added the admin-only audit-log viewer in AdminModerationModule. It queries Member 1's registered AuditLog model through the exported AuditLogsModule, validates actor and ISO date filters, checks date-range order, and uses the shared paginate() helper. The existing AuditLogsService is write-only and was left unchanged.
