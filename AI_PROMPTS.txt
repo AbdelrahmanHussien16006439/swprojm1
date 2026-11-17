@@ -148,3 +148,14 @@ Prompt:
 How the output was used:
 The review found that all Member 1 tasks already have code and that npm run build and all 73 unit tests pass. It also found one bug: Swagger registered the cookie security scheme as "cookie" while every controller uses @ApiCookieAuth('access_token'), so the lock icons pointed at a scheme that did not exist. I fixed the scheme name in main.ts. ACC-12 and ACC-13 still read the bookings/airlines/hotels collections directly until Members 3-6 merge their services. The suspension notification still waits for Member 6.
 ================================================
+
+================================================
+Date: 2026-11-17
+Student: Abdelrahman Hussien (Member 1)
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: Milestone 1 deliverables (README, AI_PROMPTS.txt, Git history)
+Prompt:
+"Make README.md a complete setup guide (summary, stack, structure, setup, every env variable, seeds, Swagger login, common problems, branch workflow). Check every env variable the code reads is in .env.example. Check whether AI_PROMPTS.txt merge conflicts come from LF/CRLF line endings and add a safe .gitattributes."
+How the output was used:
+Rewrote README.md as a setup guide: an env variable table taken from the names the code actually reads, a common-problems table (querySrv DNS, bad auth, Atlas IP access, stale dist), and the PR workflow. All 8 variable names the code reads were already in .env.example. All committed files were already LF, and every AI_PROMPTS.txt commit was a pure append, so the conflicts came from several branches appending at the same place, not from CRLF. Added .gitattributes with "* text=auto" (keeps future commits LF) and "AI_PROMPTS.txt merge=union" (keeps both sides' appended entries). Renormalisation changed no files.
+================================================

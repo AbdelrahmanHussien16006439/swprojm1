@@ -1,25 +1,44 @@
 # Travel Planning and Booking Platform
 
 Software Project I — Winter 2026 (German International University).
-A web platform for flight booking, hotel booking, itinerary planning & budgeting, and a travel blog.
+A web platform that combines flight booking, hotel booking, itinerary planning & budgeting, and a travel blog/community.
 
 **Current phase: Milestone 1 — backend only** (NestJS + MongoDB Atlas + Swagger), due 20/11/2026.
-The team plan is in [`docs/TEAM_PLAN.md`](docs/TEAM_PLAN.md) and the official description in [`docs/proj_description.md`](docs/proj_description.md).
+
+- Team plan (conventions, ownership, every endpoint and rule): [`docs/TEAM_PLAN.md`](docs/TEAM_PLAN.md)
+- PR self-check prompts (run yours before opening a PR): [`docs/PR_CHECK_PROMPTS.md`](docs/PR_CHECK_PROMPTS.md)
+- Official project description: [`docs/proj_description.md`](docs/proj_description.md)
+- Official requirements: [`docs/requirements/`](docs/requirements/)
+
+## Actors
+
+| Actor | Role value | Summary |
+| ----- | ---------- | ------- |
+| Guest | — | Search flights & hotels, browse published posts and public itineraries |
+| Registered user | `user` | Bookings, payments, itineraries & budgets, posts, comments, likes, reviews, reports |
+| Administrator | `admin` | Seeded only. Moderators, account suspension, provider deactivation, reports, audit log |
+| Airline moderator | `airline_moderator` | Manages exactly one airline and its flights |
+| Hotel moderator | `hotel_moderator` | Manages exactly one hotel and its rooms |
 
 ## Tech stack
 
 | Layer      | Technology                                         |
 | ---------- | -------------------------------------------------- |
 | Model      | MongoDB Atlas + Mongoose schemas                   |
-| Controller | NestJS controllers (REST API under `/api`)         |
+| Controller | NestJS 11 controllers (REST API under `/api`)      |
 | View       | Next.js (Milestone 2)                              |
-| Docs       | Swagger UI at `/api/docs`                          |
+| API docs   | Swagger UI at `/api/docs`                          |
+| Auth       | JWT in httpOnly cookies + server-side sessions     |
 | Payments   | Stripe test mode                                   |
 | FX rates   | FXRatesAPI (backend only, cached daily)            |
 
-## Getting started
+## Prerequisites
 
-Requirements: Node.js 20+ and npm.
+- **Node.js LTS** (20 or 22) and **npm** — check with `node -v` and `npm -v`
+- **Git**
+- Access to the shared MongoDB Atlas cluster (the team leader adds your IP / sends the connection string privately)
+
+## Setup
 
 ```bash
 git clone https://github.com/AbdelrahmanHussien16006439/swprojm1.git
@@ -27,30 +46,78 @@ cd swprojm1
 git checkout develop
 cd backend
 npm install
-cp ../.env.example .env      # then fill in the values the team leader sends you privately
-npm run seed:admin           # creates the admin account from ADMIN_EMAIL / ADMIN_PASSWORD (safe to re-run)
+cp ../.env.example .env        # Windows cmd: copy ..\.env.example .env
+```
+
+Then open `backend/.env` and fill in the values the team leader sends you privately. **Never commit `.env`.**
+
+### Environment variables
+
+| Variable | Used by | What it is |
+| -------- | ------- | ---------- |
+| `PORT` | `main.ts` | Port the API listens on (default `4000`) |
+| `FRONTEND_URL` | `main.ts` | Origin allowed by CORS with cookies (Milestone 2 frontend, default `http://localhost:3000`) |
+| `MONGODB_URI` | `app.module.ts`, seeds | Shared Atlas connection string (`mongodb+srv://...`). **Required** |
+| `JWT_ACCESS_SECRET` | auth | Secret for signing access tokens — a long random string. **Required** |
+| `ADMIN_NAME` | admin seed | Name of the seeded administrator |
+| `ADMIN_EMAIL` | admin seed | Email of the seeded administrator |
+| `ADMIN_PASSWORD` | admin seed | Password of the seeded administrator (≥ 8 characters, a letter and a digit) |
+| `PLATFORM_CURRENCY` | payments | The single currency for all flight/hotel prices and payments (e.g. `USD`) |
+| `STRIPE_SECRET_KEY` | payments | Stripe **test** secret key (`sk_test_...`) |
+| `STRIPE_WEBHOOK_SECRET` | payments | Stripe webhook signing secret (`whsec_...`) |
+| `FXRATES_API_KEY` | exchange rates | FXRatesAPI key — used only by the backend |
+
+The app refuses to start if a **required** variable is missing.
+
+### Admin account (ACC-18)
+
+Admins cannot register; they are created by a seed script. **The team leader runs this once on the shared database** — other members don't need to:
+
+```bash
+npm run seed:admin    # uses ADMIN_NAME / ADMIN_EMAIL / ADMIN_PASSWORD, safe to re-run
+```
+
+### Run
+
+```bash
 npm run start:dev
 ```
 
 - API: http://localhost:4000/api
-- Swagger UI: http://localhost:4000/api/docs
+- Swagger UI: **http://localhost:4000/api/docs**
 
-### Testing in Swagger
+## Testing in Swagger
 
-1. Call `POST /api/auth/login` (or register first with `POST /api/auth/register`).
-2. The browser stores the `access_token` and `refresh_token` **httpOnly cookies** and sends them automatically on every following Swagger request.
-3. `POST /api/auth/refresh` gets a new access token (it lasts 15 minutes); sessions expire after 30 minutes of inactivity.
-4. `POST /api/auth/logout` ends the session.
+1. Call `POST /api/auth/register` to create a user (or use the admin credentials for admin endpoints).
+2. Call `POST /api/auth/login`. The response contains only the user — the tokens are set as **httpOnly cookies** (`access_token`, `refresh_token`).
+3. The browser sends those cookies automatically on every following Swagger request — there is no "Authorize" token to paste.
+4. `POST /api/auth/refresh` issues a new access token (it lasts 15 minutes). A session expires after 30 minutes without an authenticated request.
+5. `POST /api/auth/logout` ends the session.
 
-### Scripts (run inside `backend/`)
+To switch user, log out and log in with the other account.
+
+## Scripts (run inside `backend/`)
 
 | Command              | What it does                         |
 | -------------------- | ------------------------------------ |
 | `npm run start:dev`  | Start the API with hot reload        |
 | `npm run build`      | Compile to `dist/`                   |
+| `npm test`           | Unit tests (Jest)                    |
 | `npm run lint`       | ESLint (auto-fix)                    |
 | `npm run format`     | Prettier                             |
 | `npm run seed:admin` | Seed the administrator (ACC-18)      |
+
+## Common problems
+
+| Error | Cause / fix |
+| ----- | ----------- |
+| `querySrv ECONNREFUSED` / `querySrv ETIMEOUT` | Your DNS server refuses Atlas SRV lookups. Pull the latest `develop` (it uses public DNS servers for the lookup). You can keep the normal `mongodb+srv://` string. |
+| `bad auth : authentication failed` | Wrong username or password in `MONGODB_URI`. Ask the team leader for the correct string. Special characters in the password must be URL-encoded. |
+| `Server selection timed out` / `ENOTFOUND` | Your IP is not on the Atlas network access list, or you are offline. Ask the team leader to add your IP. |
+| `Cannot find module '.../dist/main'` | Stale build output. Delete `backend/dist` and any `*.tsbuildinfo` file in `backend/`, then run `npm run start:dev` again. |
+| `Missing required environment variables: ...` | `backend/.env` is missing or incomplete — copy `.env.example` again and fill in the values. |
+| `EADDRINUSE :::4000` | Another server is already running on port 4000. Stop it (or change `PORT`). |
+| `401` on every request in Swagger | You are not logged in, or the session expired after 30 idle minutes. Call `POST /api/auth/login` again. |
 
 ## Project structure
 
@@ -78,11 +145,14 @@ swprojm1/
 ├── frontend/                     # Milestone 2
 ├── docs/
 │   ├── TEAM_PLAN.md
+│   ├── PR_CHECK_PROMPTS.md
 │   ├── proj_description.md
-│   ├── requirements/             # official PDF + requirement CSVs
+│   ├── requirements/             # official requirement CSVs
 │   └── api/
-├── AI_PROMPTS.txt
-├── .env.example
+├── AI_PROMPTS.txt                # AI usage log — add entries at the bottom
+├── README.md
+├── .env.example                  # template for backend/.env
+├── .gitattributes
 └── .gitignore
 ```
 
@@ -110,11 +180,19 @@ modules/<module>/
 | 6      | `hotel-bookings`, `reviews`, `notifications`, `admin-bookings`      |
 | 7      | `itineraries`                                                       |
 
+Only edit your own folders. If you need a change in someone else's module, ask its owner.
+
 ## Using auth in your module
 
 ```ts
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
+import { Role } from '../../common/enums/role.enum';
 
+@ApiCookieAuth('access_token')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.AIRLINE_MODERATOR)
 @Post()
@@ -156,8 +234,16 @@ Errors always have this shape:
 ## Git workflow
 
 - `main` = stable milestone releases, `develop` = integration. Never commit directly to either.
-- One branch per task from the latest `develop`: `feature/<REQ-ID>-<description>`.
-- Conventional commits with requirement IDs: `feat(auth): implement registration (ACC-01)`.
-- Open a PR into `develop`; the team leader reviews and merges.
+- One branch per task, created from the latest `develop`:
+  ```bash
+  git checkout develop
+  git pull origin develop
+  git checkout -b feature/FLT-03-create-flight
+  ```
+- Branch names: `feature/<REQ-ID>-<description>`, `fix/<REQ-ID>-<description>`, `docs/<description>`.
+- Conventional commits with requirement IDs: `feat(flights): create flight endpoint (FLT-03)`.
+- Before opening a PR: `git pull origin develop`, `npm run build`, `npm test`, and run your prompt from [`docs/PR_CHECK_PROMPTS.md`](docs/PR_CHECK_PROMPTS.md).
+- Open a PR into **`develop`** (not `main`); the team leader reviews and merges.
 - Never commit `.env`, keys or the Mongo connection string.
-- Log AI usage at the bottom of [`AI_PROMPTS.txt`](AI_PROMPTS.txt).
+- Log AI usage at the bottom of [`AI_PROMPTS.txt`](AI_PROMPTS.txt) (format at the top of the file).
+- Everything must be merged into `develop` by **19/11**; the team leader merges `develop` → `main` that night.
