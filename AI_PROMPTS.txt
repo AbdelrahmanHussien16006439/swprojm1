@@ -35,6 +35,17 @@ Reviewed the code and tested every endpoint against a local MongoDB before commi
 Date: 2026-11-17
 Student: Member 2
 Tool: ChatGPT / Codex
+Related Requirement: BLG-01, BLG-02, BLG-03, BLG-04, BLG-08, BLG-09
+Prompt:
+"Implement the Posts API endpoints per TEAM_PLAN.md for create, public list/search, mine, details, update, and delete. Use available auth guards and pagination, enforce ownership, exclude hidden/deactivated content, and clean up associated comments, likes, and uploaded images without touching other member folders."
+How the output was used:
+Added validated DTOs, controller routes, and BlogService behavior for the requested post endpoints. Registered the real User model through UsersModule, used the shared pagination helper and auth guards, and implemented ownership checks plus deletion of related comments, likes, and matching uploaded files. No comment, like, or image-upload endpoints were added.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
 Related Requirement: BLG-01, BLG-05, BLG-06
 Prompt:
 "Create the Blog module's Post, Comment, and Like Mongoose schemas per TEAM_PLAN.md. Apply tag, image, and comment limits, timestamp fields, model references, the unique post/user like index, and register/export the models from BlogModule without implementing endpoints."
