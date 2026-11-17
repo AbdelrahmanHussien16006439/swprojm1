@@ -67,13 +67,14 @@ export class BlogService {
     return this.toPostResponse(post);
   }
 
-  async listPublicPosts(query: ListPostsQueryDto) {
+  async listPublicPosts(query: ListPostsQueryDto, authorId?: string) {
     const page = query.page ?? 1;
     const match: Record<string, unknown> = {
       status: PostStatus.PUBLISHED,
       isHidden: false,
     };
     if (query.tag) match.tags = query.tag;
+    if (authorId) match.authorId = new Types.ObjectId(authorId);
 
     const pipeline: PipelineStage[] = [
       { $match: match },
@@ -153,6 +154,11 @@ export class BlogService {
       commentsCount: post.commentsCount,
     }));
     return toPaginated(data, result?.total[0]?.count ?? 0, page);
+  }
+
+  /** Reuses public-list visibility and deactivated-author filtering for BLG-12. */
+  listPublicPostsByAuthor(authorId: string, page = 1) {
+    return this.listPublicPosts({ page } as ListPostsQueryDto, authorId);
   }
 
   async listMyPosts(userId: string, page = 1) {

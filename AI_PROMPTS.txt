@@ -69,3 +69,13 @@ Prompt:
 How the output was used:
 Added POST /api/uploads with Swagger multipart documentation, Multer file-size limits, MIME and image-signature validation, random UUID filenames, and a reusable exported UploadsService. Verified a PNG upload returned 201 and an id/URL, the saved file was retrievable at its /uploads URL with matching SHA-256, a non-image returned 400, and a file over 5 MB returned 413. The Nest build passed. The start:dev script failed in this workspace because incremental compilation did not recreate dist, so the runtime checks used the same Nest entry point with ts-node and temporary local environment values.
 ================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: BLG-12
+Prompt:
+"Implement the public GET /api/authors/:id profile using UsersService.findPublicProfile and BlogService public post visibility logic. Integrate M7 public itineraries only if available; otherwise provide a clearly documented compile-safe stub without invented itinerary data. Add focused tests and keep edits in Member 2 folders and AI_PROMPTS.txt."
+How the output was used:
+Added a public author endpoint with validated ObjectId and shared page-size-10 pagination. It reuses the user profile contract and BlogService public post aggregation, including hidden/draft/deactivated-author filtering. M7's ItinerariesModule is still an empty placeholder, so a documented reader stub returns null for itineraries until M7 exposes its public author query.
