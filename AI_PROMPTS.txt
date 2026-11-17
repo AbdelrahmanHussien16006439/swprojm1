@@ -30,3 +30,14 @@ AuditLog schemas, auth (register, login with lockout, refresh, logout, me,
 change-password), profile endpoints, admin account endpoints and the admin seed.
 Reviewed the code and tested every endpoint against a local MongoDB before committing.
 ================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: GEN-08
+Prompt:
+"Implement Member 2's GEN-08 uploads task in the existing NestJS backend. Accept JPG/PNG only, limit uploads to 5 MB, store them in backend/uploads with safe unique filenames, return an id and /uploads URL, expose a Swagger-documented multipart endpoint, and export a reusable UploadsService. Review the implementation and run build and end-to-end upload checks."
+How the output was used:
+Added POST /api/uploads with Swagger multipart documentation, Multer file-size limits, MIME and image-signature validation, random UUID filenames, and a reusable exported UploadsService. Verified a PNG upload returned 201 and an id/URL, the saved file was retrievable at its /uploads URL with matching SHA-256, a non-image returned 400, and a file over 5 MB returned 413. The Nest build passed. The start:dev script failed in this workspace because incremental compilation did not recreate dist, so the runtime checks used the same Nest entry point with ts-node and temporary local environment values.
+================================================
