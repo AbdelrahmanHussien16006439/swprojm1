@@ -40,7 +40,9 @@ Prompt:
 "Implement the Posts API endpoints per TEAM_PLAN.md for create, public list/search, mine, details, update, and delete. Use available auth guards and pagination, enforce ownership, exclude hidden/deactivated content, and clean up associated comments, likes, and uploaded images without touching other member folders."
 How the output was used:
 Added validated DTOs, controller routes, and BlogService behavior for the requested post endpoints. Registered the real User model through UsersModule, used the shared pagination helper and auth guards, and implemented ownership checks plus deletion of related comments, likes, and matching uploaded files. No comment, like, or image-upload endpoints were added.
+================================================
 
+================================================
 Date: 2026-11-17
 Student: Member 2
 Tool: ChatGPT / Codex
@@ -49,7 +51,9 @@ Prompt:
 "Create the Blog module's Post, Comment, and Like Mongoose schemas per TEAM_PLAN.md. Apply tag, image, and comment limits, timestamp fields, model references, the unique post/user like index, and register/export the models from BlogModule without implementing endpoints."
 How the output was used:
 Added the three timestamped schemas with the requested references, defaults, validation limits, and unique like index; registered them in BlogModule and exported MongooseModule. No post endpoints were added.
+================================================
 
+================================================
 Date: 2026-11-17
 Student: Member 2
 Tool: ChatGPT / Codex
@@ -58,16 +62,29 @@ Prompt:
 "Implement authenticated comments, author-owned comment edits/deletes, likes with duplicate protection and safe counts, and verify both tag-filter routes against TEAM_PLAN.md. Add tests and keep all changes in the Blog module."
 How the output was used:
 Added the requested comment and like endpoints with DTO validation, ownership enforcement, chronological detail comments, atomic like-count updates, and HTTP 409 for duplicate likes. Added the missing tag-posts route by reusing the existing public listing logic and tested the comment/like/tag service behavior.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
 Related Requirement: ITN-18
 Prompt:
 "Implement the Member 2 ITN-18 exchange-rate service per TEAM_PLAN.md, with the FXRatesAPI daily cache, scheduled and startup refresh, conversion, public latest endpoint, cached fallback, and unsupported-currency handling. Keep changes within the exchange-rates module and document/testing the Member 5 currency dependency."
 How the output was used:
 Implemented the ExchangeRate schema, service, public endpoint, cron/startup refresh, conversion, and cache fallback. The Member 5 validator integration remains isolated because ReferenceDataService is not yet present; current validation checks membership in the FX rate cache. Seven focused tests and the backend build passed.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
 Related Requirement: GEN-08
 Prompt:
 "Implement Member 2's GEN-08 uploads task in the existing NestJS backend. Accept JPG/PNG only, limit uploads to 5 MB, store them in backend/uploads with safe unique filenames, return an id and /uploads URL, expose a Swagger-documented multipart endpoint, and export a reusable UploadsService. Review the implementation and run build and end-to-end upload checks."
 How the output was used:
 Added POST /api/uploads with Swagger multipart documentation, Multer file-size limits, MIME and image-signature validation, random UUID filenames, and a reusable exported UploadsService. Verified a PNG upload returned 201 and an id/URL, the saved file was retrievable at its /uploads URL with matching SHA-256, a non-image returned 400, and a file over 5 MB returned 413. The Nest build passed. The start:dev script failed in this workspace because incremental compilation did not recreate dist, so the runtime checks used the same Nest entry point with ts-node and temporary local environment values.
+================================================
 
 ================================================
 Date: 2026-11-17
@@ -78,6 +95,7 @@ Prompt:
 "Implement admin report listing and resolution plus direct hide/unhide/delete for posts and comments per TEAM_PLAN.md. Use the existing admin guards, shared pagination helper, BlogService cascade operations, and AuditLogsService; add DTO validation, Swagger docs, and focused tests. Keep review and itinerary moderation as pending owner integrations."
 How the output was used:
 Added paginated/filterable admin report listing, admin-only report resolution and direct post/comment moderation endpoints, audit logging, and focused service/controller tests. Post deletions use BlogService cascade cleanup for comments, likes, and safe image removal; comment deletion decrements the parent count safely. Review and itinerary moderation remains pending their owners' service integrations.
+================================================
 
 ================================================
 Date: 2026-11-17
@@ -88,9 +106,9 @@ Prompt:
 "Implement authenticated content reporting for posts, comments, reviews, and itineraries, with a Report schema, duplicate-report HTTP 409 behavior, validation, Swagger docs, and tests. Inspect existing target models and do not create copies or fake dependencies."
 How the output was used:
 Restored the existing GEN-09 implementation from commit 17b95c1 into the develop-based GEN-10 working tree after verifying the commit was on the feature/BLG-01-blog branch but absent from develop. ReportsModule now registers its existing controller and service alongside the Report model used by GEN-10 moderation.
-
 ================================================
 
+================================================
 Date: 2026-11-17
 Student: Member 2
 Tool: ChatGPT / Codex
@@ -99,6 +117,9 @@ Prompt:
 "Implement admin airline/hotel deactivation and reactivation with existing owner services, notification recipient discovery, NotificationsService and AuditLogsService. If dependencies are placeholders, add only a documented compile-safe fail-closed stub; do not invent provider state, booking logic, or recipients. Add admin authorization, validation, and tests."
 How the output was used:
 Inspected develop and confirmed AuditLogsService and admin guards are ready, while AirlinesModule, HotelsModule, NotificationsModule, FlightBookingsModule, and HotelBookingsModule are placeholders. Added admin-only routes, provider-type/ObjectId validation, failure audit entries, and a documented integration stub that returns HTTP 501 without changing state or fabricating notification recipients. Success-path provider mutation and notifications remain unimplemented pending the owning modules.
+================================================
+
+================================================
 Date: 2026-11-17
 Student: Member 2
 Tool: ChatGPT / Codex
@@ -107,17 +128,31 @@ Prompt:
 "Implement the public GET /api/authors/:id profile using UsersService.findPublicProfile and BlogService public post visibility logic. Integrate M7 public itineraries only if available; otherwise provide a clearly documented compile-safe stub without invented itinerary data. Add focused tests and keep edits in Member 2 folders and AI_PROMPTS.txt."
 How the output was used:
 Added a public author endpoint with validated ObjectId and shared page-size-10 pagination. It reuses the user profile contract and BlogService public post aggregation, including hidden/draft/deactivated-author filtering. M7's ItinerariesModule is still an empty placeholder, so a documented reader stub returns null for itineraries until M7 exposes its public author query.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
 Related Requirement: BLG-10, GEN-08
 Prompt:
 "Implement post image upload and removal routes using the existing BlogService and UploadsService. Enforce author ownership, JPG/PNG and 5 MB limits, a five-image cap, safe database/file cleanup, UUID image IDs, Swagger documentation, and focused tests."
 How the output was used:
 Added authenticated Blog endpoints to upload an image to an owned post and remove an image by upload ID. Reused UploadsService validation/storage through saveImage(), added safe UUID-based deletion, atomically updated post image references, and cleaned up newly uploaded files if the database write failed. Added Blog and Uploads service tests.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
 Related Requirement: GEN-09
 Prompt:
 "Implement authenticated content reporting for posts, comments, reviews, and itineraries, with a Report schema, duplicate-report HTTP 409 behavior, validation, Swagger docs, and tests. Inspect existing target models and do not create copies or fake dependencies."
 How the output was used:
 Added the Report schema with the required unique compound index, authenticated POST /api/reports, DTO validation, and conflict handling. Existing Post and Comment targets are checked using BlogModule models. Review and Itinerary modules have no models in this checkout, so their existence checks remain deferred; their IDs are still syntax-validated. Five focused tests passed.
+================================================
 
+================================================
 Date: 2026-11-17
 Student: Member 2
 Tool: ChatGPT / Codex
@@ -126,6 +161,7 @@ Prompt:
 "Implement GET /api/admin/audit-logs using the existing AuditLog model, admin guards, DTO validation, date/actor/action filters, shared page-size-10 pagination, Swagger docs, and focused tests. Do not modify Member 1's AuditLogsService or other files."
 How the output was used:
 Added the admin-only audit-log viewer in AdminModerationModule. It queries Member 1's registered AuditLog model through the exported AuditLogsModule, validates actor and ISO date filters, checks date-range order, and uses the shared paginate() helper. The existing AuditLogsService is write-only and was left unchanged.
+================================================
 
 ================================================
 Date: 2026-11-17
@@ -158,4 +194,15 @@ Prompt:
 "Make README.md a complete setup guide (summary, stack, structure, setup, every env variable, seeds, Swagger login, common problems, branch workflow). Check every env variable the code reads is in .env.example. Check whether AI_PROMPTS.txt merge conflicts come from LF/CRLF line endings and add a safe .gitattributes."
 How the output was used:
 Rewrote README.md as a setup guide: an env variable table taken from the names the code actually reads, a common-problems table (querySrv DNS, bad auth, Atlas IP access, stale dist), and the PR workflow. All 8 variable names the code reads were already in .env.example. All committed files were already LF, and every AI_PROMPTS.txt commit was a pure append, so the conflicts came from several branches appending at the same place, not from CRLF. Added .gitattributes with "* text=auto" (keeps future commits LF) and "AI_PROMPTS.txt merge=union" (keeps both sides' appended entries). Renormalisation changed no files.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Abdelrahman Hussien (Member 1)
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: GEN-12 (shared MongoDB Atlas setup), team infrastructure
+Prompt:
+"Fix the Atlas SRV DNS problem for the whole team: on some Windows machines Node fails with querySrv ECONNREFUSED/ETIMEOUT even though nslookup works. Set public DNS servers in main.ts before Mongoose connects."
+How the output was used:
+Added dns.setServers() at the top of main.ts, which runs before NestFactory.create() (that is when MongooseModule opens the connection). The assistant suggested keeping the machine's own DNS servers after 8.8.8.8 and 1.1.1.1 as a fallback, so networks that block public DNS still work. I accepted that. Build, all 73 unit tests and a local start:dev connection to Atlas passed.
 ================================================

@@ -4,11 +4,18 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import * as dns from 'node:dns';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 import { AppModule } from './app.module';
 import { ACCESS_TOKEN_COOKIE } from './common/constants/auth-cookies.constants';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+
+// Atlas mongodb+srv:// URIs need a DNS SRV lookup. On some Windows machines Node's
+// resolver uses a DNS server that refuses SRV queries (querySrv ECONNREFUSED/ETIMEOUT).
+// Try public DNS first, then fall back to the machine's own servers.
+// Must run before NestFactory.create(), which is when Mongoose connects.
+dns.setServers(['8.8.8.8', '1.1.1.1', ...dns.getServers()]);
 
 async function bootstrap() {
   // rawBody is needed to verify Stripe webhook signatures (PAY-01, Member 4)
