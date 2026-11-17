@@ -1,6 +1,10 @@
 import { Module } from '@nestjs/common';
+import { UploadsController } from './uploads.controller';
+import { UploadsService } from './uploads.service';
 
-// Owner: Member 2 — see docs/TEAM_PLAN.md Section 7.
-// Remember to export your service(s) AND MongooseModule (TEAM_PLAN 3.2).
-@Module({})
+@Module({
+  controllers: [UploadsController],
+  providers: [UploadsService],
+  exports: [UploadsService],
+})
 export class UploadsModule {}

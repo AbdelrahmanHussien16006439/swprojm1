@@ -40,4 +40,9 @@ Prompt:
 "Implement the Member 2 ITN-18 exchange-rate service per TEAM_PLAN.md, with the FXRatesAPI daily cache, scheduled and startup refresh, conversion, public latest endpoint, cached fallback, and unsupported-currency handling. Keep changes within the exchange-rates module and document/testing the Member 5 currency dependency."
 How the output was used:
 Implemented the ExchangeRate schema, service, public endpoint, cron/startup refresh, conversion, and cache fallback. The Member 5 validator integration remains isolated because ReferenceDataService is not yet present; current validation checks membership in the FX rate cache. Seven focused tests and the backend build passed.
+Related Requirement: GEN-08
+Prompt:
+"Implement Member 2's GEN-08 uploads task in the existing NestJS backend. Accept JPG/PNG only, limit uploads to 5 MB, store them in backend/uploads with safe unique filenames, return an id and /uploads URL, expose a Swagger-documented multipart endpoint, and export a reusable UploadsService. Review the implementation and run build and end-to-end upload checks."
+How the output was used:
+Added POST /api/uploads with Swagger multipart documentation, Multer file-size limits, MIME and image-signature validation, random UUID filenames, and a reusable exported UploadsService. Verified a PNG upload returned 201 and an id/URL, the saved file was retrievable at its /uploads URL with matching SHA-256, a non-image returned 400, and a file over 5 MB returned 413. The Nest build passed. The start:dev script failed in this workspace because incremental compilation did not recreate dist, so the runtime checks used the same Nest entry point with ts-node and temporary local environment values.
 ================================================
