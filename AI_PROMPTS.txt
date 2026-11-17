@@ -148,3 +148,14 @@ Prompt:
 How the output was used:
 The review found that all Member 1 tasks already have code and that npm run build and all 73 unit tests pass. It also found one bug: Swagger registered the cookie security scheme as "cookie" while every controller uses @ApiCookieAuth('access_token'), so the lock icons pointed at a scheme that did not exist. I fixed the scheme name in main.ts. ACC-12 and ACC-13 still read the bookings/airlines/hotels collections directly until Members 3-6 merge their services. The suspension notification still waits for Member 6.
 ================================================
+
+================================================
+Date: 2026-11-17
+Student: Abdelrahman Hussien (Member 1)
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: GEN-12 (shared MongoDB Atlas setup), team infrastructure
+Prompt:
+"Fix the Atlas SRV DNS problem for the whole team: on some Windows machines Node fails with querySrv ECONNREFUSED/ETIMEOUT even though nslookup works. Set public DNS servers in main.ts before Mongoose connects."
+How the output was used:
+Added dns.setServers() at the top of main.ts, which runs before NestFactory.create() (that is when MongooseModule opens the connection). The assistant suggested keeping the machine's own DNS servers after 8.8.8.8 and 1.1.1.1 as a fallback, so networks that block public DNS still work. I accepted that. Build, all 73 unit tests and a local start:dev connection to Atlas passed.
+================================================
