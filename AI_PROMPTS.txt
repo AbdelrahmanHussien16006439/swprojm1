@@ -206,3 +206,24 @@ Prompt:
 How the output was used:
 Added dns.setServers() at the top of main.ts, which runs before NestFactory.create() (that is when MongooseModule opens the connection). The assistant suggested keeping the machine's own DNS servers after 8.8.8.8 and 1.1.1.1 as a fallback, so networks that block public DNS still work. I accepted that. Build, all 73 unit tests and a local start:dev connection to Atlas passed.
 ================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: Codex
+Related Requirement: BLG-01, BLG-04, BLG-10, GEN-08, GEN-09
+Prompt:
+"Fix the reported post-image deletion security issue and report-visibility leak. Remove client-supplied images from post creation, make cleanup trust only image records created by UploadsService, and prevent reports for content the caller cannot see. Apply the relevant Member 2 security cleanups without changing shared files or environment values."
+How the output was used:
+Removed images from CreatePostDto and made post creation initialize images as an empty array. Post image removal/deletion now accepts only canonical UUID-backed { id, url } upload records, leaving legacy string references untouched. Reports now require a published, visible post, a visible comment on a public post, and a non-deactivated post author; unavailable targets return 404. Added authentication to direct uploads and removed duplicate Report schema decorators. Added focused regression tests: 33 passed; npm run build passed. Swagger was not retested in this session. No arbitrary maximum was added to report reason because the requirements specify none.
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: Codex
+Related Requirement: BLG-01, BLG-10, GEN-08, GEN-09
+Prompt:
+"Address Member 1's security and validation findings: reject client-supplied post images, ensure deletion only removes canonical files uploaded for that post, conceal private report targets, require authentication for uploads, remove duplicate report schema decorators, and cap report reasons at 500 characters. Add regression tests and verify without connecting to Atlas."
+How the output was used:
+Kept image creation server-controlled and restricted cleanup to validated upload records, including shared-reference protection. Tightened report visibility checks, guarded uploads, removed duplicate decorators, and enforced the report reason limit in both DTO and schema. Added unit coverage for image cleanup and report reason validation. `npm.cmd run build` passed; all 14 Jest suites (84 tests) passed. No Atlas or Swagger retest was run.
+================================================
+================================================

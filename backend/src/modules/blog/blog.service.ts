@@ -7,8 +7,6 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, Model, PipelineStage, Types } from 'mongoose';
-import { unlink } from 'fs/promises';
-import { resolve } from 'path';
 import {
   PAGE_SIZE,
   paginate,
@@ -68,7 +66,7 @@ export class BlogService {
       title: dto.title,
       body: dto.body,
       tags: dto.tags ?? [],
-      images: dto.images ?? [],
+      images: [],
       status,
       publishedAt: status === PostStatus.PUBLISHED ? new Date() : null,
     });
@@ -331,17 +329,16 @@ export class BlogService {
       throw new BadRequestException('Invalid image id');
     }
     const post = await this.findOwnedPost(id, userId);
-    const image = (post.images ?? []).find((entry) =>
-      typeof entry === 'string'
-        ? entry === `/uploads/${imageId}.jpg` ||
-          entry === `/uploads/${imageId}.png`
-        : entry.id === imageId,
+    const image = (post.images ?? []).find(
+      (entry): entry is PostImage =>
+        this.isManagedPostImage(entry) && entry.id === imageId,
     );
     if (!image) throw new NotFoundException('Post image not found');
-    const imageUrl = typeof image === 'string' ? image : image.url;
-    const imageMatch =
-      typeof image === 'string' ? imageUrl : { $elemMatch: { id: imageId } };
-    const imagePull = typeof image === 'string' ? imageUrl : { id: imageId };
+    const imageUrl = image.url;
+    const imageMatch = {
+      $elemMatch: { id: imageId, url: imageUrl },
+    };
+    const imagePull = { id: imageId, url: imageUrl };
 
     const updatedPost = await this.postModel
       .findOneAndUpdate(
@@ -359,8 +356,7 @@ export class BlogService {
       throw new NotFoundException('Post image not found');
     }
 
-    // An image URL may also have been attached to another post through the
-    // existing create/edit DTOs. Keep that shared file intact.
+    // Keep a file if another post still references its upload URL.
     const imageStillUsed = await this.postModel
       .exists({
         $or: [
@@ -580,6 +576,18 @@ export class BlogService {
     );
   }
 
+  private isManagedPostImage(image: unknown): image is PostImage {
+    if (typeof image !== 'object' || image === null) return false;
+    const candidate = image as Partial<PostImage>;
+    return (
+      typeof candidate.id === 'string' &&
+      this.isUploadId(candidate.id) &&
+      typeof candidate.url === 'string' &&
+      (candidate.url === `/uploads/${candidate.id}.jpg` ||
+        candidate.url === `/uploads/${candidate.id}.png`)
+    );
+  }
+
   private async discardUploadedImage(id: string): Promise<void> {
     try {
       await this.uploadsService.deleteImage(id);
@@ -638,30 +646,31 @@ export class BlogService {
   private async removeUploadedImages(
     images: Array<string | PostImage>,
   ): Promise<void> {
-    const uploadsDirectory = resolve(__dirname, '../../../uploads');
-    const safeImageUrls = new Set(
+    const managedImageIds = new Set(
       images
-        .map((image) => (typeof image === 'string' ? image : image.url))
-        .filter((url) =>
-          /^\/uploads\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.(?:jpg|png)$/i.test(
-            url,
-          ),
-        ),
+        .filter((image): image is PostImage => this.isManagedPostImage(image))
+        .map((image) => image.id),
     );
 
     await Promise.all(
-      [...safeImageUrls].map(async (url) => {
+      [...managedImageIds].map(async (id) => {
+        const possibleUrls = [`/uploads/${id}.jpg`, `/uploads/${id}.png`];
         // Keep files that another post still references.
         if (
-          await this.postModel.exists({
-            $or: [{ images: url }, { images: { $elemMatch: { url } } }],
-          })
+          await this.postModel
+            .exists({
+            $or: [
+              { images: { $in: possibleUrls } },
+              { images: { $elemMatch: { id } } },
+              { images: { $elemMatch: { url: { $in: possibleUrls } } } },
+            ],
+            })
+            .exec()
         ) {
           return;
         }
-        const filename = url.slice('/uploads/'.length);
         try {
-          await unlink(resolve(uploadsDirectory, filename));
+          await this.uploadsService.deleteImage(id);
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
             this.logger.warn(
