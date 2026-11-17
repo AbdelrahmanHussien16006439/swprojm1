@@ -51,7 +51,7 @@ export class Post {
       message: 'A post can have at most 5 images',
     },
   })
-  // Existing post creation may store URLs; BLG-10 uploads store { id, url }.
+  // BLG-10 stores images as { id, url }; legacy string values are not trusted for file deletion.
   images: Array<string | PostImage>;
 
   @Prop({ type: Number, min: 0, default: 0, required: true })

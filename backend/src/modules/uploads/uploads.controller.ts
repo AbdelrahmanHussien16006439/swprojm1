@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -14,8 +15,11 @@ import {
   ApiPayloadTooLargeResponse,
   ApiProperty,
   ApiTags,
+  ApiCookieAuth,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { IsString, Matches } from 'class-validator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import type { UploadResult } from './uploads.service';
 import { UploadsService } from './uploads.service';
 
@@ -36,6 +40,9 @@ export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard)
+  @ApiCookieAuth('access_token')
+  @ApiUnauthorizedResponse({ description: 'Login required' })
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: 5 * 1024 * 1024, files: 1 },

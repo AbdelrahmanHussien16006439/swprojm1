@@ -6,7 +6,9 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Comment } from '../blog/schemas/comment.schema';
-import { Post } from '../blog/schemas/post.schema';
+import { Post, PostStatus } from '../blog/schemas/post.schema';
+import { User } from '../users/schemas/user.schema';
+import { UserStatus } from '../../common/enums/user-status.enum';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { CreateReportDto } from './dto/create-report.dto';
 import { Report, ReportTargetType } from './schemas/report.schema';
@@ -17,6 +19,7 @@ export class ReportsService {
     @InjectModel(Report.name) private readonly reportModel: Model<Report>,
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
     @InjectModel(Comment.name) private readonly commentModel: Model<Comment>,
+    @InjectModel(User.name) private readonly userModel: Model<User>,
   ) {}
 
   async createReport(user: JwtUser, dto: CreateReportDto) {
@@ -63,16 +66,19 @@ export class ReportsService {
     targetType: ReportTargetType,
     targetId: Types.ObjectId,
   ): Promise<void> {
-    let exists: boolean;
     switch (targetType) {
       case ReportTargetType.POST:
-        exists = Boolean(await this.postModel.exists({ _id: targetId }).exec());
-        break;
-      case ReportTargetType.COMMENT:
-        exists = Boolean(
-          await this.commentModel.exists({ _id: targetId }).exec(),
-        );
-        break;
+        await this.assertPublicPost(targetId);
+        return;
+      case ReportTargetType.COMMENT: {
+        const comment = await this.commentModel
+          .findOne({ _id: targetId, isHidden: false })
+          .select('postId')
+          .exec();
+        if (!comment) throw new NotFoundException('Report target not found');
+        await this.assertPublicPost(comment.postId);
+        return;
+      }
       case ReportTargetType.REVIEW:
       case ReportTargetType.ITINERARY:
         // Their modules have no schemas/services in this checkout. The DTO still
@@ -81,7 +87,25 @@ export class ReportsService {
       default:
         throw new NotFoundException('Report target not found');
     }
+  }
 
-    if (!exists) throw new NotFoundException('Report target not found');
+  private async assertPublicPost(postId: Types.ObjectId): Promise<void> {
+    const post = await this.postModel
+      .findOne({
+        _id: postId,
+        status: PostStatus.PUBLISHED,
+        isHidden: false,
+      })
+      .select('authorId')
+      .exec();
+    if (!post) throw new NotFoundException('Report target not found');
+
+    const activeAuthor = await this.userModel
+      .exists({
+        _id: post.authorId,
+        status: { $ne: UserStatus.DEACTIVATED },
+      })
+      .exec();
+    if (!activeAuthor) throw new NotFoundException('Report target not found');
   }
 }

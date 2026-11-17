@@ -2,6 +2,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { Model, Types } from 'mongoose';
+import { UserStatus } from '../../common/enums/user-status.enum';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { CreateReportDto } from './dto/create-report.dto';
 import { ReportsService } from './reports.service';
@@ -12,7 +13,8 @@ import {
   ReportTargetType,
 } from './schemas/report.schema';
 import { Comment } from '../blog/schemas/comment.schema';
-import { Post } from '../blog/schemas/post.schema';
+import { Post, PostStatus } from '../blog/schemas/post.schema';
+import { User } from '../users/schemas/user.schema';
 
 const reporterId = new Types.ObjectId();
 const targetId = new Types.ObjectId();
@@ -20,6 +22,13 @@ const user = { sub: reporterId.toString() } as JwtUser;
 
 function execResult<T>(value: T) {
   return { exec: jest.fn().mockResolvedValue(value) };
+}
+
+function selectedResult<T>(value: T) {
+  return {
+    select: jest.fn().mockReturnThis(),
+    exec: jest.fn().mockResolvedValue(value),
+  };
 }
 
 function makeService(overrides: Record<string, any> = {}) {
@@ -37,23 +46,32 @@ function makeService(overrides: Record<string, any> = {}) {
   };
   const postModel: Record<string, any> = {
     exists: jest.fn().mockReturnValue(execResult({ _id: targetId })),
+    findOne: jest
+      .fn()
+      .mockReturnValue(selectedResult({ authorId: targetId })),
     ...overrides.postModel,
   };
   const commentModel: Record<string, any> = {
     exists: jest.fn().mockReturnValue(execResult({ _id: targetId })),
+    findOne: jest.fn().mockReturnValue(selectedResult({ postId: targetId })),
     ...overrides.commentModel,
+  };
+  const userModel: Record<string, any> = {
+    exists: jest.fn().mockReturnValue(execResult({ _id: targetId })),
+    ...overrides.userModel,
   };
   const service = new ReportsService(
     reportModel as unknown as Model<Report>,
     postModel as unknown as Model<Post>,
     commentModel as unknown as Model<Comment>,
+    userModel as unknown as Model<User>,
   );
-  return { service, reportModel, postModel, commentModel };
+  return { service, reportModel, postModel, commentModel, userModel };
 }
 
 describe('ReportsService', () => {
   it('creates a report after confirming an existing post target', async () => {
-    const { service, reportModel, postModel } = makeService();
+    const { service, reportModel, postModel, userModel } = makeService();
     const dto = {
       targetType: ReportTargetType.POST,
       targetId: targetId.toString(),
@@ -62,7 +80,15 @@ describe('ReportsService', () => {
 
     const result = await service.createReport(user, dto);
 
-    expect(postModel.exists).toHaveBeenCalledWith({ _id: targetId });
+    expect(postModel.findOne).toHaveBeenCalledWith({
+      _id: targetId,
+      status: PostStatus.PUBLISHED,
+      isHidden: false,
+    });
+    expect(userModel.exists).toHaveBeenCalledWith({
+      _id: targetId,
+      status: { $ne: UserStatus.DEACTIVATED },
+    });
     expect(reportModel.create).toHaveBeenCalledWith({
       reporterId,
       targetType: ReportTargetType.POST,
@@ -88,7 +114,7 @@ describe('ReportsService', () => {
         reason: 'Duplicate',
       }),
     ).rejects.toBeInstanceOf(ConflictException);
-    expect(postModel.exists).not.toHaveBeenCalled();
+    expect(postModel.findOne).not.toHaveBeenCalled();
     expect(reportModel.create).not.toHaveBeenCalled();
   });
 
@@ -110,7 +136,7 @@ describe('ReportsService', () => {
 
   it('returns 404 when a post or comment target does not exist', async () => {
     const { service } = makeService({
-      postModel: { exists: jest.fn().mockReturnValue(execResult(null)) },
+      postModel: { findOne: jest.fn().mockReturnValue(selectedResult(null)) },
     });
 
     await expect(
@@ -122,9 +148,9 @@ describe('ReportsService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('returns 404 when a comment target does not exist', async () => {
+  it('returns 404 when a comment target is hidden or missing', async () => {
     const { service, postModel, commentModel } = makeService({
-      commentModel: { exists: jest.fn().mockReturnValue(execResult(null)) },
+      commentModel: { findOne: jest.fn().mockReturnValue(selectedResult(null)) },
     });
 
     await expect(
@@ -134,8 +160,62 @@ describe('ReportsService', () => {
         reason: 'Missing comment',
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
-    expect(commentModel.exists).toHaveBeenCalledWith({ _id: targetId });
-    expect(postModel.exists).not.toHaveBeenCalled();
+    expect(commentModel.findOne).toHaveBeenCalledWith({
+      _id: targetId,
+      isHidden: false,
+    });
+    expect(postModel.findOne).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for a draft or hidden post', async () => {
+    const { service, reportModel, userModel } = makeService({
+      postModel: { findOne: jest.fn().mockReturnValue(selectedResult(null)) },
+    });
+
+    await expect(
+      service.createReport(user, {
+        targetType: ReportTargetType.POST,
+        targetId: targetId.toString(),
+        reason: 'Private post',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(userModel.exists).not.toHaveBeenCalled();
+    expect(reportModel.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for a comment whose parent post is not public', async () => {
+    const { service, reportModel, postModel } = makeService({
+      postModel: { findOne: jest.fn().mockReturnValue(selectedResult(null)) },
+    });
+
+    await expect(
+      service.createReport(user, {
+        targetType: ReportTargetType.COMMENT,
+        targetId: targetId.toString(),
+        reason: 'Private comment',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(postModel.findOne).toHaveBeenCalledWith({
+      _id: targetId,
+      status: PostStatus.PUBLISHED,
+      isHidden: false,
+    });
+    expect(reportModel.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when the post author is deactivated', async () => {
+    const { service, reportModel } = makeService({
+      userModel: { exists: jest.fn().mockReturnValue(execResult(null)) },
+    });
+
+    await expect(
+      service.createReport(user, {
+        targetType: ReportTargetType.POST,
+        targetId: targetId.toString(),
+        reason: 'Hidden author post',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(reportModel.create).not.toHaveBeenCalled();
   });
 
   it('validates target type, Mongo id syntax, and a non-blank reason', async () => {

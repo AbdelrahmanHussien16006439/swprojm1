@@ -68,7 +68,7 @@ export class BlogService {
       title: dto.title,
       body: dto.body,
       tags: dto.tags ?? [],
-      images: dto.images ?? [],
+      images: [],
       status,
       publishedAt: status === PostStatus.PUBLISHED ? new Date() : null,
     });
@@ -331,17 +331,16 @@ export class BlogService {
       throw new BadRequestException('Invalid image id');
     }
     const post = await this.findOwnedPost(id, userId);
-    const image = (post.images ?? []).find((entry) =>
-      typeof entry === 'string'
-        ? entry === `/uploads/${imageId}.jpg` ||
-          entry === `/uploads/${imageId}.png`
-        : entry.id === imageId,
+    const image = (post.images ?? []).find(
+      (entry): entry is PostImage =>
+        this.isManagedPostImage(entry) && entry.id === imageId,
     );
     if (!image) throw new NotFoundException('Post image not found');
-    const imageUrl = typeof image === 'string' ? image : image.url;
-    const imageMatch =
-      typeof image === 'string' ? imageUrl : { $elemMatch: { id: imageId } };
-    const imagePull = typeof image === 'string' ? imageUrl : { id: imageId };
+    const imageUrl = image.url;
+    const imageMatch = {
+      $elemMatch: { id: imageId, url: imageUrl },
+    };
+    const imagePull = { id: imageId, url: imageUrl };
 
     const updatedPost = await this.postModel
       .findOneAndUpdate(
@@ -359,8 +358,7 @@ export class BlogService {
       throw new NotFoundException('Post image not found');
     }
 
-    // An image URL may also have been attached to another post through the
-    // existing create/edit DTOs. Keep that shared file intact.
+    // Keep a file if another post still references its upload URL.
     const imageStillUsed = await this.postModel
       .exists({
         $or: [
@@ -580,6 +578,18 @@ export class BlogService {
     );
   }
 
+  private isManagedPostImage(image: unknown): image is PostImage {
+    if (typeof image !== 'object' || image === null) return false;
+    const candidate = image as Partial<PostImage>;
+    return (
+      typeof candidate.id === 'string' &&
+      this.isUploadId(candidate.id) &&
+      typeof candidate.url === 'string' &&
+      (candidate.url === `/uploads/${candidate.id}.jpg` ||
+        candidate.url === `/uploads/${candidate.id}.png`)
+    );
+  }
+
   private async discardUploadedImage(id: string): Promise<void> {
     try {
       await this.uploadsService.deleteImage(id);
@@ -641,12 +651,8 @@ export class BlogService {
     const uploadsDirectory = resolve(__dirname, '../../../uploads');
     const safeImageUrls = new Set(
       images
-        .map((image) => (typeof image === 'string' ? image : image.url))
-        .filter((url) =>
-          /^\/uploads\/[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.(?:jpg|png)$/i.test(
-            url,
-          ),
-        ),
+        .filter((image): image is PostImage => this.isManagedPostImage(image))
+        .map((image) => image.url),
     );
 
     await Promise.all(

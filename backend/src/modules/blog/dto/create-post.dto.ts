@@ -42,16 +42,6 @@ export class CreatePostDto {
   })
   tags?: string[];
 
-  @ApiPropertyOptional({
-    example: ['/uploads/01234567-89ab-cdef-0123-456789abcdef.jpg'],
-    maxItems: 5,
-  })
-  @IsOptional()
-  @IsArray({ message: 'images must be an array' })
-  @ArrayMaxSize(5, { message: 'images must contain at most 5 items' })
-  @IsString({ each: true, message: 'each image must be a string' })
-  images?: string[];
-
   @ApiPropertyOptional({ enum: PostStatus, example: PostStatus.DRAFT })
   @IsOptional()
   @IsEnum(PostStatus, { message: 'status must be draft or published' })

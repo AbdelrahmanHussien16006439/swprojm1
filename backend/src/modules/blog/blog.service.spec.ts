@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { Model, Types } from 'mongoose';
+import { unlink } from 'fs/promises';
 import { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { UserStatus } from '../../common/enums/user-status.enum';
 import { CommentTextDto } from './dto/comment-text.dto';
@@ -16,6 +17,12 @@ import { Like } from './schemas/like.schema';
 import { Post, PostStatus } from './schemas/post.schema';
 import { User } from '../users/schemas/user.schema';
 import { UploadsService } from '../uploads/uploads.service';
+import { CreatePostDto } from './dto/create-post.dto';
+
+jest.mock('fs/promises', () => ({
+  ...jest.requireActual('fs/promises'),
+  unlink: jest.fn().mockResolvedValue(undefined),
+}));
 
 const imageId = '550e8400-e29b-41d4-a716-446655440000';
 const imageUrl = `/uploads/${imageId}.png`;
@@ -58,6 +65,7 @@ function makeService(overrides: Record<string, any> = {}) {
   };
   const likeModel: Record<string, any> = {
     create: jest.fn(),
+    deleteMany: jest.fn().mockReturnValue(execResult({ deletedCount: 0 })),
     findOneAndDelete: jest
       .fn()
       .mockReturnValue(execResult({ _id: new Types.ObjectId() })),
@@ -97,6 +105,55 @@ function makeService(overrides: Record<string, any> = {}) {
 }
 
 const user = { sub: userId.toString() } as JwtUser;
+
+describe('BlogService post creation (BLG-01)', () => {
+  it('rejects images supplied in the create-post body', async () => {
+    const dto = plainToInstance(CreatePostDto, {
+      title: 'Travel',
+      body: 'Story',
+      images: [imageUrl],
+    });
+
+    const errors = await validate(dto, {
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
+
+    expect(errors.map((error) => error.property)).toContain('images');
+  });
+
+  it('creates posts without accepting caller-supplied image references', async () => {
+    const createdPost = {
+      _id: postId,
+      authorId: userId,
+      title: 'Travel',
+      body: 'Story',
+      status: PostStatus.DRAFT,
+      tags: [],
+      images: [],
+      likesCount: 0,
+      commentsCount: 0,
+      publishedAt: null,
+      isHidden: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const { service, postModel } = makeService({
+      postModel: { create: jest.fn().mockResolvedValue(createdPost) },
+    });
+
+    await service.createPost(user, {
+      title: 'Travel',
+      body: 'Story',
+      images: [imageUrl],
+    } as unknown as CreatePostDto);
+
+    expect(postModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({ images: [] }),
+    );
+    expect(postModel.create.mock.calls[0][0].images).not.toContain(imageUrl);
+  });
+});
 
 describe('BlogService comments and likes', () => {
   it('rejects blank and overlong comment text after trimming', async () => {
@@ -423,9 +480,9 @@ describe('BlogService post images (BLG-10)', () => {
       {
         _id: postId,
         authorId: userId,
-        images: { $elemMatch: { id: imageId } },
+        images: { $elemMatch: { id: imageId, url: imageUrl } },
       },
-      { $pull: { images: { id: imageId } } },
+      { $pull: { images: { id: imageId, url: imageUrl } } },
       { new: true, runValidators: true },
     );
     expect(uploadsService.deleteImage).toHaveBeenCalledWith(imageId);
@@ -470,6 +527,24 @@ describe('BlogService post images (BLG-10)', () => {
     expect(uploadsService.deleteImage).not.toHaveBeenCalled();
   });
 
+  it('does not remove legacy string image references through the image route', async () => {
+    const post = {
+      _id: postId,
+      authorId: userId,
+      images: [imageUrl],
+    };
+    const { service, uploadsService } = makeService({
+      postModel: {
+        findById: jest.fn().mockReturnValue(execResult(post)),
+      },
+    });
+
+    await expect(
+      service.deletePostImage(postId.toString(), imageId, userId.toString()),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(uploadsService.deleteImage).not.toHaveBeenCalled();
+  });
+
   it('does not delete the file when removing the post reference fails', async () => {
     const post = {
       _id: postId,
@@ -490,5 +565,25 @@ describe('BlogService post images (BLG-10)', () => {
       service.deletePostImage(postId.toString(), imageId, userId.toString()),
     ).rejects.toBe(databaseError);
     expect(uploadsService.deleteImage).not.toHaveBeenCalled();
+  });
+
+  it('never unlinks a legacy string URL when deleting its post', async () => {
+    const post = {
+      _id: postId,
+      authorId: userId,
+      images: [imageUrl],
+      deleteOne: jest.fn().mockResolvedValue(undefined),
+    };
+    const { service } = makeService({
+      postModel: {
+        findById: jest.fn().mockReturnValue(execResult(post)),
+      },
+    });
+    const unlinkMock = unlink as jest.MockedFunction<typeof unlink>;
+    unlinkMock.mockClear();
+
+    await service.deletePost(postId.toString(), userId.toString());
+
+    expect(unlinkMock).not.toHaveBeenCalled();
   });
 });
