@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, Model, PipelineStage, Types } from 'mongoose';
 import { unlink } from 'fs/promises';
@@ -16,8 +21,9 @@ import { User } from '../users/schemas/user.schema';
 import type { UserDocument } from '../users/schemas/user.schema';
 import { CreatePostDto } from './dto/create-post.dto';
 import { ListPostsQueryDto } from './dto/list-posts-query.dto';
+import { CommentTextDto } from './dto/comment-text.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
-import { Comment } from './schemas/comment.schema';
+import { Comment, CommentDocument } from './schemas/comment.schema';
 import { Like } from './schemas/like.schema';
 import { Post, PostDocument, PostStatus } from './schemas/post.schema';
 
@@ -176,6 +182,13 @@ export class BlogService {
     };
   }
 
+  async listPostsByTag(tag: string, page = 1) {
+    return this.listPublicPosts({
+      tag: tag.trim().toLowerCase(),
+      page,
+    } as ListPostsQueryDto);
+  }
+
   async getPost(id: string, viewer?: JwtUser) {
     const post = await this.postModel
       .findById(id)
@@ -257,6 +270,140 @@ export class BlogService {
     return this.toPostResponse(post);
   }
 
+  async addComment(postId: string, user: JwtUser, dto: CommentTextDto) {
+    const post = await this.findInteractablePost(postId);
+    const comment = await this.commentModel.create({
+      postId: post._id,
+      authorId: new Types.ObjectId(user.sub),
+      text: dto.text,
+    });
+    try {
+      const update = await this.postModel
+        .updateOne({ _id: post._id }, { $inc: { commentsCount: 1 } })
+        .exec();
+      if (update.matchedCount === 0) {
+        throw new NotFoundException('Post not found');
+      }
+    } catch (error) {
+      try {
+        await comment.deleteOne();
+      } catch {
+        this.logger.warn(
+          'Could not roll back a comment after counter update failure',
+        );
+      }
+      throw error;
+    }
+
+    await comment.populate({ path: 'authorId', select: 'name' });
+    return this.toCommentResponse(comment);
+  }
+
+  async updateComment(id: string, userId: string, dto: CommentTextDto) {
+    const comment = await this.commentModel.findById(id).exec();
+    if (!comment || comment.authorId.toString() !== userId) {
+      throw new NotFoundException('Comment not found');
+    }
+    comment.text = dto.text;
+    await comment.save();
+    await comment.populate({ path: 'authorId', select: 'name' });
+    return this.toCommentResponse(comment);
+  }
+
+  async deleteComment(
+    id: string,
+    userId: string,
+  ): Promise<{ message: string }> {
+    const comment = await this.commentModel.findById(id).exec();
+    if (!comment || comment.authorId.toString() !== userId) {
+      throw new NotFoundException('Comment not found');
+    }
+    const deleted = await this.commentModel
+      .findOneAndDelete({
+        _id: comment._id,
+        authorId: new Types.ObjectId(userId),
+      })
+      .exec();
+    if (!deleted) throw new NotFoundException('Comment not found');
+    await this.postModel
+      .updateOne(
+        { _id: comment.postId, commentsCount: { $gt: 0 } },
+        { $inc: { commentsCount: -1 } },
+      )
+      .exec();
+    return { message: 'Comment deleted' };
+  }
+
+  async likePost(postId: string, userId: string) {
+    const post = await this.findInteractablePost(postId);
+    let like;
+    try {
+      like = await this.likeModel.create({
+        postId: post._id,
+        userId: new Types.ObjectId(userId),
+      });
+    } catch (error) {
+      if ((error as { code?: number }).code === 11000) {
+        throw new ConflictException('You have already liked this post');
+      }
+      throw error;
+    }
+
+    try {
+      const updatedPost = await this.postModel
+        .findOneAndUpdate(
+          { _id: post._id, status: PostStatus.PUBLISHED, isHidden: false },
+          [
+            {
+              $set: {
+                likesCount: {
+                  $add: [{ $max: [{ $ifNull: ['$likesCount', 0] }, 0] }, 1],
+                },
+              },
+            },
+          ],
+          { new: true },
+        )
+        .exec();
+      if (!updatedPost) throw new NotFoundException('Post not found');
+      return { message: 'Post liked', likesCount: updatedPost.likesCount };
+    } catch (error) {
+      await this.likeModel.deleteOne({ _id: like._id }).exec();
+      throw error;
+    }
+  }
+
+  async unlikePost(postId: string, userId: string) {
+    const post = await this.findInteractablePost(postId);
+    const like = await this.likeModel
+      .findOneAndDelete({
+        postId: post._id,
+        userId: new Types.ObjectId(userId),
+      })
+      .exec();
+    if (!like) throw new NotFoundException('Like not found');
+
+    const updatedPost = await this.postModel
+      .findOneAndUpdate(
+        { _id: post._id },
+        [
+          {
+            $set: {
+              likesCount: {
+                $max: [{ $subtract: [{ $ifNull: ['$likesCount', 0] }, 1] }, 0],
+              },
+            },
+          },
+        ],
+        { new: true },
+      )
+      .exec();
+    return {
+      message: 'Post unliked',
+      likesCount: updatedPost?.likesCount ?? 0,
+    };
+  }
+
   async deletePost(id: string, userId: string): Promise<{ message: string }> {
     const post = await this.findOwnedPost(id, userId);
     await Promise.all([
@@ -274,6 +421,33 @@ export class BlogService {
       throw new NotFoundException('Post not found');
     }
     return post;
+  }
+
+  private async findInteractablePost(id: string) {
+    const post = await this.postModel.findById(id).exec();
+    if (!post || post.status !== PostStatus.PUBLISHED || post.isHidden) {
+      throw new NotFoundException('Post not found');
+    }
+    const author = await this.userModel
+      .findById(post.authorId)
+      .select('status')
+      .exec();
+    if (!author || author.status === UserStatus.DEACTIVATED) {
+      throw new NotFoundException('Post not found');
+    }
+    return post;
+  }
+
+  private toCommentResponse(comment: CommentDocument) {
+    const author = comment.authorId as unknown as UserDocument;
+    return {
+      id: comment._id.toString(),
+      postId: comment.postId.toString(),
+      text: comment.text,
+      author: { id: author._id.toString(), name: author.name },
+      createdAt: comment.createdAt,
+      updatedAt: comment.updatedAt,
+    };
   }
 
   private toPostResponse(post: PostDocument) {

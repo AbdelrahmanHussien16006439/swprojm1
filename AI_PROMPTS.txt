@@ -52,3 +52,14 @@ Prompt:
 How the output was used:
 Added the three timestamped schemas with the requested references, defaults, validation limits, and unique like index; registered them in BlogModule and exported MongooseModule. No post endpoints were added.
 ================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: BLG-05, BLG-06, BLG-07, BLG-08
+Prompt:
+"Implement authenticated comments, author-owned comment edits/deletes, likes with duplicate protection and safe counts, and verify both tag-filter routes against TEAM_PLAN.md. Add tests and keep all changes in the Blog module."
+How the output was used:
+Added the requested comment and like endpoints with DTO validation, ownership enforcement, chronological detail comments, atomic like-count updates, and HTTP 409 for duplicate likes. Added the missing tag-posts route by reusing the existing public listing logic and tested the comment/like/tag service behavior.
+================================================

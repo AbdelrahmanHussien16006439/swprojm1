@@ -14,6 +14,7 @@ import {
 import {
   ApiBadRequestResponse,
   ApiCookieAuth,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -32,6 +33,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
 import { CreatePostDto } from './dto/create-post.dto';
+import { CommentTextDto } from './dto/comment-text.dto';
 import { ListPostsQueryDto } from './dto/list-posts-query.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { BlogService } from './blog.service';
@@ -51,6 +53,57 @@ export class BlogController {
   @ApiUnauthorizedResponse({ description: 'Login required' })
   createPost(@CurrentUser() user: JwtUser, @Body() dto: CreatePostDto) {
     return this.blogService.createPost(user, dto);
+  }
+
+  @Post(':id/comments')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Comment on a published post (BLG-05)' })
+  @ApiCreatedResponse({ description: 'Comment created' })
+  @ApiBadRequestResponse({ description: 'Invalid post id or comment text' })
+  @ApiUnauthorizedResponse({ description: 'Login required' })
+  @ApiNotFoundResponse({ description: 'Published post not found' })
+  addComment(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @CurrentUser() user: JwtUser,
+    @Body() dto: CommentTextDto,
+  ) {
+    return this.blogService.addComment(id, user, dto);
+  }
+
+  @Post(':id/like')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Like a published post (BLG-06)' })
+  @ApiCreatedResponse({ description: 'Post liked' })
+  @ApiBadRequestResponse({ description: 'Invalid post id' })
+  @ApiConflictResponse({ description: 'User has already liked this post' })
+  @ApiUnauthorizedResponse({ description: 'Login required' })
+  @ApiNotFoundResponse({ description: 'Published post not found' })
+  likePost(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.blogService.likePost(id, user.sub);
+  }
+
+  @Delete(':id/like')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.USER)
+  @ApiCookieAuth('access_token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Remove my like from a post (BLG-06)' })
+  @ApiOkResponse({ description: 'Like removed' })
+  @ApiBadRequestResponse({ description: 'Invalid post id' })
+  @ApiUnauthorizedResponse({ description: 'Login required' })
+  @ApiNotFoundResponse({ description: 'Post or like not found' })
+  unlikePost(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.blogService.unlikePost(id, user.sub);
   }
 
   @Get()
