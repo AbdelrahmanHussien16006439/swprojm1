@@ -35,6 +35,29 @@ Reviewed the code and tested every endpoint against a local MongoDB before commi
 Date: 2026-11-17
 Student: Member 2
 Tool: ChatGPT / Codex
+Related Requirement: BLG-01, BLG-02, BLG-03, BLG-04, BLG-08, BLG-09
+Prompt:
+"Implement the Posts API endpoints per TEAM_PLAN.md for create, public list/search, mine, details, update, and delete. Use available auth guards and pagination, enforce ownership, exclude hidden/deactivated content, and clean up associated comments, likes, and uploaded images without touching other member folders."
+How the output was used:
+Added validated DTOs, controller routes, and BlogService behavior for the requested post endpoints. Registered the real User model through UsersModule, used the shared pagination helper and auth guards, and implemented ownership checks plus deletion of related comments, likes, and matching uploaded files. No comment, like, or image-upload endpoints were added.
+
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: BLG-01, BLG-05, BLG-06
+Prompt:
+"Create the Blog module's Post, Comment, and Like Mongoose schemas per TEAM_PLAN.md. Apply tag, image, and comment limits, timestamp fields, model references, the unique post/user like index, and register/export the models from BlogModule without implementing endpoints."
+How the output was used:
+Added the three timestamped schemas with the requested references, defaults, validation limits, and unique like index; registered them in BlogModule and exported MongooseModule. No post endpoints were added.
+
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: BLG-05, BLG-06, BLG-07, BLG-08
+Prompt:
+"Implement authenticated comments, author-owned comment edits/deletes, likes with duplicate protection and safe counts, and verify both tag-filter routes against TEAM_PLAN.md. Add tests and keep all changes in the Blog module."
+How the output was used:
+Added the requested comment and like endpoints with DTO validation, ownership enforcement, chronological detail comments, atomic like-count updates, and HTTP 409 for duplicate likes. Added the missing tag-posts route by reusing the existing public listing logic and tested the comment/like/tag service behavior.
 Related Requirement: ITN-18
 Prompt:
 "Implement the Member 2 ITN-18 exchange-rate service per TEAM_PLAN.md, with the FXRatesAPI daily cache, scheduled and startup refresh, conversion, public latest endpoint, cached fallback, and unsupported-currency handling. Keep changes within the exchange-rates module and document/testing the Member 5 currency dependency."
