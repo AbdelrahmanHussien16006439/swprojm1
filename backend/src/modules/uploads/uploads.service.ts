@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, unlink, writeFile } from 'fs/promises';
 import { join, resolve } from 'path';
 
 export interface UploadResult {
@@ -12,6 +12,11 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
 @Injectable()
 export class UploadsService {
+  /** BLG-10: named image API used by owning modules; validation remains in upload(). */
+  saveImage(file: Express.Multer.File): Promise<UploadResult> {
+    return this.upload(file);
+  }
+
   /** GEN-08: save a validated JPG/PNG using a server-generated filename. */
   async upload(file: Express.Multer.File): Promise<UploadResult> {
     if (!file?.buffer) {
@@ -35,6 +40,26 @@ export class UploadsService {
     });
 
     return { id, url: `/uploads/${filename}` };
+  }
+
+  /** BLG-10: remove only a UUID-named image created by this service. */
+  async deleteImage(id: string): Promise<void> {
+    if (
+      !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(
+        id,
+      )
+    ) {
+      throw new BadRequestException('Invalid image id');
+    }
+
+    const uploadsDirectory = resolve(__dirname, '../../../uploads');
+    for (const extension of ['jpg', 'png']) {
+      try {
+        await unlink(join(uploadsDirectory, `${id}.${extension}`));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      }
+    }
   }
 
   private getVerifiedExtension(file: Express.Multer.File): 'jpg' | 'png' {
