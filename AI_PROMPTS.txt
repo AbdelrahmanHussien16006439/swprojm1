@@ -68,6 +68,37 @@ Prompt:
 "Implement Member 2's GEN-08 uploads task in the existing NestJS backend. Accept JPG/PNG only, limit uploads to 5 MB, store them in backend/uploads with safe unique filenames, return an id and /uploads URL, expose a Swagger-documented multipart endpoint, and export a reusable UploadsService. Review the implementation and run build and end-to-end upload checks."
 How the output was used:
 Added POST /api/uploads with Swagger multipart documentation, Multer file-size limits, MIME and image-signature validation, random UUID filenames, and a reusable exported UploadsService. Verified a PNG upload returned 201 and an id/URL, the saved file was retrievable at its /uploads URL with matching SHA-256, a non-image returned 400, and a file over 5 MB returned 413. The Nest build passed. The start:dev script failed in this workspace because incremental compilation did not recreate dist, so the runtime checks used the same Nest entry point with ts-node and temporary local environment values.
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: GEN-10
+Prompt:
+"Implement admin report listing and resolution plus direct hide/unhide/delete for posts and comments per TEAM_PLAN.md. Use the existing admin guards, shared pagination helper, BlogService cascade operations, and AuditLogsService; add DTO validation, Swagger docs, and focused tests. Keep review and itinerary moderation as pending owner integrations."
+How the output was used:
+Added paginated/filterable admin report listing, admin-only report resolution and direct post/comment moderation endpoints, audit logging, and focused service/controller tests. Post deletions use BlogService cascade cleanup for comments, likes, and safe image removal; comment deletion decrements the parent count safely. Review and itinerary moderation remains pending their owners' service integrations.
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: GEN-09
+Prompt:
+"Implement authenticated content reporting for posts, comments, reviews, and itineraries, with a Report schema, duplicate-report HTTP 409 behavior, validation, Swagger docs, and tests. Inspect existing target models and do not create copies or fake dependencies."
+How the output was used:
+Restored the existing GEN-09 implementation from commit 17b95c1 into the develop-based GEN-10 working tree after verifying the commit was on the feature/BLG-01-blog branch but absent from develop. ReportsModule now registers its existing controller and service alongside the Report model used by GEN-10 moderation.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: GEN-09
+Prompt:
+"Implement authenticated content reporting for posts, comments, reviews, and itineraries, with a Report schema, duplicate-report HTTP 409 behavior, validation, Swagger docs, and tests. Inspect existing target models and do not create copies or fake dependencies."
+How the output was used:
+Added the Report schema with the required unique compound index, authenticated POST /api/reports, DTO validation, and conflict handling. Existing Post and Comment targets are checked using BlogModule models. Review and Itinerary modules have no models in this checkout, so their existence checks remain deferred; their IDs are still syntax-validated. Five focused tests passed.
 ================================================
 
 Date: 2026-11-17
