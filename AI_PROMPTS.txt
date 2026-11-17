@@ -69,3 +69,14 @@ Prompt:
 How the output was used:
 Added POST /api/uploads with Swagger multipart documentation, Multer file-size limits, MIME and image-signature validation, random UUID filenames, and a reusable exported UploadsService. Verified a PNG upload returned 201 and an id/URL, the saved file was retrievable at its /uploads URL with matching SHA-256, a non-image returned 400, and a file over 5 MB returned 413. The Nest build passed. The start:dev script failed in this workspace because incremental compilation did not recreate dist, so the runtime checks used the same Nest entry point with ts-node and temporary local environment values.
 ================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: GEN-09
+Prompt:
+"Implement authenticated content reporting for posts, comments, reviews, and itineraries, with a Report schema, duplicate-report HTTP 409 behavior, validation, Swagger docs, and tests. Inspect existing target models and do not create copies or fake dependencies."
+How the output was used:
+Added the Report schema with the required unique compound index, authenticated POST /api/reports, DTO validation, and conflict handling. Existing Post and Comment targets are checked using BlogModule models. Review and Itinerary modules have no models in this checkout, so their existence checks remain deferred; their IDs are still syntax-validated. Five focused tests passed.
+================================================
