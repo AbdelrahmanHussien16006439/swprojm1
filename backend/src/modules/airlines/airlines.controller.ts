@@ -2,19 +2,27 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBadRequestResponse,
+  ApiBody,
   ApiCookieAuth,
   ApiConflictResponse,
+  ApiConsumes,
   ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiPayloadTooLargeResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -68,5 +76,36 @@ export class AirlinesController {
     @CurrentUser() user: JwtUser,
   ) {
     return this.airlinesService.update(id, dto, user);
+  }
+
+  @Post(':id/logo')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.AIRLINE_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+    }),
+  )
+  @ApiOperation({ summary: 'Upload or replace my airline logo (FLT-01, GEN-08)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiOkResponse({ description: 'Airline logo uploaded or replaced' })
+  @ApiBadRequestResponse({ description: 'Invalid airline id or JPG/PNG file' })
+  @ApiPayloadTooLargeResponse({ description: 'Logo exceeds 5 MB' })
+  @ApiNotFoundResponse({ description: 'Airline not found or not owned by user' })
+  uploadLogo(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @CurrentUser() user: JwtUser,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.airlinesService.uploadLogo(id, user, file);
   }
 }

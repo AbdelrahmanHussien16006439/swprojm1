@@ -4,12 +4,16 @@ import { Role } from '../../common/enums/role.enum';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { AirlinesService } from './airlines.service';
 import { Airline } from './schemas/airline.schema';
+import { UploadsService } from '../uploads/uploads.service';
 
 const id = new Types.ObjectId();
 const airline = { _id: id, name: 'Cairo Air', code: 'CA' } as Airline;
 const exec = <T>(value: T) => ({ exec: jest.fn().mockResolvedValue(value) });
 
-function setup(overrides: Record<string, jest.Mock> = {}) {
+function setup(
+  overrides: Record<string, jest.Mock> = {},
+  uploadOverrides: Record<string, jest.Mock> = {},
+) {
   const model = {
     create: jest.fn().mockResolvedValue(airline),
     findById: jest.fn().mockReturnValue(exec(airline)),
@@ -17,7 +21,19 @@ function setup(overrides: Record<string, jest.Mock> = {}) {
     findOneAndUpdate: jest.fn().mockReturnValue(exec(airline)),
     ...overrides,
   } as unknown as Model<Airline>;
-  return { service: new AirlinesService(model), model };
+  const uploadsService = {
+    saveImage: jest.fn().mockResolvedValue({
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      url: '/uploads/550e8400-e29b-41d4-a716-446655440000.png',
+    }),
+    deleteImage: jest.fn().mockResolvedValue(undefined),
+    ...uploadOverrides,
+  } as unknown as UploadsService;
+  return {
+    service: new AirlinesService(model, uploadsService),
+    model,
+    uploadsService,
+  };
 }
 
 const moderator = {
@@ -53,5 +69,49 @@ describe('AirlinesService', () => {
   it('returns a not-found error for a missing airline', async () => {
     const { service } = setup({ findById: jest.fn().mockReturnValue(exec(null)) });
     await expect(service.findById(id.toString())).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('replaces the old managed logo and deletes the old file', async () => {
+    const oldId = '550e8400-e29b-41d4-a716-446655440001';
+    const { service, model, uploadsService } = setup({
+      findById: jest.fn().mockReturnValue(
+        exec({ ...airline, logoUrl: `/uploads/${oldId}.jpg` }),
+      ),
+      findOneAndUpdate: jest.fn().mockReturnValue(
+        exec({
+          ...airline,
+          logoUrl: '/uploads/550e8400-e29b-41d4-a716-446655440000.png',
+        }),
+      ),
+    });
+
+    await service.uploadLogo(id.toString(), moderator, {
+      buffer: Buffer.from('png'),
+      size: 3,
+      mimetype: 'image/png',
+    } as Express.Multer.File);
+
+    expect(uploadsService.deleteImage).toHaveBeenCalledWith(oldId);
+    expect(model.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: id.toString() },
+      { $set: { logoUrl: '/uploads/550e8400-e29b-41d4-a716-446655440000.png' } },
+      { new: true, runValidators: true },
+    );
+  });
+
+  it('deletes a newly uploaded logo if the database update fails', async () => {
+    const databaseError = new Error('database update failed');
+    const { service, uploadsService } = setup({
+      findOneAndUpdate: jest.fn().mockReturnValue({
+        exec: jest.fn().mockRejectedValue(databaseError),
+      }),
+    });
+
+    await expect(
+      service.uploadLogo(id.toString(), moderator, {} as Express.Multer.File),
+    ).rejects.toBe(databaseError);
+    expect(uploadsService.deleteImage).toHaveBeenCalledWith(
+      '550e8400-e29b-41d4-a716-446655440000',
+    );
   });
 });

@@ -241,3 +241,18 @@ Added the timestamped Airline schema with baggage and cancellation policy fields
 validated DTOs, guarded controller routes, exported AirlinesService, and focused
 unit tests. Logo upload and policy endpoints remain separate later task groups.
 ================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-01, GEN-08
+Prompt:
+"Continue Member 3's airlines work with the airline logo endpoint. Reuse the
+existing UploadsService, enforce airline-moderator ownership, accept only the
+shared JPG/PNG and 5 MB validation, replace one existing logo, clean up old or
+new files safely, add tests and Swagger documentation, and edit only my modules
+plus AI_PROMPTS.txt."
+How the output was used:
+Added POST /api/airlines/:id/logo with guarded multipart Swagger documentation,
+UploadsService integration, replacement cleanup, failure cleanup, and focused
+unit tests. The existing logo URL is replaced atomically in the airline document.
+================================================
