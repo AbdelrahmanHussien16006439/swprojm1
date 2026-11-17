@@ -88,12 +88,16 @@ Prompt:
 "Implement authenticated content reporting for posts, comments, reviews, and itineraries, with a Report schema, duplicate-report HTTP 409 behavior, validation, Swagger docs, and tests. Inspect existing target models and do not create copies or fake dependencies."
 How the output was used:
 Restored the existing GEN-09 implementation from commit 17b95c1 into the develop-based GEN-10 working tree after verifying the commit was on the feature/BLG-01-blog branch but absent from develop. ReportsModule now registers its existing controller and service alongside the Report model used by GEN-10 moderation.
-================================================
 
 ================================================
 Date: 2026-11-17
 Student: Member 2
 Tool: ChatGPT / Codex
+Related Requirement: BLG-12
+Prompt:
+"Implement the public GET /api/authors/:id profile using UsersService.findPublicProfile and BlogService public post visibility logic. Integrate M7 public itineraries only if available; otherwise provide a clearly documented compile-safe stub without invented itinerary data. Add focused tests and keep edits in Member 2 folders and AI_PROMPTS.txt."
+How the output was used:
+Added a public author endpoint with validated ObjectId and shared page-size-10 pagination. It reuses the user profile contract and BlogService public post aggregation, including hidden/draft/deactivated-author filtering. M7's ItinerariesModule is still an empty placeholder, so a documented reader stub returns null for itineraries until M7 exposes its public author query.
 Related Requirement: BLG-10, GEN-08
 Prompt:
 "Implement post image upload and removal routes using the existing BlogService and UploadsService. Enforce author ownership, JPG/PNG and 5 MB limits, a five-image cap, safe database/file cleanup, UUID image IDs, Swagger documentation, and focused tests."
