@@ -126,3 +126,14 @@ Prompt:
 "Implement GET /api/admin/audit-logs using the existing AuditLog model, admin guards, DTO validation, date/actor/action filters, shared page-size-10 pagination, Swagger docs, and focused tests. Do not modify Member 1's AuditLogsService or other files."
 How the output was used:
 Added the admin-only audit-log viewer in AdminModerationModule. It queries Member 1's registered AuditLog model through the exported AuditLogsModule, validates actor and ISO date filters, checks date-range order, and uses the shared paginate() helper. The existing AuditLogsService is write-only and was left unchanged.
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: Codex
+Related Requirement: GEN-08, ITN-18, BLG-*, GEN-09, GEN-10
+Prompt:
+"Prepare a local environment safely using placeholders, verify the env variable names and Git ignore status without exposing secrets, update my branch from develop, build and start the backend, then prepare Swagger verification for Member 2 endpoints. Follow TEAM_PLAN.md and only change Member 2 module files, except the requested AI prompt log."
+How the output was used:
+Compared environment variable names only, added placeholders for FXRATES_API_KEY, ADMIN_EMAIL, and ADMIN_PASSWORD, and confirmed backend/.env is ignored and untracked. Fetched and fast-forward merged origin/develop; npm run build passed. npm run start:dev failed because Node could not find backend/dist/main. A direct source launch reached MongoDB initialization but failed with an SRV DNS query timeout, so Swagger endpoint checks could not be performed. No .env values were inspected or printed.
+================================================
