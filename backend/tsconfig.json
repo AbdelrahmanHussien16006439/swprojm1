@@ -16,6 +16,7 @@
     "outDir": "./dist",
     "types": ["node", "jest", "multer"],
     "incremental": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "skipLibCheck": true,
     "strict": false,
     "strictNullChecks": true,
