@@ -68,9 +68,29 @@ Prompt:
 "Implement Member 2's GEN-08 uploads task in the existing NestJS backend. Accept JPG/PNG only, limit uploads to 5 MB, store them in backend/uploads with safe unique filenames, return an id and /uploads URL, expose a Swagger-documented multipart endpoint, and export a reusable UploadsService. Review the implementation and run build and end-to-end upload checks."
 How the output was used:
 Added POST /api/uploads with Swagger multipart documentation, Multer file-size limits, MIME and image-signature validation, random UUID filenames, and a reusable exported UploadsService. Verified a PNG upload returned 201 and an id/URL, the saved file was retrievable at its /uploads URL with matching SHA-256, a non-image returned 400, and a file over 5 MB returned 413. The Nest build passed. The start:dev script failed in this workspace because incremental compilation did not recreate dist, so the runtime checks used the same Nest entry point with ts-node and temporary local environment values.
-================================================
 
 ================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: GEN-10
+Prompt:
+"Implement admin report listing and resolution plus direct hide/unhide/delete for posts and comments per TEAM_PLAN.md. Use the existing admin guards, shared pagination helper, BlogService cascade operations, and AuditLogsService; add DTO validation, Swagger docs, and focused tests. Keep review and itinerary moderation as pending owner integrations."
+How the output was used:
+Added paginated/filterable admin report listing, admin-only report resolution and direct post/comment moderation endpoints, audit logging, and focused service/controller tests. Post deletions use BlogService cascade cleanup for comments, likes, and safe image removal; comment deletion decrements the parent count safely. Review and itinerary moderation remains pending their owners' service integrations.
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: GEN-09
+Prompt:
+"Implement authenticated content reporting for posts, comments, reviews, and itineraries, with a Report schema, duplicate-report HTTP 409 behavior, validation, Swagger docs, and tests. Inspect existing target models and do not create copies or fake dependencies."
+How the output was used:
+Restored the existing GEN-09 implementation from commit 17b95c1 into the develop-based GEN-10 working tree after verifying the commit was on the feature/BLG-01-blog branch but absent from develop. ReportsModule now registers its existing controller and service alongside the Report model used by GEN-10 moderation.
+
+================================================
+
 Date: 2026-11-17
 Student: Member 2
 Tool: ChatGPT / Codex
@@ -79,3 +99,30 @@ Prompt:
 "Implement admin airline/hotel deactivation and reactivation with existing owner services, notification recipient discovery, NotificationsService and AuditLogsService. If dependencies are placeholders, add only a documented compile-safe fail-closed stub; do not invent provider state, booking logic, or recipients. Add admin authorization, validation, and tests."
 How the output was used:
 Inspected develop and confirmed AuditLogsService and admin guards are ready, while AirlinesModule, HotelsModule, NotificationsModule, FlightBookingsModule, and HotelBookingsModule are placeholders. Added admin-only routes, provider-type/ObjectId validation, failure audit entries, and a documented integration stub that returns HTTP 501 without changing state or fabricating notification recipients. Success-path provider mutation and notifications remain unimplemented pending the owning modules.
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: BLG-12
+Prompt:
+"Implement the public GET /api/authors/:id profile using UsersService.findPublicProfile and BlogService public post visibility logic. Integrate M7 public itineraries only if available; otherwise provide a clearly documented compile-safe stub without invented itinerary data. Add focused tests and keep edits in Member 2 folders and AI_PROMPTS.txt."
+How the output was used:
+Added a public author endpoint with validated ObjectId and shared page-size-10 pagination. It reuses the user profile contract and BlogService public post aggregation, including hidden/draft/deactivated-author filtering. M7's ItinerariesModule is still an empty placeholder, so a documented reader stub returns null for itineraries until M7 exposes its public author query.
+Related Requirement: BLG-10, GEN-08
+Prompt:
+"Implement post image upload and removal routes using the existing BlogService and UploadsService. Enforce author ownership, JPG/PNG and 5 MB limits, a five-image cap, safe database/file cleanup, UUID image IDs, Swagger documentation, and focused tests."
+How the output was used:
+Added authenticated Blog endpoints to upload an image to an owned post and remove an image by upload ID. Reused UploadsService validation/storage through saveImage(), added safe UUID-based deletion, atomically updated post image references, and cleaned up newly uploaded files if the database write failed. Added Blog and Uploads service tests.
+Related Requirement: GEN-09
+Prompt:
+"Implement authenticated content reporting for posts, comments, reviews, and itineraries, with a Report schema, duplicate-report HTTP 409 behavior, validation, Swagger docs, and tests. Inspect existing target models and do not create copies or fake dependencies."
+How the output was used:
+Added the Report schema with the required unique compound index, authenticated POST /api/reports, DTO validation, and conflict handling. Existing Post and Comment targets are checked using BlogModule models. Review and Itinerary modules have no models in this checkout, so their existence checks remain deferred; their IDs are still syntax-validated. Five focused tests passed.
+
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: GEN-07
+Prompt:
+"Implement GET /api/admin/audit-logs using the existing AuditLog model, admin guards, DTO validation, date/actor/action filters, shared page-size-10 pagination, Swagger docs, and focused tests. Do not modify Member 1's AuditLogsService or other files."
+How the output was used:
+Added the admin-only audit-log viewer in AdminModerationModule. It queries Member 1's registered AuditLog model through the exported AuditLogsModule, validates actor and ISO date filters, checks date-range order, and uses the shared paginate() helper. The existing AuditLogsService is write-only and was left unchanged.
