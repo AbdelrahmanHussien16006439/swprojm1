@@ -1,7 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type PostDocument = HydratedDocument<Post>;
+
+export interface PostImage {
+  id: string;
+  url: string;
+}
 
 export enum PostStatus {
   DRAFT = 'draft',
@@ -38,15 +43,16 @@ export class Post {
   tags: string[];
 
   @Prop({
-    type: [String],
+    type: [MongooseSchema.Types.Mixed],
     default: [],
     validate: {
-      validator: (images: string[]) =>
+      validator: (images: Array<string | PostImage>) =>
         Array.isArray(images) && images.length <= 5,
       message: 'A post can have at most 5 images',
     },
   })
-  images: string[];
+  // Existing post creation may store URLs; BLG-10 uploads store { id, url }.
+  images: Array<string | PostImage>;
 
   @Prop({ type: Number, min: 0, default: 0, required: true })
   likesCount: number;

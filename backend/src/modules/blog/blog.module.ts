@@ -13,12 +13,14 @@ import {
   PendingPublicItineraryReader,
   PUBLIC_ITINERARY_READER,
 } from './public-itinerary-reader';
+import { UploadsModule } from '../uploads/uploads.module';
 
 // Owner: Member 2 — see docs/TEAM_PLAN.md Section 7.
 // Remember to export your service(s) AND MongooseModule (TEAM_PLAN 3.2).
 @Module({
   imports: [
     UsersModule,
+    UploadsModule,
     MongooseModule.forFeature([
       { name: Post.name, schema: PostSchema },
       { name: Comment.name, schema: CommentSchema },

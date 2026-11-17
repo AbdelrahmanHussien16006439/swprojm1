@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
@@ -11,6 +15,10 @@ import { Comment } from './schemas/comment.schema';
 import { Like } from './schemas/like.schema';
 import { Post, PostStatus } from './schemas/post.schema';
 import { User } from '../users/schemas/user.schema';
+import { UploadsService } from '../uploads/uploads.service';
+
+const imageId = '550e8400-e29b-41d4-a716-446655440000';
+const imageUrl = `/uploads/${imageId}.png`;
 
 const postId = new Types.ObjectId();
 const userId = new Types.ObjectId();
@@ -65,13 +73,27 @@ function makeService(overrides: Record<string, any> = {}) {
     }),
     ...overrides.userModel,
   };
+  const uploadsService: Record<string, any> = {
+    saveImage: jest.fn().mockResolvedValue({ id: imageId, url: imageUrl }),
+    deleteImage: jest.fn().mockResolvedValue(undefined),
+    ...overrides.uploadsService,
+  };
   const service = new BlogService(
     postModel as unknown as Model<Post>,
     commentModel as unknown as Model<Comment>,
     likeModel as unknown as Model<Like>,
     userModel as unknown as Model<User>,
+    uploadsService as unknown as UploadsService,
   );
-  return { service, post, postModel, commentModel, likeModel, userModel };
+  return {
+    service,
+    post,
+    postModel,
+    commentModel,
+    likeModel,
+    userModel,
+    uploadsService,
+  };
 }
 
 const user = { sub: userId.toString() } as JwtUser;
@@ -266,5 +288,207 @@ describe('BlogService comments and likes', () => {
       tags: 'egypt',
     });
     expect(pipeline[1].$lookup).toBeDefined();
+  });
+});
+
+describe('BlogService post images (BLG-10)', () => {
+  const file = {
+    buffer: Buffer.from('png'),
+    size: 3,
+    mimetype: 'image/png',
+  } as Express.Multer.File;
+
+  it('uploads for the post author and returns the attached image and updated post', async () => {
+    const updatedPost = {
+      _id: postId,
+      authorId: userId,
+      title: 'Travel',
+      body: 'Story',
+      status: PostStatus.DRAFT,
+      tags: [],
+      images: [{ id: imageId, url: imageUrl }],
+      likesCount: 0,
+      commentsCount: 0,
+      publishedAt: null,
+      isHidden: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const { service, postModel, uploadsService } = makeService({
+      postModel: {
+        findById: jest
+          .fn()
+          .mockReturnValue(execResult({ ...updatedPost, images: [] })),
+        findOneAndUpdate: jest.fn().mockReturnValue(execResult(updatedPost)),
+      },
+    });
+
+    const result = await service.addPostImage(
+      postId.toString(),
+      userId.toString(),
+      file,
+    );
+
+    expect(uploadsService.saveImage).toHaveBeenCalledWith(file);
+    const [filter, update, options] = postModel.findOneAndUpdate.mock.calls[0];
+    expect(filter.authorId).toEqual(userId);
+    expect(filter.$expr).toBeDefined();
+    expect(update).toEqual({
+      $push: { images: { id: imageId, url: imageUrl } },
+    });
+    expect(options).toEqual({ new: true, runValidators: true });
+    expect(result.image).toEqual({ id: imageId, url: imageUrl });
+    expect(result.post.images).toEqual([{ id: imageId, url: imageUrl }]);
+  });
+
+  it('does not upload when the post already has five images', async () => {
+    const fullPost = {
+      _id: postId,
+      authorId: userId,
+      images: ['/1', '/2', '/3', '/4', '/5'],
+    };
+    const { service, uploadsService } = makeService({
+      postModel: {
+        findById: jest.fn().mockReturnValue(execResult(fullPost)),
+      },
+    });
+
+    await expect(
+      service.addPostImage(postId.toString(), userId.toString(), file),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(uploadsService.saveImage).not.toHaveBeenCalled();
+  });
+
+  it('rejects uploads from users who do not own the post', async () => {
+    const { service, uploadsService } = makeService();
+
+    await expect(
+      service.addPostImage(postId.toString(), userId.toString(), file),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(uploadsService.saveImage).not.toHaveBeenCalled();
+  });
+
+  it('removes the saved file if the post database update fails', async () => {
+    const databaseError = new Error('database update failed');
+    const { service, uploadsService } = makeService({
+      postModel: {
+        findOneAndUpdate: jest.fn().mockReturnValue({
+          exec: jest.fn().mockRejectedValue(databaseError),
+        }),
+      },
+    });
+
+    await expect(
+      service.addPostImage(postId.toString(), otherUserId.toString(), file),
+    ).rejects.toBe(databaseError);
+    expect(uploadsService.deleteImage).toHaveBeenCalledWith(imageId);
+  });
+
+  it('removes an owned image reference and deletes its file when unused elsewhere', async () => {
+    const post = {
+      _id: postId,
+      authorId: userId,
+      images: [{ id: imageId, url: imageUrl }],
+    };
+    const updatedPost = {
+      _id: postId,
+      authorId: userId,
+      title: 'Travel',
+      body: 'Story',
+      status: PostStatus.DRAFT,
+      tags: [],
+      images: [],
+      likesCount: 0,
+      commentsCount: 0,
+      publishedAt: null,
+      isHidden: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const { service, postModel, uploadsService } = makeService({
+      postModel: {
+        findById: jest.fn().mockReturnValue(execResult(post)),
+        findOneAndUpdate: jest.fn().mockReturnValue(execResult(updatedPost)),
+        exists: jest.fn().mockReturnValue(execResult(null)),
+      },
+    });
+
+    const result = await service.deletePostImage(
+      postId.toString(),
+      imageId,
+      userId.toString(),
+    );
+
+    expect(postModel.findOneAndUpdate).toHaveBeenCalledWith(
+      {
+        _id: postId,
+        authorId: userId,
+        images: { $elemMatch: { id: imageId } },
+      },
+      { $pull: { images: { id: imageId } } },
+      { new: true, runValidators: true },
+    );
+    expect(uploadsService.deleteImage).toHaveBeenCalledWith(imageId);
+    expect(result.post.images).toEqual([]);
+  });
+
+  it('does not delete an image still referenced by another post', async () => {
+    const post = {
+      _id: postId,
+      authorId: userId,
+      images: [{ id: imageId, url: imageUrl }],
+    };
+    const updatedPost = {
+      _id: postId,
+      authorId: userId,
+      title: 'Travel',
+      body: 'Story',
+      status: PostStatus.DRAFT,
+      tags: [],
+      images: [],
+      likesCount: 0,
+      commentsCount: 0,
+      publishedAt: null,
+      isHidden: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const { service, uploadsService } = makeService({
+      postModel: {
+        findById: jest.fn().mockReturnValue(execResult(post)),
+        findOneAndUpdate: jest.fn().mockReturnValue(execResult(updatedPost)),
+        exists: jest.fn().mockReturnValue(execResult({ _id: otherUserId })),
+      },
+    });
+
+    await service.deletePostImage(
+      postId.toString(),
+      imageId,
+      userId.toString(),
+    );
+
+    expect(uploadsService.deleteImage).not.toHaveBeenCalled();
+  });
+
+  it('does not delete the file when removing the post reference fails', async () => {
+    const post = {
+      _id: postId,
+      authorId: userId,
+      images: [{ id: imageId, url: imageUrl }],
+    };
+    const databaseError = new Error('database update failed');
+    const { service, uploadsService } = makeService({
+      postModel: {
+        findById: jest.fn().mockReturnValue(execResult(post)),
+        findOneAndUpdate: jest.fn().mockReturnValue({
+          exec: jest.fn().mockRejectedValue(databaseError),
+        }),
+      },
+    });
+
+    await expect(
+      service.deletePostImage(postId.toString(), imageId, userId.toString()),
+    ).rejects.toBe(databaseError);
+    expect(uploadsService.deleteImage).not.toHaveBeenCalled();
   });
 });
