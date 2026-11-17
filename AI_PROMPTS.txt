@@ -69,3 +69,13 @@ Prompt:
 How the output was used:
 Added POST /api/uploads with Swagger multipart documentation, Multer file-size limits, MIME and image-signature validation, random UUID filenames, and a reusable exported UploadsService. Verified a PNG upload returned 201 and an id/URL, the saved file was retrievable at its /uploads URL with matching SHA-256, a non-image returned 400, and a file over 5 MB returned 413. The Nest build passed. The start:dev script failed in this workspace because incremental compilation did not recreate dist, so the runtime checks used the same Nest entry point with ts-node and temporary local environment values.
 ================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: ACC-15
+Prompt:
+"Implement admin airline/hotel deactivation and reactivation with existing owner services, notification recipient discovery, NotificationsService and AuditLogsService. If dependencies are placeholders, add only a documented compile-safe fail-closed stub; do not invent provider state, booking logic, or recipients. Add admin authorization, validation, and tests."
+How the output was used:
+Inspected develop and confirmed AuditLogsService and admin guards are ready, while AirlinesModule, HotelsModule, NotificationsModule, FlightBookingsModule, and HotelBookingsModule are placeholders. Added admin-only routes, provider-type/ObjectId validation, failure audit entries, and a documented integration stub that returns HTTP 501 without changing state or fabricating notification recipients. Success-path provider mutation and notifications remain unimplemented pending the owning modules.
