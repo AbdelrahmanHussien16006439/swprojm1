@@ -325,12 +325,7 @@ export class BlogService {
       })
       .exec();
     if (!deleted) throw new NotFoundException('Comment not found');
-    await this.postModel
-      .updateOne(
-        { _id: comment.postId, commentsCount: { $gt: 0 } },
-        { $inc: { commentsCount: -1 } },
-      )
-      .exec();
+    await this.decrementCommentCount(comment.postId);
     return { message: 'Comment deleted' };
   }
 
@@ -406,13 +401,60 @@ export class BlogService {
 
   async deletePost(id: string, userId: string): Promise<{ message: string }> {
     const post = await this.findOwnedPost(id, userId);
+    await this.removePostAndRelatedContent(post);
+    return { message: 'Post deleted' };
+  }
+
+  /** GEN-10: admin moderation deletion, preserving the normal post cascade. */
+  async deletePostForModeration(id: string): Promise<void> {
+    const post = await this.postModel.findById(id).exec();
+    if (!post) throw new NotFoundException('Post not found');
+    await this.removePostAndRelatedContent(post);
+  }
+
+  /** GEN-10: hide or restore a post without bypassing the existing schema. */
+  async setPostHidden(id: string, hidden: boolean): Promise<void> {
+    const post = await this.postModel
+      .findByIdAndUpdate(id, { $set: { isHidden: hidden } }, { new: true })
+      .exec();
+    if (!post) throw new NotFoundException('Post not found');
+  }
+
+  /** GEN-10: hide or restore a comment. */
+  async setCommentHidden(id: string, hidden: boolean): Promise<void> {
+    const comment = await this.commentModel
+      .findByIdAndUpdate(id, { $set: { isHidden: hidden } }, { new: true })
+      .exec();
+    if (!comment) throw new NotFoundException('Comment not found');
+  }
+
+  /** GEN-10: admin deletion preserves comment-count consistency. */
+  async deleteCommentForModeration(id: string): Promise<void> {
+    const comment = await this.commentModel.findById(id).exec();
+    if (!comment) throw new NotFoundException('Comment not found');
+    const deleted = await this.commentModel
+      .findOneAndDelete({ _id: comment._id })
+      .exec();
+    if (!deleted) throw new NotFoundException('Comment not found');
+    await this.decrementCommentCount(comment.postId);
+  }
+
+  private async removePostAndRelatedContent(post: PostDocument) {
     await Promise.all([
       this.commentModel.deleteMany({ postId: post._id }).exec(),
       this.likeModel.deleteMany({ postId: post._id }).exec(),
     ]);
     await post.deleteOne();
     await this.removeUploadedImages(post.images ?? []);
-    return { message: 'Post deleted' };
+  }
+
+  private async decrementCommentCount(postId: Types.ObjectId): Promise<void> {
+    await this.postModel
+      .updateOne(
+        { _id: postId, commentsCount: { $gt: 0 } },
+        { $inc: { commentsCount: -1 } },
+      )
+      .exec();
   }
 
   private async findOwnedPost(id: string, userId: string) {
