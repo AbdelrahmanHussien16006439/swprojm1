@@ -30,3 +30,14 @@ AuditLog schemas, auth (register, login with lockout, refresh, logout, me,
 change-password), profile endpoints, admin account endpoints and the admin seed.
 Reviewed the code and tested every endpoint against a local MongoDB before committing.
 ================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: BLG-01, BLG-05, BLG-06
+Prompt:
+"Create the Blog module's Post, Comment, and Like Mongoose schemas per TEAM_PLAN.md. Apply tag, image, and comment limits, timestamp fields, model references, the unique post/user like index, and register/export the models from BlogModule without implementing endpoints."
+How the output was used:
+Added the three timestamped schemas with the requested references, defaults, validation limits, and unique like index; registered them in BlogModule and exported MongooseModule. No post endpoints were added.
+================================================
