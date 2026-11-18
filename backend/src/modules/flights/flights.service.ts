@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Types } from 'mongoose';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { AirlinesService } from '../airlines/airlines.service';
@@ -28,11 +29,26 @@ export class FlightsService {
     return flight;
   }
 
+  /** FLT-30: every minute, only scheduled flights past departure become departed. */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async markDepartedFlights(): Promise<void> {
+    await this.flightModel
+      .updateMany(
+        {
+          status: FlightStatus.SCHEDULED,
+          departureTime: { $lte: new Date() },
+        },
+        { $set: { status: FlightStatus.DEPARTED } },
+      )
+      .exec();
+  }
+
   async addCabin(
     flightId: string,
     dto: CreateCabinDto,
     user: JwtUser,
   ): Promise<Flight> {
+    const airlineObjectId = this.getProviderObjectId(user);
     const flight = await this.getOwnedScheduledFlight(flightId, user);
     if (flight.cabins.some((cabin) => cabin.cabinClass === dto.cabinClass)) {
       throw new ConflictException('This cabin class already exists on the flight');
@@ -43,7 +59,7 @@ export class FlightsService {
         {
           _id: flightId,
           status: FlightStatus.SCHEDULED,
-          airlineId: user.providerId,
+          airlineId: airlineObjectId,
           // Keep the duplicate-class check inside the atomic update filter.
           $expr: {
             $eq: [
@@ -87,6 +103,7 @@ export class FlightsService {
     dto: UpdateCabinDto,
     user: JwtUser,
   ): Promise<Flight> {
+    const airlineObjectId = this.getProviderObjectId(user);
     await this.getOwnedScheduledFlight(flightId, user);
     const cabinObjectId = new Types.ObjectId(cabinId);
 
@@ -94,7 +111,7 @@ export class FlightsService {
       const capacityFilter = {
         _id: flightId,
         status: FlightStatus.SCHEDULED,
-        airlineId: user.providerId,
+        airlineId: airlineObjectId,
         $expr: {
           $gt: [
             {
@@ -175,7 +192,7 @@ export class FlightsService {
         {
           _id: flightId,
           status: FlightStatus.SCHEDULED,
-          airlineId: user.providerId,
+          airlineId: airlineObjectId,
           'cabins._id': cabinObjectId,
         },
         { $set: { 'cabins.$.price': dto.price } },
@@ -190,14 +207,22 @@ export class FlightsService {
     flightId: string,
     user: JwtUser,
   ): Promise<Flight> {
+    const providerObjectId = this.getProviderObjectId(user);
     const flight = await this.findById(flightId);
     await this.airlinesService.findById(flight.airlineId.toString());
-    if (!user.providerId || flight.airlineId.toString() !== user.providerId) {
+    if (!flight.airlineId.equals(providerObjectId)) {
       throw new NotFoundException('Flight not found');
     }
     if (flight.status !== FlightStatus.SCHEDULED) {
       throw new BadRequestException('Only scheduled flights can be edited');
     }
     return flight;
+  }
+
+  private getProviderObjectId(user: JwtUser): Types.ObjectId {
+    if (!user.providerId || !Types.ObjectId.isValid(user.providerId)) {
+      throw new NotFoundException('Flight not found');
+    }
+    return new Types.ObjectId(user.providerId);
   }
 }
