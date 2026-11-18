@@ -71,6 +71,32 @@ describe('AirlinesService', () => {
     await expect(service.findById(id.toString())).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('updates the baggage policy for the owning moderator', async () => {
+    const { service, model } = setup();
+    const policy = { extraBagPrice: 25, maxExtraBagsPerPassenger: 2 };
+
+    await expect(service.updateBaggagePolicy(id.toString(), policy, moderator)).resolves.toBe(
+      airline,
+    );
+    expect(model.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: id.toString() },
+      { $set: { baggagePolicy: policy } },
+      { new: true, runValidators: true },
+    );
+  });
+
+  it('does not update baggage policy for another airline', async () => {
+    const { service, model } = setup();
+
+    await expect(
+      service.updateBaggagePolicy(new Types.ObjectId().toString(), {
+        extraBagPrice: 25,
+        maxExtraBagsPerPassenger: 2,
+      }, moderator),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(model.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
   it('replaces the old managed logo and deletes the old file', async () => {
     const oldId = '550e8400-e29b-41d4-a716-446655440001';
     const { service, model, uploadsService } = setup({

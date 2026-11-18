@@ -8,6 +8,7 @@ import { Model } from 'mongoose';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { UploadsService } from '../uploads/uploads.service';
 import { CreateAirlineDto } from './dto/create-airline.dto';
+import { UpdateBaggagePolicyDto } from './dto/update-baggage-policy.dto';
 import { UpdateAirlineDto } from './dto/update-airline.dto';
 import { Airline } from './schemas/airline.schema';
 
@@ -71,6 +72,26 @@ export class AirlinesService {
       baggagePolicy: airline.baggagePolicy,
       cancellationTiers: airline.cancellationTiers,
     };
+  }
+
+  async updateBaggagePolicy(
+    id: string,
+    dto: UpdateBaggagePolicyDto,
+    user: JwtUser,
+  ): Promise<Airline> {
+    if (!user.providerId || user.providerId !== id) {
+      throw new NotFoundException('Airline not found');
+    }
+
+    const airline = await this.airlineModel
+      .findOneAndUpdate(
+        { _id: id },
+        { $set: { baggagePolicy: dto } },
+        { new: true, runValidators: true },
+      )
+      .exec();
+    if (!airline) throw new NotFoundException('Airline not found');
+    return airline;
   }
 
   async uploadLogo(
