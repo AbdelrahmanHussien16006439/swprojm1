@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Types } from 'mongoose';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { AirlinesService } from '../airlines/airlines.service';
@@ -26,6 +27,20 @@ export class FlightsService {
     const flight = await this.flightModel.findById(id).exec();
     if (!flight) throw new NotFoundException('Flight not found');
     return flight;
+  }
+
+  /** FLT-30: every minute, only scheduled flights past departure become departed. */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async markDepartedFlights(): Promise<void> {
+    await this.flightModel
+      .updateMany(
+        {
+          status: FlightStatus.SCHEDULED,
+          departureTime: { $lte: new Date() },
+        },
+        { $set: { status: FlightStatus.DEPARTED } },
+      )
+      .exec();
   }
 
   async addCabin(
