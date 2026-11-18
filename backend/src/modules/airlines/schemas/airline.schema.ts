@@ -5,7 +5,13 @@ export type AirlineDocument = HydratedDocument<Airline>;
 
 @Schema({ _id: false })
 export class BaggagePolicy {
-  @Prop({ required: true, min: 0 })
+  @Prop({
+    required: true,
+    validate: {
+      validator: (value: number) => value > 0,
+      message: 'extraBagPrice must be greater than zero',
+    },
+  })
   extraBagPrice: number;
 
   @Prop({ required: true, min: 0, validate: Number.isInteger })

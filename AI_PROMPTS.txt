@@ -281,3 +281,16 @@ Added the Task 5 cabin DTOs, guarded controller routes, atomic cabin insertion a
 capacity updates, duplicate-class protection, and focused tests. Cron and
 airport-dependent flight creation remain later tasks.
 ================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-08
+Prompt:
+"Implement the airline baggage policy endpoint from TEAM_PLAN.md: an owning
+airline moderator can set extra bag price greater than zero and maximum extra
+bags per passenger at least zero, with DTO validation, Swagger documentation,
+ownership checks, and tests."
+How the output was used:
+Added the validated baggage-policy DTO, protected PUT endpoint, atomic policy
+update through AirlinesService, and ownership-focused unit tests.
+================================================
