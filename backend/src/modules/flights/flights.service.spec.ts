@@ -104,6 +104,37 @@ describe('FlightsService', () => {
     );
   });
 
+  it('adds the first cabin when the scheduled flight has an empty cabins array', async () => {
+    const updatedFlight = {
+      ...flight,
+      airlineId,
+      status: FlightStatus.SCHEDULED,
+      cabins: [{ cabinClass: CabinClass.ECONOMY, totalSeats: 180 }],
+    } as Flight;
+    const { service, model } = setup({
+      findOneAndUpdate: jest.fn((filter) => {
+        expect(filter.cabins).toBeUndefined();
+        expect(filter.$expr).toEqual(expect.any(Object));
+        return exec(updatedFlight);
+      }),
+    });
+
+    await expect(
+      service.addCabin(
+        flightId.toString(),
+        {
+          cabinClass: CabinClass.ECONOMY,
+          price: 200,
+          totalSeats: 180,
+          freeBags: 1,
+          maxBagWeightKg: 23,
+        },
+        moderator,
+      ),
+    ).resolves.toBe(updatedFlight);
+    expect(model.findOneAndUpdate).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects a cabin class that already exists', async () => {
     const { service } = setup({
       findById: jest.fn().mockReturnValue(

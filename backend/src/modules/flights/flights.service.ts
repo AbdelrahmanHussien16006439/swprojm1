@@ -9,7 +9,7 @@ import { Model } from 'mongoose';
 import { Types } from 'mongoose';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { AirlinesService } from '../airlines/airlines.service';
-import { CabinClass, FlightStatus } from './flights.constants';
+import { FlightStatus } from './flights.constants';
 import { CreateCabinDto } from './dto/create-cabin.dto';
 import { UpdateCabinDto } from './dto/update-cabin.dto';
 import { Flight } from './schemas/flight.schema';
@@ -44,7 +44,21 @@ export class FlightsService {
           _id: flightId,
           status: FlightStatus.SCHEDULED,
           airlineId: user.providerId,
-          cabins: { $not: { $elemMatch: { cabinClass: dto.cabinClass } } },
+          // Keep the duplicate-class check inside the atomic update filter.
+          $expr: {
+            $eq: [
+              {
+                $size: {
+                  $filter: {
+                    input: { $ifNull: ['$cabins', []] },
+                    as: 'cabin',
+                    cond: { $eq: ['$$cabin.cabinClass', dto.cabinClass] },
+                  },
+                },
+              },
+              0,
+            ],
+          },
         },
         {
           $push: {
