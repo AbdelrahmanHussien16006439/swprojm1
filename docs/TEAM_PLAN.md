@@ -160,7 +160,10 @@ if (flight.airlineId.toString() !== user.providerId) throw new ForbiddenExceptio
 if (booking.userId.toString() !== user.sub) throw new NotFoundException(); // hide private resources
 Testing in Swagger: call POST /api/auth/login in Swagger; the browser stores the cookies and sends them automatically on the next Swagger requests.
 3.7 Database & model names (use EXACTLY these names in ref)
-@Schema({ timestamps: true }) on every schema. References: @Prop({ type: Types.ObjectId, ref: 'Flight' }).
+@Schema({ timestamps: true }) on every schema.
+References: @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Flight' }) with import { Schema as MongooseSchema, Types } from 'mongoose' (the TypeScript field type stays Types.ObjectId). Never write @Prop({ type: Types.ObjectId }): it silently becomes Mixed, Mongoose stops casting string ids, and id filters match nothing.
+Arrays of references: @Prop({ type: [{ type: MongooseSchema.Types.ObjectId, ref: 'Flight' }] }).
+Guard every reference field with a schema test: expect(XSchema.path('field').instance).toBe('ObjectId').
 Validate id params with ParseObjectIdPipe (from common/) → 400 for invalid ids, 404 when not found.
 Money (PAY-04): all flight and hotel prices, payments and refunds use one platform currency = PLATFORM_CURRENCY from .env (e.g. USD). Flight/hotel prices have no currency field. Only itinerary budgets use other currencies.
 Dates: stored in UTC. Hotel and itinerary dates are calendar dates stored as Date at UTC midnight (API format YYYY-MM-DD).

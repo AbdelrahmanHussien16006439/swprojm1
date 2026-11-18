@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, Schema as MongooseSchema, Types } from 'mongoose';
 import { ProviderType } from '../../../common/enums/provider-type.enum';
 import { Role } from '../../../common/enums/role.enum';
 import { UserStatus } from '../../../common/enums/user-status.enum';
@@ -38,7 +38,7 @@ export class User {
   @Prop({ type: String, enum: Object.values(ProviderType) })
   providerType?: ProviderType;
 
-  @Prop({ type: Types.ObjectId })
+  @Prop({ type: MongooseSchema.Types.ObjectId })
   providerId?: Types.ObjectId;
 
   @Prop()

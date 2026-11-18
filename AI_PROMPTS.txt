@@ -4,6 +4,7 @@ Every team member adds entries at the BOTTOM of this file for prompts that mater
 contributed to the project. Use this format:
 
 ================================================
+### Member N — YYYY-MM-DD HH:MM — Requirement ID
 Date: YYYY-MM-DD
 Student: Student Name
 Tool: ChatGPT / Claude / Copilot / ...
@@ -13,6 +14,8 @@ Prompt:
 How the output was used:
 <what you kept, changed, or rejected>
 ================================================
+
+Start every new entry with a unique line after the ==== separator, e.g. ### Member 3 — 2026-11-18 22:50 — FLT-08, so Git doesn't glue entries together when branches merge.
 
 ================================================
 Date: 2026-11-16
@@ -307,4 +310,21 @@ How the output was used:
 Kept the flight reference schema guards, changed addCabin and both updateCabin
 filters to use validated ObjectIds, compared ownership as ObjectIds, and added
 a regression test for first-cabin insertion.
+================================================
+### Member 1 — 2026-11-18 23:07 — GEN-07, ACC-06, ACC-13
+Date: 2026-11-18
+Student: Abdelrahman Hussien (Member 1)
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: GEN-07, ACC-06, ACC-13
+Prompt:
+"Change every @Prop({ type: Types.ObjectId }) in my schemas to
+MongooseSchema.Types.ObjectId, check that id queries in my modules still work,
+add schema guard tests, fix the reference rule in TEAM_PLAN.md 3.7, and add a
+unique header line to the AI_PROMPTS.txt format so merges stop gluing entries."
+How the output was used:
+Session.userId, User.providerId and AuditLog.actorId now use
+MongooseSchema.Types.ObjectId (they had silently become Mixed); indexes kept.
+Verified all id filters in auth/users/admin-accounts/audit-logs already pass
+ObjectIds. Added schema guard tests, corrected TEAM_PLAN.md 3.7, and added the
+### header rule to this file's format instructions.
 ================================================
