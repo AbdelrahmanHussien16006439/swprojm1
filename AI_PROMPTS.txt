@@ -227,3 +227,17 @@ How the output was used:
 Kept image creation server-controlled and restricted cleanup to validated upload records, including shared-reference protection. Tightened report visibility checks, guarded uploads, removed duplicate decorators, and enforced the report reason limit in both DTO and schema. Added unit coverage for image cleanup and report reason validation. `npm.cmd run build` passed; all 14 Jest suites (84 tests) passed. No Atlas or Swagger retest was run.
 ================================================
 ================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-01
+Prompt:
+"Implement the Member 3 airline schema, AirlinesService, and admin/public/moderator
+airline endpoints from TEAM_PLAN.md. Use the shared guards, exact model names,
+DTO validation, Swagger decorators, ownership checks, and keep edits in airlines,
+flights, and AI_PROMPTS.txt only."
+How the output was used:
+Added the timestamped Airline schema with baggage and cancellation policy fields,
+validated DTOs, guarded controller routes, exported AirlinesService, and focused
+unit tests. Logo upload and policy endpoints remain separate later task groups.
+================================================
