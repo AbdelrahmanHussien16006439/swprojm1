@@ -35,6 +35,7 @@ import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
 import { CreateAirlineDto } from './dto/create-airline.dto';
 import { UpdateBaggagePolicyDto } from './dto/update-baggage-policy.dto';
+import { UpdateCancellationPolicyDto } from './dto/update-cancellation-policy.dto';
 import { UpdateAirlineDto } from './dto/update-airline.dto';
 import { AirlinesService } from './airlines.service';
 
@@ -94,6 +95,22 @@ export class AirlinesController {
     @CurrentUser() user: JwtUser,
   ) {
     return this.airlinesService.updateBaggagePolicy(id, dto, user);
+  }
+
+  @Put(':id/cancellation-policy')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.AIRLINE_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Update my airline cancellation policy (FLT-09)' })
+  @ApiOkResponse({ description: 'Cancellation policy updated' })
+  @ApiBadRequestResponse({ description: 'Invalid cancellation policy tiers' })
+  @ApiNotFoundResponse({ description: 'Airline not found or not owned by user' })
+  updateCancellationPolicy(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Body() dto: UpdateCancellationPolicyDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.airlinesService.updateCancellationPolicy(id, dto, user);
   }
 
   @Post(':id/logo')

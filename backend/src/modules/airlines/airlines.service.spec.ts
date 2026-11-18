@@ -125,6 +125,32 @@ describe('AirlinesService', () => {
     );
   });
 
+  it('updates cancellation tiers for the owning moderator', async () => {
+    const { service, model } = setup();
+    const tiers = [
+      { daysBefore: 30, refundPercent: 75 },
+      { daysBefore: 0, refundPercent: 0 },
+    ];
+
+    await expect(
+      service.updateCancellationPolicy(id.toString(), { tiers }, moderator),
+    ).resolves.toBe(airline);
+    expect(model.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: id.toString() },
+      { $set: { cancellationTiers: tiers } },
+      { new: true, runValidators: true },
+    );
+  });
+
+  it('does not update cancellation tiers for another airline', async () => {
+    const { service, model } = setup();
+
+    await expect(
+      service.updateCancellationPolicy(new Types.ObjectId().toString(), { tiers: [] }, moderator),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(model.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
   it('deletes a newly uploaded logo if the database update fails', async () => {
     const databaseError = new Error('database update failed');
     const { service, uploadsService } = setup({
