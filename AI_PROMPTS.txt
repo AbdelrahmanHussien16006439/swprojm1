@@ -308,3 +308,16 @@ Kept the flight reference schema guards, changed addCabin and both updateCabin
 filters to use validated ObjectIds, compared ownership as ObjectIds, and added
 a regression test for first-cabin insertion.
 ================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-08
+Prompt:
+"Implement the airline baggage policy endpoint from TEAM_PLAN.md: an owning
+airline moderator can set extra bag price greater than zero and maximum extra
+bags per passenger at least zero, with DTO validation, Swagger documentation,
+ownership checks, and tests."
+How the output was used:
+Added the validated baggage-policy DTO, protected PUT endpoint, atomic policy
+update through AirlinesService, and ownership-focused unit tests.
+================================================
