@@ -256,3 +256,16 @@ Added POST /api/airlines/:id/logo with guarded multipart Swagger documentation,
 UploadsService integration, replacement cleanup, failure cleanup, and focused
 unit tests. The existing logo URL is replaced atomically in the airline document.
 ================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-30
+Prompt:
+"Implement Task 6 from TEAM_PLAN.md: add the scheduled-flight status cron so
+flights whose UTC departureTime has passed become departed. Use one atomic
+updateMany filter, add a unit test, and edit only the flights module plus the
+AI usage log."
+How the output was used:
+Added the every-minute FlightsService cron and a regression test proving only
+scheduled flights with departureTime at or before now are transitioned.
+================================================
