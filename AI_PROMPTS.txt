@@ -256,3 +256,28 @@ Added POST /api/airlines/:id/logo with guarded multipart Swagger documentation,
 UploadsService integration, replacement cleanup, failure cleanup, and focused
 unit tests. The existing logo URL is replaced atomically in the airline document.
 ================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-03, FLT-30, GEN-06
+Prompt:
+"Implement the Member 3 Task 4 flight schema and exported FlightsService.findById
+from TEAM_PLAN.md, using exact UTC time, cabin, and status fields without editing
+airlines or creating airport schemas."
+How the output was used:
+Recorded the missing Task 4 AI usage entry in this commit because the Task 4 code
+was merged into develop without its corresponding log entry.
+================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-04, FLT-05
+Prompt:
+"Implement cabin creation and price/seat updates from TEAM_PLAN.md with exact
+cabin classes, DTO validation, Swagger, ownership through AirlinesService,
+atomic seat counters, duplicate-class protection, tests, and no edits to airlines."
+How the output was used:
+Added the Task 5 cabin DTOs, guarded controller routes, atomic cabin insertion and
+capacity updates, duplicate-class protection, and focused tests. Cron and
+airport-dependent flight creation remain later tasks.
+================================================
