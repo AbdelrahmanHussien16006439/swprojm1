@@ -294,3 +294,17 @@ How the output was used:
 Added the every-minute FlightsService cron and a regression test proving only
 scheduled flights with departureTime at or before now are transitioned.
 ================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-04
+Prompt:
+"Fix the cabin filter ObjectId mismatch by using real Mongoose ObjectId schema
+types, validating the moderator providerId, converting ownership filters to
+ObjectId values, and adding regression tests without adding packages or editing
+airlines."
+How the output was used:
+Kept the flight reference schema guards, changed addCabin and both updateCabin
+filters to use validated ObjectIds, compared ownership as ObjectIds, and added
+a regression test for first-cabin insertion.
+================================================
