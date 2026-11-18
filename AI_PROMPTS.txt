@@ -308,3 +308,21 @@ Kept the flight reference schema guards, changed addCabin and both updateCabin
 filters to use validated ObjectIds, compared ownership as ObjectIds, and added
 a regression test for first-cabin insertion.
 ================================================
+Date: 2026-11-19
+Student: Member 2
+Tool: Codex
+Related Requirements: BLG-01, GEN-09, GEN-10
+Prompt:
+"Fix ObjectId schema declarations in my blog and reports modules using
+MongooseSchema.Types.ObjectId while keeping Types.ObjectId TypeScript types.
+Check id comparisons and aggregation pipelines, add schema guard tests, run
+the backend build and unit tests, report affected collections, and commit only
+my modules plus AI_PROMPTS.txt with the required commit message. Do not read
+.env, add packages, or push."
+How the output was used:
+Updated Post, Comment, Like and Report ObjectId paths, preserved existing
+indexes, and added schema guard tests. Existing blog aggregations already used
+Types.ObjectId for id matching; the image-count $expr compares array sizes.
+Potential legacy string ids: posts.authorId, comments.postId/comments.authorId,
+likes.postId/likes.userId, reports.reporterId/reports.targetId/reports.resolvedBy.
+================================================
