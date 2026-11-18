@@ -281,3 +281,17 @@ Added the Task 5 cabin DTOs, guarded controller routes, atomic cabin insertion a
 capacity updates, duplicate-class protection, and focused tests. Cron and
 airport-dependent flight creation remain later tasks.
 ================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-04
+Prompt:
+"Fix the cabin filter ObjectId mismatch by using real Mongoose ObjectId schema
+types, validating the moderator providerId, converting ownership filters to
+ObjectId values, and adding regression tests without adding packages or editing
+airlines."
+How the output was used:
+Kept the flight reference schema guards, changed addCabin and both updateCabin
+filters to use validated ObjectIds, compared ownership as ObjectIds, and added
+a regression test for first-cabin insertion.
+================================================
