@@ -15,7 +15,7 @@ export enum PostStatus {
 
 @Schema({ timestamps: true })
 export class Post {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   authorId: Types.ObjectId;
 
   @Prop({ required: true, trim: true })
