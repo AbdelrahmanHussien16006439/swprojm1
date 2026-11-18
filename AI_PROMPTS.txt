@@ -284,6 +284,20 @@ airport-dependent flight creation remain later tasks.
 Date: 2026-11-18
 Student: Member 3
 Tool: Codex
+Related Requirement: FLT-09
+Prompt:
+"Implement the airline cancellation-policy endpoint from TEAM_PLAN.md: an owning
+airline moderator can replace cancellation tiers, with integer non-negative
+daysBefore values, unique thresholds, refund percentages from 0 to 100, Swagger
+documentation, ownership checks, and tests."
+How the output was used:
+Added the nested validated cancellation-tier DTO, protected PUT endpoint, atomic
+policy replacement through AirlinesService, schema uniqueness validation, and
+ownership-focused unit tests.
+================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
 Related Requirement: FLT-30
 Prompt:
 "Implement Task 6 from TEAM_PLAN.md: add the scheduled-flight status cron so

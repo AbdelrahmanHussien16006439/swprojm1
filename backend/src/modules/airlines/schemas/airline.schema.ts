@@ -42,7 +42,15 @@ export class Airline {
   })
   baggagePolicy: BaggagePolicy;
 
-  @Prop({ type: [CancellationTier], default: [] })
+  @Prop({
+    type: [CancellationTier],
+    default: [],
+    validate: {
+      validator: (tiers: CancellationTier[]) =>
+        new Set(tiers.map((tier) => tier.daysBefore)).size === tiers.length,
+      message: 'daysBefore values must be unique',
+    },
+  })
   cancellationTiers: CancellationTier[];
 
   createdAt: Date;

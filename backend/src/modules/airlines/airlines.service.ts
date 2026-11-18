@@ -8,6 +8,7 @@ import { Model } from 'mongoose';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { UploadsService } from '../uploads/uploads.service';
 import { CreateAirlineDto } from './dto/create-airline.dto';
+import { UpdateCancellationPolicyDto } from './dto/update-cancellation-policy.dto';
 import { UpdateAirlineDto } from './dto/update-airline.dto';
 import { Airline } from './schemas/airline.schema';
 
@@ -60,6 +61,26 @@ export class AirlinesService {
   async setActive(id: string, isActive: boolean): Promise<Airline> {
     const airline = await this.airlineModel
       .findByIdAndUpdate(id, { isActive }, { new: true, runValidators: true })
+      .exec();
+    if (!airline) throw new NotFoundException('Airline not found');
+    return airline;
+  }
+
+  async updateCancellationPolicy(
+    id: string,
+    dto: UpdateCancellationPolicyDto,
+    user: JwtUser,
+  ): Promise<Airline> {
+    if (!user.providerId || user.providerId !== id) {
+      throw new NotFoundException('Airline not found');
+    }
+
+    const airline = await this.airlineModel
+      .findOneAndUpdate(
+        { _id: id },
+        { $set: { cancellationTiers: dto.tiers } },
+        { new: true, runValidators: true },
+      )
       .exec();
     if (!airline) throw new NotFoundException('Airline not found');
     return airline;
