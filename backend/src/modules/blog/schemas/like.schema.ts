@@ -1,14 +1,14 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type LikeDocument = HydratedDocument<Like>;
 
 @Schema({ timestamps: true })
 export class Like {
-  @Prop({ type: Types.ObjectId, ref: 'Post', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Post', required: true })
   postId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
 
   createdAt: Date;

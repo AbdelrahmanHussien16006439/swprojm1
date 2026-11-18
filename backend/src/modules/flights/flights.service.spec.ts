@@ -103,7 +103,7 @@ describe('FlightsService', () => {
       expect.objectContaining({
         _id: flightId.toString(),
         status: FlightStatus.SCHEDULED,
-        airlineId: airlineId.toString(),
+        airlineId,
       }),
       {
         $push: {
@@ -130,6 +130,8 @@ describe('FlightsService', () => {
       findOneAndUpdate: jest.fn((filter) => {
         expect(filter.cabins).toBeUndefined();
         expect(filter.$expr).toEqual(expect.any(Object));
+        expect(filter.airlineId).toBeInstanceOf(Types.ObjectId);
+        expect(filter.airlineId).toEqual(airlineId);
         return exec(updatedFlight);
       }),
     });
@@ -148,6 +150,26 @@ describe('FlightsService', () => {
       ),
     ).resolves.toBe(updatedFlight);
     expect(model.findOneAndUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses an ObjectId for the airline ownership filter when adding the first cabin', async () => {
+    const { service, model } = setup();
+
+    await service.addCabin(
+      flightId.toString(),
+      {
+        cabinClass: CabinClass.ECONOMY,
+        price: 200,
+        totalSeats: 180,
+        freeBags: 1,
+        maxBagWeightKg: 23,
+      },
+      moderator,
+    );
+
+    const filter = (model.findOneAndUpdate as jest.Mock).mock.calls[0][0];
+    expect(filter.airlineId).toBeInstanceOf(Types.ObjectId);
+    expect(filter.airlineId).toEqual(airlineId);
   });
 
   it('rejects a cabin class that already exists', async () => {

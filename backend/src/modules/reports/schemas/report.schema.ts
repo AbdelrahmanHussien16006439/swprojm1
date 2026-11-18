@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type ReportDocument = HydratedDocument<Report>;
 
@@ -19,7 +19,7 @@ export enum ReportStatus {
 
 @Schema({ timestamps: true })
 export class Report {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   reporterId: Types.ObjectId;
 
   @Prop({
@@ -29,7 +29,8 @@ export class Report {
   })
   targetType: ReportTargetType;
 
-  @Prop({ type: Types.ObjectId, required: true })
+  // targetId is polymorphic (post/comment/review/itinerary), so it has no fixed ref.
+  @Prop({ type: MongooseSchema.Types.ObjectId, required: true })
   targetId: Types.ObjectId;
 
   @Prop({ type: String, required: true, trim: true, maxlength: 500 })
@@ -43,7 +44,7 @@ export class Report {
   })
   status: ReportStatus;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', default: null })
   resolvedBy: Types.ObjectId | null;
 
   @Prop({ type: Date, default: null })

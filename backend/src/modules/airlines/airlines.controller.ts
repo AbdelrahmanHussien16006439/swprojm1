@@ -34,6 +34,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
 import { CreateAirlineDto } from './dto/create-airline.dto';
+import { UpdateBaggagePolicyDto } from './dto/update-baggage-policy.dto';
 import { UpdateCancellationPolicyDto } from './dto/update-cancellation-policy.dto';
 import { UpdateAirlineDto } from './dto/update-airline.dto';
 import { AirlinesService } from './airlines.service';
@@ -78,6 +79,22 @@ export class AirlinesController {
     @CurrentUser() user: JwtUser,
   ) {
     return this.airlinesService.update(id, dto, user);
+  }
+
+  @Put(':id/baggage-policy')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.AIRLINE_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Update my airline baggage policy (FLT-08)' })
+  @ApiOkResponse({ description: 'Baggage policy updated' })
+  @ApiBadRequestResponse({ description: 'Invalid baggage policy values' })
+  @ApiNotFoundResponse({ description: 'Airline not found or not owned by user' })
+  updateBaggagePolicy(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Body() dto: UpdateBaggagePolicyDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.airlinesService.updateBaggagePolicy(id, dto, user);
   }
 
   @Put(':id/cancellation-policy')

@@ -48,6 +48,7 @@ export class FlightsService {
     dto: CreateCabinDto,
     user: JwtUser,
   ): Promise<Flight> {
+    const airlineObjectId = this.getProviderObjectId(user);
     const flight = await this.getOwnedScheduledFlight(flightId, user);
     if (flight.cabins.some((cabin) => cabin.cabinClass === dto.cabinClass)) {
       throw new ConflictException('This cabin class already exists on the flight');
@@ -58,7 +59,7 @@ export class FlightsService {
         {
           _id: flightId,
           status: FlightStatus.SCHEDULED,
-          airlineId: user.providerId,
+          airlineId: airlineObjectId,
           // Keep the duplicate-class check inside the atomic update filter.
           $expr: {
             $eq: [
@@ -102,6 +103,7 @@ export class FlightsService {
     dto: UpdateCabinDto,
     user: JwtUser,
   ): Promise<Flight> {
+    const airlineObjectId = this.getProviderObjectId(user);
     await this.getOwnedScheduledFlight(flightId, user);
     const cabinObjectId = new Types.ObjectId(cabinId);
 
@@ -109,7 +111,7 @@ export class FlightsService {
       const capacityFilter = {
         _id: flightId,
         status: FlightStatus.SCHEDULED,
-        airlineId: user.providerId,
+        airlineId: airlineObjectId,
         $expr: {
           $gt: [
             {
@@ -190,7 +192,7 @@ export class FlightsService {
         {
           _id: flightId,
           status: FlightStatus.SCHEDULED,
-          airlineId: user.providerId,
+          airlineId: airlineObjectId,
           'cabins._id': cabinObjectId,
         },
         { $set: { 'cabins.$.price': dto.price } },
@@ -205,14 +207,22 @@ export class FlightsService {
     flightId: string,
     user: JwtUser,
   ): Promise<Flight> {
+    const providerObjectId = this.getProviderObjectId(user);
     const flight = await this.findById(flightId);
     await this.airlinesService.findById(flight.airlineId.toString());
-    if (!user.providerId || flight.airlineId.toString() !== user.providerId) {
+    if (!flight.airlineId.equals(providerObjectId)) {
       throw new NotFoundException('Flight not found');
     }
     if (flight.status !== FlightStatus.SCHEDULED) {
       throw new BadRequestException('Only scheduled flights can be edited');
     }
     return flight;
+  }
+
+  private getProviderObjectId(user: JwtUser): Types.ObjectId {
+    if (!user.providerId || !Types.ObjectId.isValid(user.providerId)) {
+      throw new NotFoundException('Flight not found');
+    }
+    return new Types.ObjectId(user.providerId);
   }
 }
