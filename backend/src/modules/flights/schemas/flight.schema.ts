@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, Schema as MongooseSchema, Types } from 'mongoose';
 import { CabinClass, FlightStatus } from '../flights.constants';
 
 export type FlightDocument = HydratedDocument<Flight>;
@@ -33,16 +33,21 @@ export class FlightCabin {
 
 @Schema({ timestamps: true })
 export class Flight {
-  @Prop({ type: Types.ObjectId, ref: 'Airline', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Airline',
+    required: true,
+    index: true,
+  })
   airlineId: Types.ObjectId;
 
   @Prop({ required: true, trim: true })
   flightNumber: string;
 
-  @Prop({ type: Types.ObjectId, ref: 'Airport', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Airport', required: true })
   departureAirportId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Airport', required: true })
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Airport', required: true })
   arrivalAirportId: Types.ObjectId;
 
   // GEN-06: API local times are converted before persistence; these are UTC.
