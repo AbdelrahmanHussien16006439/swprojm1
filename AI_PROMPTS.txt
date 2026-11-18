@@ -284,6 +284,19 @@ airport-dependent flight creation remain later tasks.
 Date: 2026-11-18
 Student: Member 3
 Tool: Codex
+Related Requirement: FLT-30
+Prompt:
+"Implement Task 6 from TEAM_PLAN.md: add the scheduled-flight status cron so
+flights whose UTC departureTime has passed become departed. Use one atomic
+updateMany filter, add a unit test, and edit only the flights module plus the
+AI usage log."
+How the output was used:
+Added the every-minute FlightsService cron and a regression test proving only
+scheduled flights with departureTime at or before now are transitioned.
+================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
 Related Requirement: FLT-04
 Prompt:
 "Fix the cabin filter ObjectId mismatch by using real Mongoose ObjectId schema

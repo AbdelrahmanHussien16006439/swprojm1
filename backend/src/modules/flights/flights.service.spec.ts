@@ -70,6 +70,21 @@ describe('FlightsService', () => {
     );
   });
 
+  it('marks only scheduled flights past departure as departed', async () => {
+    const updateMany = jest.fn().mockReturnValue(exec({ modifiedCount: 1 }));
+    const { service } = setup({ updateMany });
+
+    await service.markDepartedFlights();
+
+    expect(updateMany).toHaveBeenCalledWith(
+      {
+        status: FlightStatus.SCHEDULED,
+        departureTime: { $lte: expect.any(Date) },
+      },
+      { $set: { status: FlightStatus.DEPARTED } },
+    );
+  });
+
   it('adds a cabin with counters initialized atomically', async () => {
     const { service, model } = setup();
     await service.addCabin(
