@@ -31,5 +31,9 @@ describe('HotelBooking schema', () => {
     const reference = HotelBookingSchema.path('bookingReference');
     expect(reference.options.unique).toBe(true);
     expect(reference.options.sparse).toBe(true);
+    const rooms = HotelBookingSchema.path('rooms') as unknown as {
+      schema: { path(name: string): { options: { min?: number } } };
+    };
+    expect(rooms.schema.path('adults').options.min).toBe(0);
   });
 });

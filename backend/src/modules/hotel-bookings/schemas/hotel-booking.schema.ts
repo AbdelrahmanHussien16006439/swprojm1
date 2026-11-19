@@ -22,7 +22,7 @@ export class HotelBookingRoom {
   @Prop({ required: true, min: 0 })
   pricePerNight: number;
 
-  @Prop({ required: true, min: 1, validate: Number.isInteger })
+  @Prop({ required: true, min: 0, validate: Number.isInteger })
   adults: number;
 
   @Prop({
