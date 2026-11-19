@@ -632,3 +632,17 @@ Prompt:
 How the output was used:
 Added an owner-only calendar endpoint with inclusive UTC dates and Available/Blocked statuses from room activation, availability and blocked ranges. Booked status and reservation references remain a TODO because Member 6's RoomNight support is not in develop. Build passed and all 32 test suites (201 tests) passed.
 ================================================
+### Member 6 — 2026-11-19 22:10 Africa/Cairo — GEN-01
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirement: GEN-01
+Prompt:
+"Implement Member 6 task 1: the Notification schema, exported notify/notifyMany
+service, and authenticated paginated notification list/read endpoints. Enforce
+ownership, use shared pagination, add DTO and Swagger documentation, ObjectId
+schema guard tests, and focused service tests."
+How the output was used:
+Added the Notification model and module exports, shared notification creation
+methods, GET /api/notifications with unread count and newest-first pagination,
+and mark-one/mark-all read routes. Build and the full unit test suite passed.
+================================================
