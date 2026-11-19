@@ -466,3 +466,20 @@ Added POST /api/flight-bookings/hold, atomic seat counter transitions, expiry
 cron and verified-payment confirmation callback. Notifications remain a marked
 Member 6 TODO. Build and all unit tests passed.
 ================================================
+
+================================================
+### Member 4 — 2026-11-19 16:13 — FLT-22, FLT-23
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: FLT-22, FLT-23
+Prompt:
+"Fix the task 6 duplicate bookingReference bug on the same feature branch:
+leave the reference undefined on pending bookings, retain a sparse unique index,
+unset the reference when reverting confirmation, release seats if booking insert
+fails, and test two pending holds from different users. Build and run tests;
+commit and push this branch only."
+How the output was used:
+Removed the null default from bookingReference and verified its sparse unique
+index. Confirmation rollback now unsets it. Added tests for insert-failure seat
+release and two distinct pending holds. Build and all unit tests passed.
+================================================

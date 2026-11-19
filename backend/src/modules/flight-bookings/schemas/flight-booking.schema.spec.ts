@@ -22,4 +22,15 @@ describe('FlightBooking schema', () => {
       'cancelled',
     ]);
   });
+
+  it('leaves bookingReference absent until confirmation and indexes only present values uniquely', () => {
+    const path = FlightBookingSchema.path('bookingReference');
+    expect(path.options.default).toBeUndefined();
+    expect(path.options.sparse).toBe(true);
+    expect(path.options.unique).toBe(true);
+    const bookingReferenceIndex = FlightBookingSchema.indexes().find(
+      ([fields]) => fields.bookingReference === 1,
+    );
+    expect(bookingReferenceIndex?.[1]).toMatchObject({ unique: true, sparse: true });
+  });
 });

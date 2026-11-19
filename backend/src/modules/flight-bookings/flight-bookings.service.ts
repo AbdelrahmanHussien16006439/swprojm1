@@ -194,8 +194,8 @@ export class FlightBookingsService {
         .findOneAndUpdate(
           { _id: bookingId, status: 'confirmed', bookingReference: confirmed.bookingReference },
           {
-            $set: { status: 'pending_payment', bookingReference: null },
-            $unset: { paymentId: 1 },
+            $set: { status: 'pending_payment' },
+            $unset: { paymentId: 1, bookingReference: 1 },
           },
           { new: true },
         )
