@@ -45,6 +45,7 @@ import { CreateRoomDto } from './dto/create-room.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { RoomDateRangeDto, UpdateRoomAvailabilityDto } from './dto/room-date-range.dto';
 import { HotelAvailabilityQueryDto } from './dto/hotel-availability-query.dto';
+import { HotelAvailabilityCalendarQueryDto } from './dto/hotel-availability-calendar-query.dto';
 import { SearchHotelsDto } from './dto/search-hotels.dto';
 import { HotelsService } from './hotels.service';
 
@@ -88,6 +89,30 @@ export class HotelsController {
     @Query() query: HotelAvailabilityQueryDto,
   ) {
     return this.hotelsService.getFreeRooms(hotelId, query.checkIn, query.checkOut);
+  }
+
+  @Get(':id/availability')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({
+    summary: 'View the room availability calendar for my hotel (HTL-08)',
+    description:
+      'Returns inclusive UTC calendar dates. Booked status and reservation references await Member 6 RoomNight support.',
+  })
+  @ApiQuery({ name: 'from', required: true, example: '2026-12-10' })
+  @ApiQuery({ name: 'to', required: true, example: '2026-12-15' })
+  @ApiOkResponse({ description: 'Room statuses for each date in the requested range.' })
+  @ApiBadRequestResponse({ description: 'Invalid dates or to is before from.' })
+  @ApiUnauthorizedResponse({ description: 'Login as a hotel moderator.' })
+  @ApiForbiddenResponse({ description: 'Hotel moderator role required.' })
+  @ApiNotFoundResponse({ description: 'Hotel not found or not owned by this moderator.' })
+  getAvailabilityCalendar(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @Query() query: HotelAvailabilityCalendarQueryDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.getAvailabilityCalendar(hotelId, query.from, query.to, user);
   }
 
   @Post()

@@ -156,6 +156,55 @@ export class HotelsService {
     }));
   }
 
+  async getAvailabilityCalendar(
+    hotelId: string,
+    fromValue: string,
+    toValue: string,
+    user: JwtUser,
+  ) {
+    await this.findOwnedHotel(hotelId, user);
+    const from = this.toUtcDate(fromValue);
+    const to = this.toUtcDate(toValue);
+    if (to.getTime() < from.getTime()) {
+      throw new BadRequestException('to must be the same as or after from');
+    }
+
+    const rooms = await this.roomModel.find({ hotelId }).exec();
+    const dates: Date[] = [];
+    for (
+      let timestamp = from.getTime();
+      timestamp <= to.getTime();
+      timestamp += 24 * 60 * 60 * 1000
+    ) {
+      dates.push(new Date(timestamp));
+    }
+
+    // TODO HTL-08: overlay active RoomNight bookings and reservation references after Member 6 merges.
+    return rooms.map((room) => ({
+      roomId: room._id,
+      roomName: room.name,
+      dates: dates.map((date) => {
+        const timestamp = date.getTime();
+        const isBlocked =
+          !room.isActive ||
+          (room.blockedRanges ?? []).some(
+            (range) =>
+              range.startDate.getTime() <= timestamp &&
+              timestamp <= range.endDate.getTime(),
+          );
+        const isAvailable = (room.availabilityRanges ?? []).some(
+          (range) =>
+            range.startDate.getTime() <= timestamp &&
+            timestamp <= range.endDate.getTime(),
+        );
+        return {
+          date: date.toISOString().slice(0, 10),
+          status: !isBlocked && isAvailable ? 'Available' : 'Blocked',
+        };
+      }),
+    }));
+  }
+
   async update(id: string, dto: UpdateHotelDto, user: JwtUser) {
     const hotel = await this.findOwnedHotel(id, user);
     const update: Partial<Hotel> = {};
