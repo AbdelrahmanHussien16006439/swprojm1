@@ -63,7 +63,7 @@ export class PaymentsService {
     const intent = await this.stripe.paymentIntents.create({
       amount: this.toStripeAmount(amount),
       currency: this.platformCurrency.toLowerCase(),
-      automatic_payment_methods: { enabled: true },
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
       metadata: { bookingType, bookingId, userId },
     });
     if (!intent.client_secret) {
