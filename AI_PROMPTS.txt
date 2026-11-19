@@ -427,3 +427,23 @@ ownership, pending-hold checks and atomic acceptance persistence. Added the
 Stripe configuration regression assertion. Backend build and all unit tests
 passed.
 ================================================
+
+================================================
+### Member 4 — 2026-11-19 13:43 — FLT-12, FLT-19, FLT-21
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: FLT-12, FLT-19, FLT-21
+Prompt:
+"Implement task 5 from TEAM_PLAN.md: POST /api/flight-bookings booking summary
+with passenger ages measured at the outbound departure date, at least one adult,
+infant limits, fares, baggage validation and fees. It must not persist or hold
+seats. Use the existing FlightsService and AirlinesService, add DTO validation,
+Swagger docs and tests, build and test, and commit only my modules plus
+AI_PROMPTS.txt."
+How the output was used:
+Added the guarded booking summary endpoint and calculation/validation service,
+using the existing flight and airline services. Round-trip baggage follows the
+Section 10 per-segment default. Tests cover passenger age bands, infant limits,
+baggage limits, summary totals and the no-write behavior. Build and unit tests
+passed.
+================================================

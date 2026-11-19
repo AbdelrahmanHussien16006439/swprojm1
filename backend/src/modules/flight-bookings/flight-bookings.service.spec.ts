@@ -1,6 +1,8 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Model, Types } from 'mongoose';
 import { AirlinesService } from '../airlines/airlines.service';
+import { FlightsService } from '../flights/flights.service';
+import { CreateBookingSummaryDto } from './dto/create-booking-summary.dto';
 import { FlightBooking } from './schemas/flight-booking.schema';
 import { FlightBookingsService } from './flight-bookings.service';
 
@@ -11,18 +13,25 @@ describe('FlightBookingsService policies', () => {
     findOneAndUpdate: jest.Mock;
   };
   let airlinesService: { getModeratorPolicies: jest.Mock };
+  let flightsService: { findById: jest.Mock };
 
   beforeEach(() => {
     bookingModel = { findOne: jest.fn(), findOneAndUpdate: jest.fn() };
     airlinesService = {
+      findById: jest.fn().mockResolvedValue({
+        isActive: true,
+        baggagePolicy: { extraBagPrice: 10, maxExtraBagsPerPassenger: 2 },
+      }),
       getModeratorPolicies: jest.fn().mockResolvedValue({
         baggagePolicy: { extraBagPrice: 20, maxExtraBagsPerPassenger: 2 },
         cancellationTiers: [{ daysBefore: 7, refundPercent: 50 }],
       }),
     };
+    flightsService = { findById: jest.fn() };
     service = new FlightBookingsService(
       bookingModel as unknown as Model<FlightBooking>,
       airlinesService as unknown as AirlinesService,
+      flightsService as unknown as FlightsService,
     );
   });
 
@@ -114,5 +123,153 @@ describe('FlightBookingsService policies', () => {
     await expect(
       service.acceptPolicies('booking-1', new Types.ObjectId().toString()),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('calculates a round-trip summary from outbound departure age without writing a booking', async () => {
+    const airlineId = new Types.ObjectId();
+    const airportA = new Types.ObjectId();
+    const airportB = new Types.ObjectId();
+    const outboundId = new Types.ObjectId();
+    const returnId = new Types.ObjectId();
+    const outboundCabinId = new Types.ObjectId();
+    const returnCabinId = new Types.ObjectId();
+    const outbound = {
+      _id: outboundId,
+      airlineId,
+      flightNumber: 'AB100',
+      departureAirportId: airportA,
+      arrivalAirportId: airportB,
+      departureTime: new Date('2035-05-01T15:00:00.000Z'),
+      arrivalTime: new Date('2035-05-01T17:00:00.000Z'),
+      status: 'scheduled',
+      cabins: [
+        {
+          _id: outboundCabinId,
+          cabinClass: 'economy',
+          price: 100,
+          availableSeats: 2,
+          freeBags: 1,
+          maxBagWeightKg: 23,
+        },
+      ],
+    };
+    const returnFlight = {
+      _id: returnId,
+      airlineId,
+      flightNumber: 'AB101',
+      departureAirportId: airportB,
+      arrivalAirportId: airportA,
+      departureTime: new Date('2035-05-10T10:00:00.000Z'),
+      arrivalTime: new Date('2035-05-10T12:00:00.000Z'),
+      status: 'scheduled',
+      cabins: [
+        {
+          _id: returnCabinId,
+          cabinClass: 'economy',
+          price: 120,
+          availableSeats: 2,
+          freeBags: 1,
+          maxBagWeightKg: 23,
+        },
+      ],
+    };
+    flightsService.findById.mockImplementation(async (id: string) =>
+      id === outboundId.toString() ? outbound : returnFlight,
+    );
+    const dto = {
+      outbound: {
+        flightId: outboundId.toString(),
+        cabinId: outboundCabinId.toString(),
+      },
+      return: {
+        flightId: returnId.toString(),
+        cabinId: returnCabinId.toString(),
+      },
+      passengers: [
+        {
+          fullName: 'Adult One',
+          dateOfBirth: '2020-04-30',
+          documentNumber: 'ADULT-1',
+          extraBags: 1,
+          extraBagsWeightKg: 20,
+        },
+        {
+          fullName: 'Child One',
+          dateOfBirth: '2028-05-02',
+          documentNumber: 'CHILD-1',
+          extraBags: 2,
+          extraBagsWeightKg: 23,
+        },
+        {
+          fullName: 'Infant One',
+          dateOfBirth: '2034-05-01',
+          documentNumber: 'INFANT-1',
+        },
+      ],
+    } as CreateBookingSummaryDto;
+
+    const summary = await service.createSummary(dto);
+
+    expect(summary.tripType).toBe('round_trip');
+    expect(summary.passengers.map((passenger) => passenger.type)).toEqual([
+      'adult',
+      'child',
+      'infant',
+    ]);
+    expect(summary.baggage.totalFee).toBe(60);
+    expect(summary.totalPrice).toBe(522);
+    expect(summary.segments).toHaveLength(2);
+    expect(flightsService.findById).toHaveBeenCalledTimes(2);
+    expect(bookingModel.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects summaries with no adult, too many infants, excessive bags or weight', async () => {
+    const airlineId = new Types.ObjectId();
+    const cabinId = new Types.ObjectId();
+    const flightId = new Types.ObjectId();
+    flightsService.findById.mockResolvedValue({
+      airlineId,
+      departureAirportId: new Types.ObjectId(),
+      arrivalAirportId: new Types.ObjectId(),
+      departureTime: new Date('2035-05-01T15:00:00.000Z'),
+      arrivalTime: new Date('2035-05-01T17:00:00.000Z'),
+      status: 'scheduled',
+      cabins: [
+        {
+          _id: cabinId,
+          cabinClass: 'economy',
+          price: 100,
+          availableSeats: 5,
+          maxBagWeightKg: 23,
+          freeBags: 1,
+        },
+      ],
+    });
+    const selection = { flightId: flightId.toString(), cabinId: cabinId.toString() };
+    const adult = {
+      fullName: 'Adult',
+      dateOfBirth: '2020-04-30',
+      documentNumber: 'A1',
+    };
+    const infant = {
+      fullName: 'Infant',
+      dateOfBirth: '2034-05-01',
+      documentNumber: 'I1',
+    };
+    const dto = (passengers: object[]) =>
+      ({ outbound: selection, passengers }) as CreateBookingSummaryDto;
+
+    await expect(
+      service.createSummary(dto([{ ...infant, dateOfBirth: '2028-05-02' }])),
+    ).rejects.toThrow('at least one adult');
+    await expect(
+      service.createSummary(dto([adult, infant, { ...infant, documentNumber: 'I2' }])),
+    ).rejects.toThrow('more infants than adults');
+    await expect(
+      service.createSummary(dto([{ ...adult, extraBags: 3, extraBagsWeightKg: 20 }])),
+    ).rejects.toThrow('exceed the airline baggage policy');
+    await expect(
+      service.createSummary(dto([{ ...adult, extraBags: 1, extraBagsWeightKg: 24 }])),
+    ).rejects.toThrow('exceeds the selected cabin weight limit');
   });
 });
