@@ -620,6 +620,7 @@ npm run start:dev
     When does a flight booking become Completed (GEN-11)? When the last segment's arrival time has passed
     Does "Upcoming" (FLT-25, HTL-20) include pending_payment? No — only confirmed in the future
 11. Definition of done (every endpoint)
+    npm run build and npm test pass, AND the server STARTS: run npm run start:dev and wait for "Nest application successfully started" before saying a task is done (unit tests mock models, so they can't catch missing module imports / dependency-injection errors).
     Works in Swagger UI (/api/docs) with example request bodies.
     DTO validation with field-level messages; wrong input → 400.
     Correct guard/role; ownership checked in the service.
