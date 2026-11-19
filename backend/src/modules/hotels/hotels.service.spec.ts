@@ -1,10 +1,15 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Model } from 'mongoose';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ReferenceDataService } from '../reference-data/reference-data.service';
+import { CreateRoomDto } from './dto/create-room.dto';
 import { HotelsService } from './hotels.service';
 import { Hotel } from './schemas/hotel.schema';
-import { Room } from './schemas/room.schema';
+import { Room, RoomDateRange } from './schemas/room.schema';
 
 describe('HotelsService basics', () => {
   let service: HotelsService;
@@ -16,6 +21,10 @@ describe('HotelsService basics', () => {
   };
   let roomModel: {
     find: jest.Mock;
+    findOne: jest.Mock;
+    findOneAndUpdate: jest.Mock;
+    create: jest.Mock;
+    deleteOne: jest.Mock;
     updateMany: jest.Mock;
   };
   let referenceDataService: {
@@ -32,6 +41,10 @@ describe('HotelsService basics', () => {
     };
     roomModel = {
       find: jest.fn(),
+      findOne: jest.fn(),
+      findOneAndUpdate: jest.fn(),
+      create: jest.fn(),
+      deleteOne: jest.fn(),
       updateMany: jest.fn(),
     };
     referenceDataService = {
@@ -221,5 +234,148 @@ describe('HotelsService basics', () => {
       },
       { new: true, runValidators: true },
     );
+  });
+
+  it('creates a room for the owning hotel moderator', async () => {
+    const hotelId = '64b000000000000000000001';
+    hotelModel.findById.mockReturnValue({
+      populate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: hotelId }) }),
+    });
+    const created = { name: 'Deluxe King 301' };
+    roomModel.create.mockResolvedValue(created);
+    const dto: CreateRoomDto = {
+      name: ' Deluxe King 301 ',
+      type: ' Deluxe ',
+      beds: 1,
+      maxOccupancy: 2,
+      pricePerNight: 120,
+    };
+
+    await expect(
+      service.createRoom(hotelId, dto, { providerId: hotelId } as JwtUser),
+    ).resolves.toBe(created);
+    expect(roomModel.create).toHaveBeenCalledWith({
+      hotelId,
+      name: 'Deluxe King 301',
+      type: 'Deluxe',
+      beds: 1,
+      maxOccupancy: 2,
+      pricePerNight: 120,
+    });
+  });
+
+  it('maps duplicate room names to a conflict', async () => {
+    const hotelId = '64b000000000000000000001';
+    hotelModel.findById.mockReturnValue({
+      populate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: hotelId }) }),
+    });
+    roomModel.create.mockRejectedValue({ code: 11000 });
+
+    await expect(
+      service.createRoom(
+        hotelId,
+        { name: '301', type: 'Deluxe', beds: 1, maxOccupancy: 2, pricePerNight: 120 },
+        { providerId: hotelId } as JwtUser,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('returns 404 when another hotel moderator tries to manage a room', async () => {
+    await expect(
+      service.createRoom(
+        '64b000000000000000000001',
+        { name: '301', type: 'Deluxe', beds: 1, maxOccupancy: 2, pricePerNight: 120 },
+        { providerId: '64b000000000000000000002' } as JwtUser,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(hotelModel.findById).not.toHaveBeenCalled();
+  });
+
+  it('rejects an overlapping availability range before saving', async () => {
+    const hotelId = '64b000000000000000000001';
+    const roomId = '64b000000000000000000002';
+    hotelModel.findById.mockReturnValue({
+      populate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: hotelId }) }),
+    });
+    const room = {
+      availabilityRanges: [
+        {
+          startDate: new Date('2026-12-01T00:00:00.000Z'),
+          endDate: new Date('2026-12-10T00:00:00.000Z'),
+        },
+      ] as RoomDateRange[],
+      save: jest.fn(),
+    };
+    roomModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(room) });
+
+    await expect(
+      service.addAvailability(
+        hotelId,
+        roomId,
+        { startDate: '2026-12-10', endDate: '2026-12-15' },
+        { providerId: hotelId } as JwtUser,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(room.save).not.toHaveBeenCalled();
+  });
+
+  it('only deletes rooms that have never been reserved', async () => {
+    const hotelId = '64b000000000000000000001';
+    const roomId = '64b000000000000000000002';
+    hotelModel.findById.mockReturnValue({
+      populate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: hotelId }) }),
+    });
+    roomModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: roomId, everReserved: true }),
+    });
+
+    await expect(
+      service.deleteRoom(hotelId, roomId, { providerId: hotelId } as JwtUser),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(roomModel.deleteOne).not.toHaveBeenCalled();
+  });
+
+  it('edits room beds, occupancy and current price without changing room identity', async () => {
+    const hotelId = '64b000000000000000000001';
+    const roomId = '64b000000000000000000002';
+    hotelModel.findById.mockReturnValue({
+      populate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: hotelId }) }),
+    });
+    roomModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: roomId, hotelId, everReserved: true }),
+    });
+    const updated = { _id: roomId, beds: 2, maxOccupancy: 3, pricePerNight: 140 };
+    roomModel.findOneAndUpdate.mockReturnValue({ exec: jest.fn().mockResolvedValue(updated) });
+
+    await expect(
+      service.updateRoom(
+        hotelId,
+        roomId,
+        { beds: 2, maxOccupancy: 3, pricePerNight: 140 },
+        { providerId: hotelId } as JwtUser,
+      ),
+    ).resolves.toBe(updated);
+    expect(roomModel.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: roomId, hotelId },
+      { $set: { beds: 2, maxOccupancy: 3, pricePerNight: 140 } },
+      { new: true, runValidators: true },
+    );
+  });
+
+  it('deletes a never-reserved room', async () => {
+    const hotelId = '64b000000000000000000001';
+    const roomId = '64b000000000000000000002';
+    hotelModel.findById.mockReturnValue({
+      populate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: hotelId }) }),
+    });
+    roomModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: roomId, everReserved: false }),
+    });
+    roomModel.deleteOne.mockReturnValue({ exec: jest.fn().mockResolvedValue({ deletedCount: 1 }) });
+
+    await expect(
+      service.deleteRoom(hotelId, roomId, { providerId: hotelId } as JwtUser),
+    ).resolves.toBeUndefined();
+    expect(roomModel.deleteOne).toHaveBeenCalledWith({ _id: roomId, hotelId });
   });
 });

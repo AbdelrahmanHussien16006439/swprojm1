@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,10 +9,18 @@ import { Model, Types } from 'mongoose';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ReferenceDataService } from '../reference-data/reference-data.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
+import { CreateRoomDto } from './dto/create-room.dto';
 import { UpdateHotelDto } from './dto/update-hotel.dto';
 import { UpdateHotelPoliciesDto } from './dto/update-hotel-policies.dto';
+import { RoomDateRangeDto, UpdateRoomAvailabilityDto } from './dto/room-date-range.dto';
+import { UpdateRoomDto } from './dto/update-room.dto';
 import { Hotel } from './schemas/hotel.schema';
-import { Room } from './schemas/room.schema';
+import {
+  availabilityRangesDoNotOverlap,
+  hasValidRoomRangeDates,
+  Room,
+  RoomDateRange,
+} from './schemas/room.schema';
 
 @Injectable()
 export class HotelsService {
@@ -94,6 +103,116 @@ export class HotelsService {
     return hotel;
   }
 
+  async createRoom(hotelId: string, dto: CreateRoomDto, user: JwtUser) {
+    await this.findOwnedHotel(hotelId, user);
+    try {
+      return await this.roomModel.create({
+        hotelId,
+        name: dto.name.trim(),
+        type: dto.type.trim(),
+        beds: dto.beds,
+        maxOccupancy: dto.maxOccupancy,
+        pricePerNight: dto.pricePerNight,
+      });
+    } catch (error) {
+      this.throwDuplicateRoomName(error);
+      throw error;
+    }
+  }
+
+  async updateRoom(
+    hotelId: string,
+    roomId: string,
+    dto: UpdateRoomDto,
+    user: JwtUser,
+  ) {
+    await this.findOwnedHotel(hotelId, user);
+    const room = await this.findRoomInHotel(hotelId, roomId);
+    const update: Partial<Room> = {};
+    if (dto.beds !== undefined) update.beds = dto.beds;
+    if (dto.maxOccupancy !== undefined) update.maxOccupancy = dto.maxOccupancy;
+    if (dto.pricePerNight !== undefined) update.pricePerNight = dto.pricePerNight;
+    if (dto.isActive !== undefined) update.isActive = dto.isActive;
+
+    if (dto.isActive === false) {
+      // TODO HTL-06: check confirmed and pending RoomNight reservations after Member 6 merges.
+    }
+
+    const updated = await this.roomModel
+      .findOneAndUpdate(
+        { _id: room._id, hotelId },
+        { $set: update },
+        { new: true, runValidators: true },
+      )
+      .exec();
+    if (!updated) throw new NotFoundException('Room not found');
+    return updated;
+  }
+
+  async deleteRoom(hotelId: string, roomId: string, user: JwtUser): Promise<void> {
+    await this.findOwnedHotel(hotelId, user);
+    const room = await this.findRoomInHotel(hotelId, roomId);
+    if (room.everReserved) {
+      throw new ConflictException('A room that has been reserved cannot be deleted');
+    }
+    // TODO HTL-06: reject active confirmed or pending reservations after Member 6 merges.
+    await this.roomModel.deleteOne({ _id: room._id, hotelId }).exec();
+  }
+
+  async addAvailability(
+    hotelId: string,
+    roomId: string,
+    dto: RoomDateRangeDto,
+    user: JwtUser,
+  ) {
+    await this.findOwnedHotel(hotelId, user);
+    const room = await this.findRoomInHotel(hotelId, roomId);
+    const newRange = this.toDateRange(dto);
+    const ranges = [...(room.availabilityRanges ?? []), newRange];
+    if (!availabilityRangesDoNotOverlap(ranges)) {
+      throw new BadRequestException('Availability ranges must be valid and must not overlap');
+    }
+    room.availabilityRanges = ranges;
+    await room.save();
+    return room;
+  }
+
+  async updateAvailability(
+    hotelId: string,
+    roomId: string,
+    dto: UpdateRoomAvailabilityDto,
+    user: JwtUser,
+  ) {
+    await this.findOwnedHotel(hotelId, user);
+    const room = await this.findRoomInHotel(hotelId, roomId);
+    if (dto.availabilityRanges === undefined && dto.blockedRanges === undefined) {
+      throw new BadRequestException(
+        'Provide availabilityRanges and/or blockedRanges to update',
+      );
+    }
+
+    if (dto.availabilityRanges !== undefined) {
+      const ranges = dto.availabilityRanges.map((range) => this.toDateRange(range));
+      if (!availabilityRangesDoNotOverlap(ranges)) {
+        throw new BadRequestException('Availability ranges must be valid and must not overlap');
+      }
+      // TODO HTL-05: check confirmed RoomNight reservations before removing dates after Member 6 merges.
+      room.availabilityRanges = ranges;
+    }
+
+    if (dto.blockedRanges !== undefined) {
+      const ranges = dto.blockedRanges.map((range) => this.toDateRange(range));
+      if (!hasValidRoomRangeDates(ranges)) {
+        throw new BadRequestException('Blocked ranges must have valid date ranges');
+      }
+      // TODO HTL-06: reject blocked dates overlapping confirmed/pending RoomNight reservations after Member 6 merges.
+      room.blockedRanges = ranges;
+    }
+
+    await room.save();
+    return room;
+  }
+
   findRoomsByIds(ids: string[]) {
     return this.roomModel.find({ _id: { $in: ids } }).exec();
   }
@@ -130,6 +249,38 @@ export class HotelsService {
       throw new NotFoundException('Hotel not found');
     }
     return this.findById(id);
+  }
+
+  private async findRoomInHotel(hotelId: string, roomId: string) {
+    const room = await this.roomModel.findOne({ _id: roomId, hotelId }).exec();
+    if (!room) throw new NotFoundException('Room not found');
+    return room;
+  }
+
+  private toDateRange(range: RoomDateRangeDto): RoomDateRange {
+    const startDate = this.toUtcDate(range.startDate);
+    const endDate = this.toUtcDate(range.endDate);
+    if (startDate.getTime() > endDate.getTime()) {
+      throw new BadRequestException('endDate must be the same as or after startDate');
+    }
+    return { startDate, endDate } as RoomDateRange;
+  }
+
+  private toUtcDate(value: string): Date {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      throw new BadRequestException('Dates must use YYYY-MM-DD format');
+    }
+    const date = new Date(`${value}T00:00:00.000Z`);
+    if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+      throw new BadRequestException('Date is invalid');
+    }
+    return date;
+  }
+
+  private throwDuplicateRoomName(error: unknown): void {
+    if ((error as { code?: number })?.code === 11000) {
+      throw new ConflictException('Room name already exists in this hotel');
+    }
   }
 
   private async resolveLocation(cityId: string, countryId: string) {

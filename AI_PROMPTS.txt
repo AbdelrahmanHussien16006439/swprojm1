@@ -581,3 +581,21 @@ tier and local-time validation; and Member 6 dependency TODOs for reviews and
 date-specific available rooms. Build passed and all 29 test suites (177 tests)
 passed.
 ================================================
+### Member 5 — 2026-11-19 20:35 — HTL-03, HTL-04, HTL-05, HTL-06
+Student: Member 5
+Tool: ChatGPT / Codex
+Related Requirements: HTL-03, HTL-04, HTL-05, HTL-06
+Prompt:
+"Implement Member 5 Task 4: hotel moderator endpoints to add, edit, and delete
+rooms and to add, replace, and remove availability and blocked date ranges.
+Enforce room validation, per-hotel unique names, ownership, non-overlapping
+availability ranges, and never-reserved deletion. Do not fake Member 6
+reservation checks if RoomNight is absent. Add Swagger DTOs and unit tests,
+build/test, and edit only hotels plus AI_PROMPTS.txt."
+How the output was used:
+Added guarded room CRUD and availability range routes with strict UTC
+date-only inputs, range validation, unique-name conflict handling, and
+everReserved deletion protection. Confirmed/pending reservation overlap checks
+remain TODOs because Member 6's RoomNight service is not in develop. Build
+passed and all 30 test suites (187 tests) passed.
+================================================
