@@ -9,17 +9,23 @@ import {
   Patch,
   Post,
   Put,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBadRequestResponse,
+  ApiBody,
   ApiCookieAuth,
   ApiCreatedResponse,
   ApiConflictResponse,
+  ApiConsumes,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiPayloadTooLargeResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -198,5 +204,58 @@ export class HotelsController {
     @CurrentUser() user: JwtUser,
   ) {
     return this.hotelsService.updateAvailability(hotelId, roomId, dto, user);
+  }
+
+  @Post(':id/photos')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+    }),
+  )
+  @ApiOperation({ summary: 'Add a photo to my hotel (HTL-01, GEN-08)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiOkResponse({ description: 'Hotel photo uploaded.' })
+  @ApiBadRequestResponse({ description: 'Missing or invalid JPG/PNG image.' })
+  @ApiPayloadTooLargeResponse({ description: 'Image exceeds 5 MB.' })
+  @ApiConflictResponse({ description: 'Hotel already has 5 photos.' })
+  @ApiUnauthorizedResponse({ description: 'Login required.' })
+  @ApiForbiddenResponse({ description: 'Hotel moderator role required.' })
+  @ApiNotFoundResponse({ description: 'Hotel not found or not owned by user.' })
+  uploadPhoto(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.addPhoto(hotelId, file, user);
+  }
+
+  @Delete(':id/photos/:photoId')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Remove a photo from my hotel (HTL-01, GEN-08)' })
+  @ApiOkResponse({ description: 'Hotel photo removed.' })
+  @ApiBadRequestResponse({ description: 'Photo id is invalid.' })
+  @ApiUnauthorizedResponse({ description: 'Login required.' })
+  @ApiForbiddenResponse({ description: 'Hotel moderator role required.' })
+  @ApiNotFoundResponse({ description: 'Hotel, photo, or ownership not found.' })
+  deletePhoto(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @Param('photoId') photoId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.removePhoto(hotelId, photoId, user);
   }
 }

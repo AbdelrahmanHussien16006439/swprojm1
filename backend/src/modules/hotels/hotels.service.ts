@@ -8,6 +8,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ReferenceDataService } from '../reference-data/reference-data.service';
+import { UploadsService } from '../uploads/uploads.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { UpdateHotelDto } from './dto/update-hotel.dto';
@@ -28,6 +29,7 @@ export class HotelsService {
     @InjectModel(Hotel.name) private readonly hotelModel: Model<Hotel>,
     @InjectModel(Room.name) private readonly roomModel: Model<Room>,
     private readonly referenceDataService: ReferenceDataService,
+    private readonly uploadsService: UploadsService,
   ) {}
 
   async create(dto: CreateHotelDto) {
@@ -211,6 +213,51 @@ export class HotelsService {
 
     await room.save();
     return room;
+  }
+
+  async addPhoto(hotelId: string, file: Express.Multer.File, user: JwtUser) {
+    const hotel = await this.findOwnedHotel(hotelId, user);
+    if ((hotel.photos ?? []).length >= 5) {
+      throw new ConflictException('A hotel can have at most 5 photos');
+    }
+
+    const uploaded = await this.uploadsService.saveImage(file);
+    try {
+      const updated = await this.hotelModel
+        .findOneAndUpdate(
+          { _id: hotelId, 'photos.4': { $exists: false } },
+          { $push: { photos: uploaded } },
+          { new: true, runValidators: true },
+        )
+        .populate('cityId countryId')
+        .exec();
+      if (!updated) {
+        throw new ConflictException('A hotel can have at most 5 photos');
+      }
+      return updated;
+    } catch (error) {
+      await this.uploadsService.deleteImage(uploaded.id);
+      throw error;
+    }
+  }
+
+  async removePhoto(hotelId: string, photoId: string, user: JwtUser) {
+    const hotel = await this.findOwnedHotel(hotelId, user);
+    const photoExists = (hotel.photos ?? []).some((photo) => photo.id === photoId);
+    if (!photoExists) throw new NotFoundException('Hotel photo not found');
+
+    const updated = await this.hotelModel
+      .findOneAndUpdate(
+        { _id: hotelId, 'photos.id': photoId },
+        { $pull: { photos: { id: photoId } } },
+        { new: true, runValidators: true },
+      )
+      .populate('cityId countryId')
+      .exec();
+    if (!updated) throw new NotFoundException('Hotel photo not found');
+
+    await this.uploadsService.deleteImage(photoId);
+    return updated;
   }
 
   findRoomsByIds(ids: string[]) {
