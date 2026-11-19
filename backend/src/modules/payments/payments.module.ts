@@ -8,7 +8,7 @@ import {
 } from '../flight-bookings/schemas/flight-booking.schema';
 import { Payment, PaymentSchema } from './schemas/payment.schema';
 import { Refund, RefundSchema } from './schemas/refund.schema';
-import { PaymentsController } from './payments.controller';
+import { PaymentsController, RefundsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { STRIPE_CLIENT } from './payments.constants';
 
@@ -31,7 +31,7 @@ import { STRIPE_CLIENT } from './payments.constants';
         new Stripe(config.getOrThrow<string>('STRIPE_SECRET_KEY')),
     },
   ],
-  controllers: [PaymentsController],
+  controllers: [PaymentsController, RefundsController],
   exports: [PaymentsService, MongooseModule],
 })
 export class PaymentsModule {}

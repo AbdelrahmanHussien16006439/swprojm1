@@ -389,3 +389,22 @@ service operations, server-side flight booking checks, currency conversion to
 Stripe minor units, FLT-09 tier calculation, and service tests. Build and all
 unit tests passed.
 ================================================
+
+================================================
+### Member 4 — 2026-11-19 12:42 — PAY-01, PAY-03, FLT-23
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: PAY-01, PAY-03, FLT-23
+Prompt:
+"Implement Member 4 task 3 from TEAM_PLAN.md on a branch from latest develop:
+Stripe-signed POST /api/payments/webhook using rawBody, failed payment retry,
+GET payment, and GET refund. Enforce ownership and use ParseObjectIdPipe. Do not
+fake missing booking or notification services, touch files outside my modules
+and AI_PROMPTS.txt, read backend/.env, or push. Add unit tests, build, test, and
+commit only my files."
+How the output was used:
+Added webhook signature verification and PaymentIntent succeeded/failed/canceled
+state handling, retry and private payment/refund lookup routes. The verified
+success callback to FlightBookingsService remains marked for task 6 because that
+service is not yet implemented. Build and all unit tests passed.
+================================================
