@@ -1,6 +1,22 @@
 import { Module } from '@nestjs/common';
+import { FlightBookingsModule } from '../flight-bookings/flight-bookings.module';
+import { FlightsModule } from '../flights/flights.module';
+import { HotelBookingsModule } from '../hotel-bookings/hotel-bookings.module';
+import { HotelsModule } from '../hotels/hotels.module';
+import { UsersModule } from '../users/users.module';
+import { AdminBookingsController } from './admin-bookings.controller';
+import { AdminBookingsService } from './admin-bookings.service';
 
-// Owner: Member 6 — see docs/TEAM_PLAN.md Section 7.
-// Remember to export your service(s) AND MongooseModule (TEAM_PLAN 3.2).
-@Module({})
+@Module({
+  imports: [
+    FlightBookingsModule,
+    FlightsModule,
+    HotelBookingsModule,
+    HotelsModule,
+    UsersModule,
+  ],
+  controllers: [AdminBookingsController],
+  providers: [AdminBookingsService],
+  exports: [AdminBookingsService],
+})
 export class AdminBookingsModule {}
