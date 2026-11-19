@@ -712,3 +712,19 @@ whole-calendar-day rule. Cancellation updates status and deletes every room-nigh
 in one MongoDB transaction; eligible refunds use PaymentsService and notify the
 user. Build, all unit tests and formatting checks passed.
 ================================================
+### Member 6 — 2026-11-19 23:12 Africa/Cairo — HTL-22
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirement: HTL-22
+Prompt:
+"Implement Member 6 task 6: GET /api/hotels/:id/reservations for the owning
+hotel moderator only. Support status/date filtering and shared pagination; show
+guest, dates and status; enforce role and provider ownership in both controller
+and service; use UsersService for guest display names, add Swagger docs/tests,
+and edit only Member 6 folders plus AI_PROMPTS.txt."
+How the output was used:
+Added the hotel moderator reservations route with status and inclusive check-in
+date filters, owner-scoped query and pagination. Guest names use UsersService's
+public profile so deactivated users display as Deleted user. Build and all unit
+tests passed.
+================================================

@@ -3,7 +3,9 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { HotelsModule } from '../hotels/hotels.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { UsersModule } from '../users/users.module';
 import { HotelBookingsController } from './hotel-bookings.controller';
+import { HotelModeratorReservationsController } from './hotel-moderator-reservations.controller';
 import { HotelBookingsService } from './hotel-bookings.service';
 import {
   HotelBooking,
@@ -18,13 +20,14 @@ import { RoomNight, RoomNightSchema } from './schemas/room-night.schema';
     HotelsModule,
     forwardRef(() => PaymentsModule),
     NotificationsModule,
+    UsersModule,
     MongooseModule.forFeature([
       { name: HotelBooking.name, schema: HotelBookingSchema },
       { name: RoomNight.name, schema: RoomNightSchema },
     ]),
   ],
   providers: [HotelBookingsService],
-  controllers: [HotelBookingsController],
+  controllers: [HotelBookingsController, HotelModeratorReservationsController],
   exports: [HotelBookingsService, MongooseModule],
 })
 export class HotelBookingsModule {}

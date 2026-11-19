@@ -35,6 +35,7 @@ describe('HotelBookingsService', () => {
     createRefund: jest.Mock;
   };
   let notificationsService: { notify: jest.Mock };
+  let usersService: { findPublicProfile: jest.Mock };
 
   beforeEach(() => {
     bookingModel = {
@@ -77,6 +78,7 @@ describe('HotelBookingsService', () => {
       createRefund: jest.fn(),
     };
     notificationsService = { notify: jest.fn().mockResolvedValue(undefined) };
+    usersService = { findPublicProfile: jest.fn() };
     service = new HotelBookingsService(
       bookingModel as never,
       roomNightModel as never,
@@ -88,6 +90,7 @@ describe('HotelBookingsService', () => {
       hotelsService as never,
       paymentsService as never,
       notificationsService as never,
+      usersService as never,
     );
   });
 
@@ -282,6 +285,58 @@ describe('HotelBookingsService', () => {
       rooms: [{ adults: 1, children: [7], guests: 2 }],
       status: 'confirmed',
     });
+  });
+
+  it("lists reservations only for the moderator's hotel with filters", async () => {
+    const hotelId = new Types.ObjectId();
+    const userId = new Types.ObjectId();
+    const booking = makeReservation(userId, hotelId, 'confirmed');
+    bookingModel.find.mockReturnValue(query([booking]));
+    bookingModel.countDocuments.mockReturnValue(query(1));
+    usersService.findPublicProfile.mockResolvedValue({
+      id: userId.toString(),
+      name: 'Hotel guest',
+      joinedAt: new Date(),
+      status: 'active',
+    });
+
+    const result = await service.findForModerator(
+      hotelId.toString(),
+      {
+        sub: new Types.ObjectId().toString(),
+        providerId: hotelId.toString(),
+      } as never,
+      {
+        page: 1,
+        status: 'confirmed',
+        from: '2026-12-10',
+        to: '2026-12-10',
+      } as never,
+    );
+
+    const filter = bookingModel.find.mock.calls[0][0];
+    expect(filter.hotelId.toString()).toBe(hotelId.toString());
+    expect(filter.status).toBe('confirmed');
+    expect(filter.checkIn).toEqual({
+      $gte: new Date('2026-12-10T00:00:00.000Z'),
+      $lt: new Date('2026-12-11T00:00:00.000Z'),
+    });
+    expect(result.data[0].guest.name).toBe('Hotel guest');
+    expect(result).toMatchObject({ page: 1, limit: 10, total: 1 });
+  });
+
+  it("hides another hotel's reservations from the moderator", async () => {
+    await expect(
+      service.findForModerator(
+        new Types.ObjectId().toString(),
+        {
+          sub: new Types.ObjectId().toString(),
+          providerId: new Types.ObjectId().toString(),
+        } as never,
+        {} as never,
+      ),
+    ).rejects.toThrow('Hotel not found');
+    expect(bookingModel.find).not.toHaveBeenCalled();
   });
 
   it('returns payment and refund details for an owned reservation', async () => {
