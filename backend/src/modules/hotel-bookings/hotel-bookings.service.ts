@@ -19,7 +19,10 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { Payment } from '../payments/schemas/payment.schema';
 import { Refund } from '../payments/schemas/refund.schema';
 import { PaymentsService } from '../payments/payments.service';
+import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
+import { UsersService } from '../users/users.service';
 import { CreateHotelBookingDto } from './dto/create-hotel-booking.dto';
+import { HotelModeratorReservationsQueryDto } from './dto/hotel-moderator-reservations-query.dto';
 import { MyHotelBookingsQueryDto } from './dto/my-hotel-bookings-query.dto';
 import { HOTEL_BOOKING_HOLD_MINUTES } from './hotel-bookings.constants';
 import { HotelBooking } from './schemas/hotel-booking.schema';
@@ -47,6 +50,7 @@ export class HotelBookingsService {
     @Inject(forwardRef(() => PaymentsService))
     private readonly paymentsService: PaymentsService,
     private readonly notificationsService: NotificationsService,
+    private readonly usersService: UsersService,
   ) {}
 
   /** HTL-16 / HTL-18: hold every requested room-night in one transaction. */
@@ -299,6 +303,66 @@ export class HotelBookingsService {
       ...result,
       data: result.data.map((booking) => this.toReservationSummary(booking)),
     };
+  }
+
+  /** HTL-22: hotel moderators can view reservations for their own hotel only. */
+  async findForModerator(
+    hotelId: string,
+    user: JwtUser,
+    query: HotelModeratorReservationsQueryDto,
+  ) {
+    if (!user.providerId || user.providerId !== hotelId) {
+      throw new NotFoundException('Hotel not found');
+    }
+    const filter: Record<string, unknown> = {
+      hotelId: new Types.ObjectId(hotelId),
+    };
+    if (query.status) filter.status = query.status;
+
+    const checkIn: Record<string, Date> = {};
+    const from = query.from
+      ? this.parseCalendarDate(query.from, 'from')
+      : undefined;
+    const to = query.to ? this.parseCalendarDate(query.to, 'to') : undefined;
+    if (from && to && from.getTime() > to.getTime()) {
+      throw new BadRequestException('from must be on or before to');
+    }
+    if (from) checkIn.$gte = from;
+    if (to) {
+      const exclusiveUpperBound = new Date(to);
+      exclusiveUpperBound.setUTCDate(exclusiveUpperBound.getUTCDate() + 1);
+      checkIn.$lt = exclusiveUpperBound;
+    }
+    if (Object.keys(checkIn).length > 0) filter.checkIn = checkIn;
+
+    const result = await paginate(this.hotelBookingModel, filter, query.page, {
+      sort: { checkIn: 1, createdAt: -1 },
+    });
+    const data = await Promise.all(
+      result.data.map(async (booking) => {
+        const document = booking as HotelBooking & { _id: Types.ObjectId };
+        const guest = await this.usersService.findPublicProfile(
+          booking.userId.toString(),
+        );
+        return {
+          id: document._id.toString(),
+          bookingReference: booking.bookingReference ?? null,
+          guest: { id: guest.id, name: guest.name },
+          rooms: booking.rooms.map((room) => ({
+            roomName: room.roomName,
+            adults: room.adults,
+            children: room.children,
+            guests: room.adults + room.children.length,
+          })),
+          checkIn: this.toDateLabel(booking.checkIn),
+          checkOut: this.toDateLabel(booking.checkOut),
+          status: booking.status,
+          totalPrice: booking.totalPrice,
+          createdAt: booking.createdAt,
+        };
+      }),
+    );
+    return { ...result, data };
   }
 
   /** HTL-20: load complete details, hiding bookings owned by another user. */
