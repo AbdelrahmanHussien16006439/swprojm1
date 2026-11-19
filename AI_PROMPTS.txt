@@ -544,3 +544,22 @@ the official docs directory. Build passed and all 26 test suites (158 tests)
 passed. The shared database seed was not run.
 ================================================
 ================================================
+### Member 5 — 2026-11-19 19:45 — HTL-01, HTL-03, HTL-04, HTL-09, HTL-10
+Student: Member 5
+Tool: ChatGPT / Codex
+Related Requirements: HTL-01, HTL-03, HTL-04, HTL-09, HTL-10
+Prompt:
+"Implement Member 5 Task 2 from TEAM_PLAN.md: Hotel and Room schemas with their
+ObjectId references, required fields and validation; register/export both models;
+add HotelsService.findById, findRoomsByIds, setActive, updateRating, and
+markRoomsReserved. Include unit tests, build and test the backend, and change only
+the hotels module and AI_PROMPTS.txt."
+How the output was used:
+Added the Hotel and Room schemas with per-hotel room-name uniqueness, hotel photo
+and cancellation-tier constraints, standard time fields, ratings fields, and
+validated non-overlapping room availability ranges. Registered both models and
+added the five shared HotelsService methods. Build passed and all 28 test suites
+(168 tests) passed.
+================================================
+================================================
+================================================
