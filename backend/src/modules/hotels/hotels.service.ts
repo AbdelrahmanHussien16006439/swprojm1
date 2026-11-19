@@ -6,11 +6,13 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { PAGE_SIZE, toPaginated } from '../../common/utils/pagination';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ReferenceDataService } from '../reference-data/reference-data.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { CreateRoomDto } from './dto/create-room.dto';
+import { SearchHotelsDto } from './dto/search-hotels.dto';
 import { UpdateHotelDto } from './dto/update-hotel.dto';
 import { UpdateHotelPoliciesDto } from './dto/update-hotel-policies.dto';
 import { RoomDateRangeDto, UpdateRoomAvailabilityDto } from './dto/room-date-range.dto';
@@ -54,6 +56,104 @@ export class HotelsService {
       .exec();
     if (!hotel) throw new NotFoundException('Hotel not found');
     return hotel;
+  }
+
+  async search(dto: SearchHotelsDto) {
+    const locationFilter = await this.resolveSearchLocation(dto);
+    const { checkIn, checkOut, nights } = this.getStay(dto.checkIn, dto.checkOut);
+    const guests = dto.guests;
+    const roomsRequired = dto.rooms ?? 1;
+    const page = dto.page ?? 1;
+
+    if (
+      dto.minPrice !== undefined &&
+      dto.maxPrice !== undefined &&
+      dto.minPrice > dto.maxPrice
+    ) {
+      throw new BadRequestException('minPrice must be less than or equal to maxPrice');
+    }
+
+    const hotels = await this.hotelModel
+      .find({ ...locationFilter, isActive: true })
+      .populate('cityId countryId')
+      .exec();
+    if (hotels.length === 0) return toPaginated([], 0, page);
+
+    // TODO HTL-11: exclude rooms with active RoomNight reservations after Member 6 merges.
+    const activeRooms = await this.roomModel
+      .find({ hotelId: { $in: hotels.map((hotel) => hotel._id) }, isActive: true })
+      .exec();
+    const roomsByHotel = new Map<string, Room[]>();
+    for (const room of activeRooms) {
+      const hotelId = room.hotelId.toString();
+      const hotelRooms = roomsByHotel.get(hotelId) ?? [];
+      hotelRooms.push(room);
+      roomsByHotel.set(hotelId, hotelRooms);
+    }
+
+    const results: Array<Record<string, unknown>> = [];
+    for (const hotel of hotels) {
+      const availableRooms = (roomsByHotel.get(hotel._id.toString()) ?? []).filter(
+        (room) => this.isRoomAvailableForStay(room, nights),
+      );
+      if (availableRooms.length < roomsRequired) continue;
+
+      const feasibleRooms = this.getFeasibleRooms(availableRooms, roomsRequired, guests);
+      if (feasibleRooms.length === 0) continue;
+
+      const cheapestRoomPrice = Math.min(
+        ...feasibleRooms.map((room) => room.pricePerNight),
+      );
+      if (dto.minPrice !== undefined && cheapestRoomPrice < dto.minPrice) continue;
+      if (dto.maxPrice !== undefined && cheapestRoomPrice > dto.maxPrice) continue;
+      if (
+        dto.minRating !== undefined &&
+        (hotel.ratingsCount === 0 || hotel.averageRating < dto.minRating)
+      ) {
+        continue;
+      }
+
+      results.push({
+        ...hotel.toObject(),
+        cheapestRoomPrice,
+        availableRoomCount: availableRooms.length,
+      });
+    }
+
+    const direction = dto.order === 'desc' ? -1 : 1;
+    results.sort((left, right) => {
+      const leftSort =
+        dto.sortBy === 'rating'
+          ? Number(left.averageRating ?? 0)
+          : Number(left.cheapestRoomPrice ?? 0);
+      const rightSort =
+        dto.sortBy === 'rating'
+          ? Number(right.averageRating ?? 0)
+          : Number(right.cheapestRoomPrice ?? 0);
+      return (leftSort - rightSort) * direction ||
+        String(left.name ?? '').localeCompare(String(right.name ?? ''));
+    });
+
+    const start = (page - 1) * PAGE_SIZE;
+    return toPaginated(results.slice(start, start + PAGE_SIZE), results.length, page);
+  }
+
+  async getFreeRooms(hotelId: string, checkInValue: string, checkOutValue: string) {
+    const hotel = await this.findById(hotelId);
+    const { nights } = this.getStay(checkInValue, checkOutValue);
+    if (!hotel.isActive) return [];
+
+    // TODO HTL-15: exclude rooms with active RoomNight reservations after Member 6 merges.
+    const rooms = await this.roomModel
+      .find({ hotelId, isActive: true })
+      .sort({ pricePerNight: 1 })
+      .exec();
+    const freeRooms = rooms.filter((room) => this.isRoomAvailableForStay(room, nights));
+    const nightsCount = nights.length;
+    return freeRooms.map((room) => ({
+      ...room.toObject(),
+      totalStayPrice: room.pricePerNight * nightsCount,
+    }));
   }
 
   async update(id: string, dto: UpdateHotelDto, user: JwtUser) {
@@ -349,6 +449,92 @@ export class HotelsService {
       throw new BadRequestException('City does not belong to the selected country');
     }
     return { city, country };
+  }
+
+  private async resolveSearchLocation(dto: SearchHotelsDto) {
+    const hasCity = Boolean(dto.cityId);
+    const hasCountry = Boolean(dto.countryId);
+    if (hasCity === hasCountry) {
+      throw new BadRequestException('Provide exactly one of cityId or countryId');
+    }
+    try {
+      if (dto.cityId) {
+        const city = await this.referenceDataService.findCity(dto.cityId);
+        return { cityId: city._id };
+      }
+      const countryId = dto.countryId;
+      if (!countryId) {
+        throw new BadRequestException('Provide exactly one of cityId or countryId');
+      }
+      const country = await this.referenceDataService.findCountry(countryId);
+      return { countryId: country._id };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new BadRequestException('cityId or countryId must exist in reference data');
+      }
+      throw error;
+    }
+  }
+
+  private getStay(checkInValue: string, checkOutValue: string) {
+    const checkIn = this.toUtcDate(checkInValue);
+    const checkOut = this.toUtcDate(checkOutValue);
+    if (checkOut.getTime() <= checkIn.getTime()) {
+      throw new BadRequestException('checkOut must be after checkIn');
+    }
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    if (checkIn.getTime() < today.getTime()) {
+      throw new BadRequestException('checkIn cannot be in the past');
+    }
+
+    const nights: Date[] = [];
+    for (
+      let current = checkIn.getTime();
+      current < checkOut.getTime();
+      current += 24 * 60 * 60 * 1000
+    ) {
+      nights.push(new Date(current));
+    }
+    return { checkIn, checkOut, nights };
+  }
+
+  private isRoomAvailableForStay(room: Room, nights: Date[]): boolean {
+    const availabilityRanges = room.availabilityRanges ?? [];
+    const blockedRanges = room.blockedRanges ?? [];
+    return nights.every((night) => {
+      const timestamp = night.getTime();
+      const isInAvailability = availabilityRanges.some(
+        (range) =>
+          range.startDate.getTime() <= timestamp &&
+          timestamp <= range.endDate.getTime(),
+      );
+      const isBlocked = blockedRanges.some(
+        (range) =>
+          range.startDate.getTime() <= timestamp &&
+          timestamp <= range.endDate.getTime(),
+      );
+      return isInAvailability && !isBlocked;
+    });
+  }
+
+  private getFeasibleRooms(
+    availableRooms: Room[],
+    roomsRequired: number,
+    guests: number,
+  ): Room[] {
+    return availableRooms.filter((candidate, index) => {
+      const otherOccupancies = availableRooms
+        .filter((_, otherIndex) => otherIndex !== index)
+        .map((room) => room.maxOccupancy)
+        .sort((left, right) => right - left)
+        .slice(0, roomsRequired - 1);
+      return (
+        candidate.maxOccupancy +
+          otherOccupancies.reduce((total, occupancy) => total + occupancy, 0) >=
+        guests
+      );
+    });
   }
 
   private referenceId(reference: Types.ObjectId | { _id: Types.ObjectId } | unknown): string {

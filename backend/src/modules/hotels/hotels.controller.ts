@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -26,6 +27,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiPayloadTooLargeResponse,
+  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -42,12 +44,51 @@ import { UpdateHotelPoliciesDto } from './dto/update-hotel-policies.dto';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { RoomDateRangeDto, UpdateRoomAvailabilityDto } from './dto/room-date-range.dto';
+import { HotelAvailabilityQueryDto } from './dto/hotel-availability-query.dto';
+import { SearchHotelsDto } from './dto/search-hotels.dto';
 import { HotelsService } from './hotels.service';
 
 @ApiTags('hotels')
 @Controller('hotels')
 export class HotelsController {
   constructor(private readonly hotelsService: HotelsService) {}
+
+  @Get('search')
+  @ApiOperation({ summary: 'Search available hotels by city or country (HTL-11, HTL-12)' })
+  @ApiQuery({ name: 'cityId', required: false, example: 'cairo' })
+  @ApiQuery({ name: 'countryId', required: false, example: 'EG' })
+  @ApiQuery({ name: 'checkIn', required: true, example: '2026-12-10' })
+  @ApiQuery({ name: 'checkOut', required: true, example: '2026-12-15' })
+  @ApiQuery({ name: 'guests', required: true, example: 2 })
+  @ApiQuery({ name: 'rooms', required: false, example: 1 })
+  @ApiQuery({ name: 'minPrice', required: false, example: 50 })
+  @ApiQuery({ name: 'maxPrice', required: false, example: 300 })
+  @ApiQuery({ name: 'minRating', required: false, example: 4 })
+  @ApiQuery({ name: 'sortBy', required: false, enum: ['price', 'rating'] })
+  @ApiQuery({ name: 'order', required: false, enum: ['asc', 'desc'] })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiOkResponse({ description: 'Paginated matching hotels with cheapest qualifying room price.' })
+  @ApiBadRequestResponse({ description: 'Invalid location, dates, guest count, price or rating filters.' })
+  search(@Query() query: SearchHotelsDto) {
+    return this.hotelsService.search(query);
+  }
+
+  @Get(':id/rooms/available')
+  @ApiOperation({
+    summary: 'List rooms available for the requested stay (HTL-15)',
+    description: 'Active reservation checks await Member 6 RoomNight support.',
+  })
+  @ApiQuery({ name: 'checkIn', required: true, example: '2026-12-10' })
+  @ApiQuery({ name: 'checkOut', required: true, example: '2026-12-15' })
+  @ApiOkResponse({ description: 'Available rooms with nightly price and total stay price.' })
+  @ApiBadRequestResponse({ description: 'Invalid stay dates.' })
+  @ApiNotFoundResponse({ description: 'Hotel not found.' })
+  getFreeRooms(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @Query() query: HotelAvailabilityQueryDto,
+  ) {
+    return this.hotelsService.getFreeRooms(hotelId, query.checkIn, query.checkOut);
+  }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)

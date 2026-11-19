@@ -614,3 +614,12 @@ shared UploadsService, enforce the five-photo limit atomically, and clean up the
 uploaded file if the database write fails. Build passed and all 30 test suites
 (191 tests) passed.
 ================================================
+### Member 5 — 2026-11-19 21:25 — HTL-11, HTL-12, HTL-15
+Student: Member 5
+Tool: ChatGPT / Codex
+Related Requirements: HTL-11, HTL-12, HTL-15
+Prompt:
+"Implement Member 5 Task 6: public hotel search by city or country, with date and guest/room filters, availability ranges, blocked dates, price/rating filters, sorting and pagination; add the available-room listing for a hotel stay with total stay prices. Follow the Member 5 scope, add DTO validation, Swagger docs and unit tests, build/test, edit only hotels plus AI_PROMPTS.txt, and leave explicit TODOs for Member 6 reservation checks."
+How the output was used:
+Added validated search and available-room query endpoints, availability and occupancy matching, inclusive price bounds, rating filtering, sorting and pagination. Build passed and all 31 test suites (197 tests) passed. RoomNight reservation exclusion remains marked for Member 6 integration.
+================================================
