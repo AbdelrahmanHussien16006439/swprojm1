@@ -646,3 +646,18 @@ Added the Notification model and module exports, shared notification creation
 methods, GET /api/notifications with unread count and newest-first pagination,
 and mark-one/mark-all read routes. Build and the full unit test suite passed.
 ================================================
+### Member 6 — 2026-11-19 22:20 Africa/Cairo — HTL-16, HTL-18, HTL-23
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirements: HTL-16, HTL-18, HTL-23
+Prompt:
+"Implement Member 6 task 2 from the latest develop: add HotelBooking, RoomNight,
+and Review schemas with exact lifecycle values, ObjectId refs, sparse booking
+reference behavior, unique room/date and review/booking indexes; register and
+export the models; add HotelBookingsService's hasUpcomingConfirmed,
+findRoomNights, and hasActiveReservationOverlap helpers with guard tests."
+How the output was used:
+Added the three timestamped models and registered them in their owner modules.
+Exported HotelBookingsService and implemented its confirmed-booking and active
+room-night lookup helpers. Build and the full unit test suite passed.
+================================================
