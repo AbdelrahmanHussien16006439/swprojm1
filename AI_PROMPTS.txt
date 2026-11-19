@@ -728,3 +728,20 @@ date filters, owner-scoped query and pagination. Guest names use UsersService's
 public profile so deactivated users display as Deleted user. Build and all unit
 tests passed.
 ================================================
+### Member 6 — 2026-11-19 23:35 Africa/Cairo — HTL-23, HTL-24, GEN-11
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirements: HTL-23, HTL-24, GEN-11
+Prompt:
+"Implement Member 6 task 7: a minutely cron that completes confirmed hotel
+reservations after check-out; POST a single review only for the owner's completed
+reservation; author-owned review edits/deletes; and public newest-first paginated
+hotel reviews with visible-review rating totals and deleted-user names. Recalculate
+ratings via HotelsService.updateRating, add validated DTOs, guards, Swagger and
+focused tests, and edit only Member 6 folders plus AI_PROMPTS.txt."
+How the output was used:
+Added the completion cron, review creation/edit/delete and public list routes.
+Reviews are unique per reservation, owner-scoped, and only visible reviews
+contribute to hotel ratings. Deactivated authors display as Deleted user. Build
+and all unit tests passed.
+================================================

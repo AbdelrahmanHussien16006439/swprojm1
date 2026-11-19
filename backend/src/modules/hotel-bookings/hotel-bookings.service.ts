@@ -21,6 +21,8 @@ import { Refund } from '../payments/schemas/refund.schema';
 import { PaymentsService } from '../payments/payments.service';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { UsersService } from '../users/users.service';
+import { CreateReviewDto } from '../reviews/dto/create-review.dto';
+import { ReviewsService } from '../reviews/reviews.service';
 import { CreateHotelBookingDto } from './dto/create-hotel-booking.dto';
 import { HotelModeratorReservationsQueryDto } from './dto/hotel-moderator-reservations-query.dto';
 import { MyHotelBookingsQueryDto } from './dto/my-hotel-bookings-query.dto';
@@ -51,6 +53,7 @@ export class HotelBookingsService {
     private readonly paymentsService: PaymentsService,
     private readonly notificationsService: NotificationsService,
     private readonly usersService: UsersService,
+    private readonly reviewsService: ReviewsService,
   ) {}
 
   /** HTL-16 / HTL-18: hold every requested room-night in one transaction. */
@@ -365,6 +368,22 @@ export class HotelBookingsService {
     return { ...result, data };
   }
 
+  /** HTL-23: only the owner can review their completed reservation. */
+  async createReview(bookingId: string, userId: string, dto: CreateReviewDto) {
+    const booking = await this.findOwnedBooking(bookingId, userId);
+    if (booking.status !== 'completed') {
+      throw new BadRequestException(
+        'A review can be submitted only for a completed reservation',
+      );
+    }
+    return this.reviewsService.createForBooking(
+      userId,
+      this.referenceId(booking.hotelId)!,
+      bookingId,
+      dto,
+    );
+  }
+
   /** HTL-20: load complete details, hiding bookings owned by another user. */
   async getMine(bookingId: string, userId: string) {
     const booking = await this.hotelBookingModel
@@ -631,6 +650,18 @@ export class HotelBookingsService {
         );
       }
     }
+  }
+
+  /** HTL-23 / GEN-11: complete reservations after their UTC check-out date. */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async completeCheckedOutReservations(): Promise<void> {
+    const today = this.utcToday();
+    await this.hotelBookingModel
+      .updateMany(
+        { status: 'confirmed', checkOut: { $lt: today } },
+        { $set: { status: 'completed' } },
+      )
+      .exec();
   }
 
   /** ACC-12: a confirmed reservation remains upcoming until checkout completion. */

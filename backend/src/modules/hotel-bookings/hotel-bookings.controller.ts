@@ -21,6 +21,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { CreateHotelBookingDto } from './dto/create-hotel-booking.dto';
+import { CreateReviewDto } from '../reviews/dto/create-review.dto';
 import { CancelHotelBookingDto } from './dto/cancel-hotel-booking.dto';
 import { MyHotelBookingsQueryDto } from './dto/my-hotel-bookings-query.dto';
 import { HotelBookingsService } from './hotel-bookings.service';
@@ -82,6 +83,17 @@ export class HotelBookingsController {
       user.sub,
       dto.confirm,
     );
+  }
+
+  @Post(':id/review')
+  @ApiParam({ name: 'id', example: '665f1d4a2a8c7b4e5f123456' })
+  @ApiOperation({ summary: 'Review your completed hotel reservation' })
+  createReview(
+    @Param('id', ParseObjectIdPipe) bookingId: string,
+    @Body() dto: CreateReviewDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelBookingsService.createReview(bookingId, user.sub, dto);
   }
 
   @Post()
