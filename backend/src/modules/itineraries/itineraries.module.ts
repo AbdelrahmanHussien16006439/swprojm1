@@ -1,6 +1,19 @@
 import { Module } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
+import { ReferenceDataModule } from '../reference-data/reference-data.module';
+import { ItinerariesController } from './itineraries.controller';
+import { ItinerariesService } from './itineraries.service';
+import { Itinerary, ItinerarySchema } from './schemas/itinerary.schema';
 
-// Owner: Member 7 — see docs/TEAM_PLAN.md Section 7.
-// Remember to export your service(s) AND MongooseModule (TEAM_PLAN 3.2).
-@Module({})
+@Module({
+  imports: [
+    MongooseModule.forFeature([
+      { name: Itinerary.name, schema: ItinerarySchema },
+    ]),
+    ReferenceDataModule,
+  ],
+  controllers: [ItinerariesController],
+  providers: [ItinerariesService],
+  exports: [ItinerariesService, MongooseModule],
+})
 export class ItinerariesModule {}
