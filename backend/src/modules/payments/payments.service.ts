@@ -5,6 +5,7 @@ import {
   InternalServerErrorException,
   NotFoundException,
   NotImplementedException,
+  forwardRef,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
@@ -13,6 +14,7 @@ import Stripe from 'stripe';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { Role } from '../../common/enums/role.enum';
 import { FlightBooking } from '../flight-bookings/schemas/flight-booking.schema';
+import { FlightBookingsService } from '../flight-bookings/flight-bookings.service';
 import { Payment } from './schemas/payment.schema';
 import { Refund } from './schemas/refund.schema';
 import {
@@ -37,6 +39,8 @@ export class PaymentsService {
     private readonly configService: ConfigService,
     @Inject(STRIPE_CLIENT)
     private readonly stripe: Stripe,
+    @Inject(forwardRef(() => FlightBookingsService))
+    private readonly flightBookingsService: FlightBookingsService,
   ) {
     const currency = configService.getOrThrow<string>('PLATFORM_CURRENCY').toUpperCase();
     if (!/^[A-Z]{3}$/.test(currency)) {
@@ -106,11 +110,31 @@ export class PaymentsService {
   async cancelPayment(paymentId: string): Promise<void> {
     const payment = await this.paymentModel.findById(paymentId).exec();
     if (!payment) throw new NotFoundException('Payment not found');
-    if (payment.status !== 'pending') return;
+    if (payment.status !== 'pending' && payment.status !== 'failed') return;
 
     await this.stripe.paymentIntents.cancel(payment.stripePaymentIntentId);
     payment.status = 'cancelled';
     await payment.save();
+  }
+
+  async cancelPaymentsForBooking(
+    bookingType: BookingType,
+    bookingId: string,
+  ): Promise<void> {
+    const payments = await this.paymentModel
+      .find({ bookingType, bookingId, status: { $in: ['pending', 'failed'] } })
+      .exec();
+    for (const payment of payments) {
+      await this.cancelPayment(payment._id.toString());
+    }
+  }
+
+  async findSucceededPaymentIdForBooking(bookingId: string): Promise<string | null> {
+    const payment = await this.paymentModel
+      .findOne({ bookingType: 'flight', bookingId, status: 'succeeded' })
+      .sort({ createdAt: -1 })
+      .exec();
+    return payment?._id.toString() ?? null;
   }
 
   /** Issue and record a Stripe refund (PAY-03). */
@@ -230,18 +254,16 @@ export class PaymentsService {
     const intent = event.data.object as Stripe.PaymentIntent;
     if (event.type === 'payment_intent.succeeded') {
       const payment = await this.paymentModel
-        .findOneAndUpdate(
-          {
-            stripePaymentIntentId: intent.id,
-            status: { $in: ['pending', 'failed'] },
-          },
-          { $set: { status: 'succeeded' } },
-          { new: true },
-        )
+        .findOne({ stripePaymentIntentId: intent.id })
         .exec();
-      if (payment) {
-        // TODO (task 6): call FlightBookingsService.onPaymentSucceeded(bookingId).
-        // Booking status and seat counters must change only in that verified callback.
+      if (payment && payment.status !== 'cancelled') {
+        if (payment.status !== 'succeeded') {
+          payment.status = 'succeeded';
+          await payment.save();
+        }
+        await this.flightBookingsService.onPaymentSucceeded(
+          payment.bookingId.toString(),
+        );
       }
     } else if (event.type === 'payment_intent.payment_failed') {
       await this.paymentModel

@@ -1,19 +1,25 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { randomBytes } from 'crypto';
 import { AirlinesService } from '../airlines/airlines.service';
 import { FlightStatus } from '../flights/flights.constants';
 import { Flight } from '../flights/schemas/flight.schema';
 import { FlightsService } from '../flights/flights.service';
 import { FlightBooking } from './schemas/flight-booking.schema';
+import { PaymentsService } from '../payments/payments.service';
 import {
   ADULT_MIN_AGE,
   CHILD_MIN_AGE,
+  FLIGHT_BOOKING_HOLD_MINUTES,
   INFANT_FARE_PERCENT,
   MAX_INFANTS_PER_ADULT,
   MIN_ADULT_PASSENGERS,
@@ -27,7 +33,234 @@ export class FlightBookingsService {
     private readonly flightBookingModel: Model<FlightBooking>,
     private readonly airlinesService: AirlinesService,
     private readonly flightsService: FlightsService,
+    @InjectModel(Flight.name)
+    private readonly flightModel: Model<Flight>,
+    @Inject(forwardRef(() => PaymentsService))
+    private readonly paymentsService: PaymentsService,
   ) {}
+
+  /** FLT-22: atomically hold seats for ten minutes after a fresh summary check. */
+  async holdSeats(dto: CreateBookingSummaryDto, userId: string) {
+    const summary = await this.createSummary(dto);
+    const seatsHeld = summary.passengers.filter(
+      (passenger) => passenger.type !== 'infant',
+    ).length;
+    const heldSegments: Array<{ flightId: string; cabinId: string }> = [];
+
+    try {
+      for (const selection of [dto.outbound, ...(dto.return ? [dto.return] : [])]) {
+        await this.changeHeldSeats(selection.flightId, selection.cabinId, seatsHeld, 'hold');
+        heldSegments.push(selection);
+      }
+    } catch (error) {
+      await this.releaseHeldSegments(heldSegments, seatsHeld);
+      throw error;
+    }
+
+    try {
+      const outboundFlight = await this.flightsService.findById(dto.outbound.flightId);
+      const now = new Date();
+      const holdExpiresAt = new Date(
+        now.getTime() + FLIGHT_BOOKING_HOLD_MINUTES * 60 * 1000,
+      );
+      const booking = await this.flightBookingModel.create({
+        userId: new Types.ObjectId(userId),
+        airlineId: outboundFlight.airlineId,
+        tripType: dto.return ? 'round_trip' : 'one_way',
+        segments: summary.segments.map((segment) => ({
+          flightId: new Types.ObjectId(segment.flight.flightId),
+          cabinId: new Types.ObjectId(segment.cabin.cabinId),
+          cabinClass: segment.cabin.cabinClass,
+          fare: segment.cabin.farePerSeat,
+        })),
+        passengers: summary.passengers,
+        seatsHeld,
+        baggageFee: summary.baggage.totalFee,
+        totalPrice: summary.totalPrice,
+        status: 'pending_payment',
+        holdExpiresAt,
+        policyAcceptance: null,
+      });
+      return {
+        booking,
+        holdExpiresAt,
+        summary,
+      };
+    } catch (error) {
+      await this.releaseHeldSegments(heldSegments, seatsHeld);
+      throw error;
+    }
+  }
+
+  /** FLT-22/PAY-01: expire holds, release inventory, and cancel their Stripe intents. */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async expirePendingBookings(): Promise<void> {
+    const now = new Date();
+    const expiredCandidates = await this.flightBookingModel
+      .find({ status: 'pending_payment', holdExpiresAt: { $lte: now } })
+      .exec();
+
+    for (const candidate of expiredCandidates) {
+      const expired = await this.flightBookingModel
+        .findOneAndUpdate(
+          {
+            _id: candidate._id,
+            status: 'pending_payment',
+            holdExpiresAt: { $lte: now },
+          },
+          { $set: { status: 'expired' } },
+          { new: true },
+        )
+        .exec();
+      if (!expired) continue;
+
+      for (const segment of expired.segments) {
+        await this.changeHeldSeats(
+          segment.flightId.toString(),
+          segment.cabinId.toString(),
+          expired.seatsHeld,
+          'release',
+        );
+      }
+      if (expired.paymentId) {
+        await this.paymentsService.cancelPayment(expired.paymentId.toString());
+      } else {
+        await this.paymentsService.cancelPaymentsForBooking(
+          'flight',
+          expired._id.toString(),
+        );
+      }
+    }
+  }
+
+  /** FLT-23: called only after PaymentsService verifies a Stripe success webhook. */
+  async onPaymentSucceeded(bookingId: string): Promise<void> {
+    const booking = await this.flightBookingModel.findById(bookingId).exec();
+    if (!booking || booking.status !== 'pending_payment') return;
+    const now = new Date();
+    if (booking.holdExpiresAt <= now) return;
+
+    const paymentId = await this.paymentsService.findSucceededPaymentIdForBooking(bookingId);
+    if (!paymentId) return;
+
+    let confirmed: FlightBooking | null = null;
+    for (let attempt = 0; attempt < 3 && !confirmed; attempt += 1) {
+      const bookingReference = this.generateBookingReference();
+      try {
+        confirmed = await this.flightBookingModel
+          .findOneAndUpdate(
+            {
+              _id: bookingId,
+              status: 'pending_payment',
+              holdExpiresAt: { $gt: now },
+            },
+            {
+              $set: {
+                status: 'confirmed',
+                bookingReference,
+                paymentId: new Types.ObjectId(paymentId),
+              },
+            },
+            { new: true },
+          )
+          .exec();
+      } catch (error) {
+        if ((error as { code?: number })?.code !== 11000) throw error;
+      }
+    }
+    if (!confirmed) return;
+
+    const transferred: FlightBooking['segments'] = [];
+    try {
+      for (const segment of confirmed.segments) {
+        await this.changeHeldSeats(
+          segment.flightId.toString(),
+          segment.cabinId.toString(),
+          confirmed.seatsHeld,
+          'confirm',
+        );
+        transferred.push(segment);
+      }
+    } catch (error) {
+      for (const segment of transferred.reverse()) {
+        await this.changeHeldSeats(
+          segment.flightId.toString(),
+          segment.cabinId.toString(),
+          confirmed.seatsHeld,
+          'revert-confirm',
+        );
+      }
+      await this.flightBookingModel
+        .findOneAndUpdate(
+          { _id: bookingId, status: 'confirmed', bookingReference: confirmed.bookingReference },
+          {
+            $set: { status: 'pending_payment' },
+            $unset: { paymentId: 1, bookingReference: 1 },
+          },
+          { new: true },
+        )
+        .exec();
+      throw error;
+    }
+
+    // TODO(Member 6): notify the user about confirmation when NotificationsService exists.
+  }
+
+  private async changeHeldSeats(
+    flightId: string,
+    cabinId: string,
+    seats: number,
+    action: 'hold' | 'release' | 'confirm' | 'revert-confirm',
+  ): Promise<void> {
+    const cabinObjectId = new Types.ObjectId(cabinId);
+    const filter: Record<string, unknown> = {
+      _id: flightId,
+      'cabins._id': cabinObjectId,
+    };
+    let inc: Record<string, number>;
+    if (action === 'hold') {
+      filter.status = FlightStatus.SCHEDULED;
+      filter.cabins = {
+        $elemMatch: { _id: cabinObjectId, availableSeats: { $gte: seats } },
+      };
+      inc = { 'cabins.$.availableSeats': -seats, 'cabins.$.heldSeats': seats };
+    } else if (action === 'release') {
+      filter.cabins = {
+        $elemMatch: { _id: cabinObjectId, heldSeats: { $gte: seats } },
+      };
+      inc = { 'cabins.$.heldSeats': -seats, 'cabins.$.availableSeats': seats };
+    } else if (action === 'confirm') {
+      filter.cabins = {
+        $elemMatch: { _id: cabinObjectId, heldSeats: { $gte: seats } },
+      };
+      inc = { 'cabins.$.heldSeats': -seats, 'cabins.$.bookedSeats': seats };
+    } else {
+      filter.cabins = {
+        $elemMatch: { _id: cabinObjectId, bookedSeats: { $gte: seats } },
+      };
+      inc = { 'cabins.$.bookedSeats': -seats, 'cabins.$.heldSeats': seats };
+    }
+
+    const updated = await this.flightModel
+      .findOneAndUpdate({ ...filter }, { $inc: inc }, { new: true })
+      .exec();
+    if (!updated) {
+      throw new ConflictException('Flight cabin inventory changed; retry the request');
+    }
+  }
+
+  private async releaseHeldSegments(
+    segments: Array<{ flightId: string; cabinId: string }>,
+    seats: number,
+  ): Promise<void> {
+    for (const segment of segments.reverse()) {
+      await this.changeHeldSeats(segment.flightId, segment.cabinId, seats, 'release');
+    }
+  }
+
+  private generateBookingReference(): string {
+    return `FL${randomBytes(5).toString('hex').toUpperCase()}`;
+  }
 
   /** FLT-12/19/21: validate and calculate a summary without writing or holding seats. */
   async createSummary(dto: CreateBookingSummaryDto) {

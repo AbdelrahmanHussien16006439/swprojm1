@@ -19,6 +19,7 @@ describe('PaymentsService', () => {
     findById: jest.Mock;
     findOne: jest.Mock;
     findOneAndUpdate: jest.Mock;
+    find: jest.Mock;
   };
   let refundModel: { create: jest.Mock; findById: jest.Mock };
   let bookingModel: { findOne: jest.Mock };
@@ -32,6 +33,7 @@ describe('PaymentsService', () => {
     refunds: { create: jest.Mock };
     webhooks: { constructEvent: jest.Mock };
   };
+  let flightBookingsService: { onPaymentSucceeded: jest.Mock };
 
   beforeEach(() => {
     paymentModel = {
@@ -39,9 +41,11 @@ describe('PaymentsService', () => {
       findById: jest.fn(),
       findOne: jest.fn(),
       findOneAndUpdate: jest.fn(),
+      find: jest.fn(),
     };
     refundModel = { create: jest.fn(), findById: jest.fn() };
     bookingModel = { findOne: jest.fn() };
+    flightBookingsService = { onPaymentSucceeded: jest.fn() };
     stripe = {
       paymentIntents: {
         create: jest.fn().mockResolvedValue({ id: 'pi_test', client_secret: 'secret_test' }),
@@ -69,6 +73,7 @@ describe('PaymentsService', () => {
       bookingModel as unknown as Model<FlightBooking>,
       config,
       stripe as unknown as Stripe,
+      flightBookingsService as never,
     );
   });
 
@@ -193,13 +198,17 @@ describe('PaymentsService', () => {
   });
 
   it('verifies webhook signatures and records succeeded payment events', async () => {
-    const payment = { bookingId: new Types.ObjectId() };
+    const payment = {
+      bookingId: new Types.ObjectId(),
+      status: 'pending',
+      save: jest.fn().mockResolvedValue(undefined),
+    };
     const event = {
       type: 'payment_intent.succeeded',
       data: { object: { id: 'pi_verified' } },
     };
     stripe.webhooks.constructEvent.mockReturnValue(event);
-    paymentModel.findOneAndUpdate.mockReturnValue({
+    paymentModel.findOne.mockReturnValue({
       exec: jest.fn().mockResolvedValue(payment),
     });
 
@@ -211,10 +220,13 @@ describe('PaymentsService', () => {
       'sig_verified',
       'whsec_test',
     );
-    expect(paymentModel.findOneAndUpdate).toHaveBeenCalledWith(
-      { stripePaymentIntentId: 'pi_verified', status: { $in: ['pending', 'failed'] } },
-      { $set: { status: 'succeeded' } },
-      { new: true },
+    expect(paymentModel.findOne).toHaveBeenCalledWith({
+      stripePaymentIntentId: 'pi_verified',
+    });
+    expect(payment.status).toBe('succeeded');
+    expect(payment.save).toHaveBeenCalled();
+    expect(flightBookingsService.onPaymentSucceeded).toHaveBeenCalledWith(
+      payment.bookingId.toString(),
     );
   });
 

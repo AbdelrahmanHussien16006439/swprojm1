@@ -86,8 +86,9 @@ export class FlightBooking {
   @Prop({ type: String, required: true, enum: FLIGHT_BOOKING_STATUSES, default: 'pending_payment', index: true })
   status: FlightBookingStatus;
 
-  @Prop({ type: String, unique: true, sparse: true, default: null })
-  bookingReference: string | null;
+  // Missing until verified payment; sparse unique indexing allows many pending holds.
+  @Prop({ type: String, unique: true, sparse: true })
+  bookingReference?: string;
 
   @Prop({ type: Date, required: true, index: true })
   holdExpiresAt: Date;

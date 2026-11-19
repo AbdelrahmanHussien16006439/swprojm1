@@ -24,4 +24,12 @@ export class FlightBookingSummaryController {
   createSummary(@Body() dto: CreateBookingSummaryDto, @CurrentUser() _user: JwtUser) {
     return this.flightBookingsService.createSummary(dto);
   }
+
+  @Post('hold')
+  @ApiOperation({
+    summary: 'Hold seats and create a pending-payment booking for ten minutes',
+  })
+  hold(@Body() dto: CreateBookingSummaryDto, @CurrentUser() user: JwtUser) {
+    return this.flightBookingsService.holdSeats(dto, user.sub);
+  }
 }

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import Stripe from 'stripe';
@@ -6,6 +6,7 @@ import {
   FlightBooking,
   FlightBookingSchema,
 } from '../flight-bookings/schemas/flight-booking.schema';
+import { FlightBookingsModule } from '../flight-bookings/flight-bookings.module';
 import { Payment, PaymentSchema } from './schemas/payment.schema';
 import { Refund, RefundSchema } from './schemas/refund.schema';
 import { PaymentsController, RefundsController } from './payments.controller';
@@ -16,6 +17,7 @@ import { STRIPE_CLIENT } from './payments.constants';
 // Remember to export your service(s) AND MongooseModule (TEAM_PLAN 3.2).
 @Module({
   imports: [
+    forwardRef(() => FlightBookingsModule),
     MongooseModule.forFeature([
       { name: Payment.name, schema: PaymentSchema },
       { name: Refund.name, schema: RefundSchema },
