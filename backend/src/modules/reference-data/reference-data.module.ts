@@ -1,6 +1,25 @@
 import { Module } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
+import { ReferenceDataController } from './reference-data.controller';
+import { ReferenceDataService } from './reference-data.service';
+import { Airport, AirportSchema } from './schemas/airport.schema';
+import { Attraction, AttractionSchema } from './schemas/attraction.schema';
+import { City, CitySchema } from './schemas/city.schema';
+import { Country, CountrySchema } from './schemas/country.schema';
+import { Currency, CurrencySchema } from './schemas/currency.schema';
 
-// Owner: Member 5 — see docs/TEAM_PLAN.md Section 7.
-// Remember to export your service(s) AND MongooseModule (TEAM_PLAN 3.2).
-@Module({})
+@Module({
+  imports: [
+    MongooseModule.forFeature([
+      { name: Country.name, schema: CountrySchema },
+      { name: City.name, schema: CitySchema },
+      { name: Airport.name, schema: AirportSchema },
+      { name: Currency.name, schema: CurrencySchema },
+      { name: Attraction.name, schema: AttractionSchema },
+    ]),
+  ],
+  controllers: [ReferenceDataController],
+  providers: [ReferenceDataService],
+  exports: [ReferenceDataService, MongooseModule],
+})
 export class ReferenceDataModule {}
