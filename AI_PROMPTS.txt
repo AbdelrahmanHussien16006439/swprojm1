@@ -745,3 +745,18 @@ Reviews are unique per reservation, owner-scoped, and only visible reviews
 contribute to hotel ratings. Deactivated authors display as Deleted user. Build
 and all unit tests passed.
 ================================================
+### Member 6 — 2026-11-19 23:45 Africa/Cairo — ACC-17
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirement: ACC-17
+Prompt:
+"Implement Member 6 task 8: admin-only GET /api/admin/bookings with a read-only
+combined list of flight and hotel reservations, reference, user, provider, travel
+dates, amount and status. Support type, status, inclusive date-range filters and
+shared pagination. Add Swagger docs and focused tests; edit only Member 6 folders
+plus AI_PROMPTS.txt."
+How the output was used:
+Added the admin-protected combined bookings endpoint, batched lookups for user
+and provider names, UTC travel-date filters, newest-first merged pagination and
+Swagger documentation. Focused tests and the backend build passed.
+================================================
