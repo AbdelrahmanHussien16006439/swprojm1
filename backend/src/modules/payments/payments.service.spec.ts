@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException, NotImplementedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  NotImplementedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Model, Types } from 'mongoose';
 import Stripe from 'stripe';
@@ -6,31 +10,58 @@ import { FlightBooking } from '../flight-bookings/schemas/flight-booking.schema'
 import { Payment } from './schemas/payment.schema';
 import { Refund } from './schemas/refund.schema';
 import { PaymentsService } from './payments.service';
+import { Role } from '../../common/enums/role.enum';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
-  let paymentModel: { create: jest.Mock; findById: jest.Mock };
-  let refundModel: { create: jest.Mock };
+  let paymentModel: {
+    create: jest.Mock;
+    findById: jest.Mock;
+    findOne: jest.Mock;
+    findOneAndUpdate: jest.Mock;
+  };
+  let refundModel: { create: jest.Mock; findById: jest.Mock };
   let bookingModel: { findOne: jest.Mock };
   let stripe: {
-    paymentIntents: { create: jest.Mock; confirm: jest.Mock; cancel: jest.Mock };
+    paymentIntents: {
+      create: jest.Mock;
+      confirm: jest.Mock;
+      cancel: jest.Mock;
+      retrieve: jest.Mock;
+    };
     refunds: { create: jest.Mock };
+    webhooks: { constructEvent: jest.Mock };
   };
 
   beforeEach(() => {
-    paymentModel = { create: jest.fn(), findById: jest.fn() };
-    refundModel = { create: jest.fn() };
+    paymentModel = {
+      create: jest.fn(),
+      findById: jest.fn(),
+      findOne: jest.fn(),
+      findOneAndUpdate: jest.fn(),
+    };
+    refundModel = { create: jest.fn(), findById: jest.fn() };
     bookingModel = { findOne: jest.fn() };
     stripe = {
       paymentIntents: {
         create: jest.fn().mockResolvedValue({ id: 'pi_test', client_secret: 'secret_test' }),
-        confirm: jest.fn().mockResolvedValue({ status: 'succeeded' }),
+        confirm: jest.fn().mockResolvedValue({
+          status: 'succeeded',
+          client_secret: 'secret_retry',
+        }),
         cancel: jest.fn().mockResolvedValue({ status: 'canceled' }),
+        retrieve: jest.fn().mockResolvedValue({
+          status: 'requires_payment_method',
+          client_secret: 'secret_retry',
+        }),
       },
       refunds: { create: jest.fn() },
+      webhooks: { constructEvent: jest.fn() },
     };
     const config = {
-      getOrThrow: jest.fn().mockReturnValue('USD'),
+      getOrThrow: jest.fn((key: string) =>
+        key === 'PLATFORM_CURRENCY' ? 'USD' : 'whsec_test',
+      ),
     } as unknown as ConfigService;
     service = new PaymentsService(
       paymentModel as unknown as Model<Payment>,
@@ -52,7 +83,9 @@ describe('PaymentsService', () => {
         10,
       ),
     ).toBe(50);
-    expect(service.calculateRefundPercent([{ daysBefore: 7, refundPercent: 50 }], 2)).toBe(0);
+    expect(
+      service.calculateRefundPercent([{ daysBefore: 7, refundPercent: 50 }], 2),
+    ).toBe(0);
   });
 
   it('derives amount and currency from the owned booking and does not store the test method', async () => {
@@ -144,12 +177,94 @@ describe('PaymentsService', () => {
     refundModel.create.mockResolvedValue(refund);
     stripe.refunds.create.mockResolvedValue({ id: 're_test', status: 'succeeded' });
 
-    await expect(service.createRefund('payment-1', 40, 50, 'user cancellation')).resolves.toBe(refund);
+    await expect(
+      service.createRefund('payment-1', 40, 50, 'user cancellation'),
+    ).resolves.toBe(refund);
     expect(stripe.refunds.create).toHaveBeenCalledWith({
       payment_intent: 'pi_paid',
       amount: 4000,
     });
     expect(refund).toMatchObject({ stripeRefundId: 're_test', status: 'refunded' });
     expect(refund.save).toHaveBeenCalled();
+  });
+
+  it('verifies webhook signatures and records succeeded payment events', async () => {
+    const payment = { bookingId: new Types.ObjectId() };
+    const event = {
+      type: 'payment_intent.succeeded',
+      data: { object: { id: 'pi_verified' } },
+    };
+    stripe.webhooks.constructEvent.mockReturnValue(event);
+    paymentModel.findOneAndUpdate.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(payment),
+    });
+
+    await expect(service.handleWebhook(Buffer.from('{}'), 'sig_verified')).resolves.toEqual({
+      received: true,
+    });
+    expect(stripe.webhooks.constructEvent).toHaveBeenCalledWith(
+      Buffer.from('{}'),
+      'sig_verified',
+      'whsec_test',
+    );
+    expect(paymentModel.findOneAndUpdate).toHaveBeenCalledWith(
+      { stripePaymentIntentId: 'pi_verified', status: { $in: ['pending', 'failed'] } },
+      { $set: { status: 'succeeded' } },
+      { new: true },
+    );
+  });
+
+  it('rejects invalid webhook signatures without changing payment state', async () => {
+    stripe.webhooks.constructEvent.mockImplementation(() => {
+      throw new Error('bad signature');
+    });
+    await expect(service.handleWebhook(Buffer.from('{}'), 'bad_sig')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(paymentModel.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('retries only an owned failed payment whose booking hold is still active', async () => {
+    const bookingId = new Types.ObjectId();
+    paymentModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({
+        _id: new Types.ObjectId(),
+        userId: 'user-1',
+        bookingType: 'flight',
+        bookingId,
+        stripePaymentIntentId: 'pi_retry',
+        status: 'failed',
+      }),
+    });
+    bookingModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({
+        status: 'pending_payment',
+        holdExpiresAt: new Date(Date.now() + 60_000),
+        policyAcceptance: { acceptedAt: new Date(), policySnapshot: {} },
+      }),
+    });
+
+    await expect(
+      service.retryPayment('payment-1', 'user-1', 'pm_card_visa'),
+    ).resolves.toEqual({ paymentId: expect.any(String), clientSecret: 'secret_retry' });
+    expect(paymentModel.findOne).toHaveBeenCalledWith({ _id: 'payment-1', userId: 'user-1' });
+    expect(stripe.paymentIntents.confirm).toHaveBeenCalledWith('pi_retry', {
+      payment_method: 'pm_card_visa',
+    });
+  });
+
+  it('hides another user’s payment with a 404', async () => {
+    paymentModel.findById.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({
+        userId: new Types.ObjectId().toString(),
+        bookingType: 'flight',
+      }),
+    });
+    await expect(
+      service.getPayment('payment-1', {
+        sub: new Types.ObjectId().toString(),
+        role: Role.USER,
+      } as never),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });
