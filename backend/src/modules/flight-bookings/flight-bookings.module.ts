@@ -4,6 +4,7 @@ import { AirlinesModule } from '../airlines/airlines.module';
 import { FlightsModule } from '../flights/flights.module';
 import {
   BookingPoliciesController,
+  FlightModeratorBookingsController,
   FlightBookingsController,
 } from './flight-bookings.controller';
 import { FlightBookingSummaryController } from './flight-bookings.summary.controller';
@@ -27,6 +28,7 @@ import { PaymentsModule } from '../payments/payments.module';
     BookingPoliciesController,
     FlightBookingSummaryController,
     FlightBookingsController,
+    FlightModeratorBookingsController,
   ],
   exports: [FlightBookingsService, MongooseModule],
 })

@@ -10,3 +10,6 @@ export class MyBookingsQueryDto extends PaginationQueryDto {
   })
   group?: 'upcoming' | 'past' | 'cancelled';
 }
+
+/** FLT-29: standard pagination for an airline moderator's flight bookings. */
+export class ModeratorBookingsQueryDto extends PaginationQueryDto {}

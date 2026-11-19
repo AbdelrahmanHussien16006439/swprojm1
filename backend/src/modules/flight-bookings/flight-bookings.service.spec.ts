@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { Model, Types } from 'mongoose';
@@ -742,5 +743,182 @@ describe('FlightBookingsService policies', () => {
 
     expect(ticket.filename).toBe('e-ticket-FLPDF123456.pdf');
     expect(ticket.buffer.subarray(0, 5).toString()).toBe('%PDF-');
+  });
+
+  it('completes confirmed bookings only after the last segment has arrived', async () => {
+    const arrivedId = new Types.ObjectId();
+    const futureId = new Types.ObjectId();
+    bookingModel.find.mockReturnValue({
+      exec: jest.fn().mockResolvedValue([
+        { _id: arrivedId, segments: [{ flightId: new Types.ObjectId() }] },
+        { _id: futureId, segments: [{ flightId: new Types.ObjectId() }] },
+      ]),
+    });
+    flightsService.findById
+      .mockResolvedValueOnce({ arrivalTime: new Date(Date.now() - 60_000) })
+      .mockResolvedValueOnce({ arrivalTime: new Date(Date.now() + 60_000) });
+    bookingModel.findOneAndUpdate.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ status: 'completed' }),
+    });
+
+    await service.completeArrivedBookings();
+
+    expect(bookingModel.findOneAndUpdate).toHaveBeenCalledTimes(1);
+    expect(bookingModel.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: arrivedId, status: 'confirmed' },
+      { $set: { status: 'completed' } },
+      { new: true },
+    );
+  });
+
+  it('exposes only the calling moderator airline bookings and seat counts', async () => {
+    const flightId = new Types.ObjectId();
+    const airlineId = new Types.ObjectId();
+    const cabinId = new Types.ObjectId();
+    const booking = {
+      bookingReference: 'FLMOD123456',
+      segments: [{ flightId, cabinClass: 'economy' }],
+      passengers: [{ fullName: 'Taylor Passenger' }],
+      seatsHeld: 1,
+      status: 'confirmed',
+    };
+    flightsService.findById.mockResolvedValue({
+      airlineId,
+      cabins: [{ _id: cabinId, cabinClass: 'economy', availableSeats: 4 }],
+    });
+    const query = {
+      sort: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      exec: jest.fn().mockResolvedValue([booking]),
+    };
+    bookingModel.find.mockReturnValue(query);
+    bookingModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
+
+    const result = await service.listFlightBookingsForModerator(
+      flightId.toString(),
+      airlineId.toString(),
+      1,
+    );
+
+    expect(result).toMatchObject({
+      total: 1,
+      data: [{
+        bookingReference: 'FLMOD123456',
+        passengerNames: ['Taylor Passenger'],
+        cabin: 'economy',
+        seats: 1,
+        status: 'confirmed',
+      }],
+      seatsRemainingPerCabin: [{
+        cabinId: cabinId.toString(),
+        cabinClass: 'economy',
+        seatsRemaining: 4,
+      }],
+    });
+    await expect(
+      service.listFlightBookingsForModerator(flightId.toString(), new Types.ObjectId().toString()),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('cancels confirmed bookings for a flight, restores inventory and issues a full refund', async () => {
+    const flightId = new Types.ObjectId();
+    const cabinId = new Types.ObjectId();
+    const paymentId = new Types.ObjectId();
+    const refundId = new Types.ObjectId();
+    const bookingId = new Types.ObjectId();
+    const booking = {
+      _id: bookingId,
+      status: 'confirmed',
+      paymentId,
+      totalPrice: 250,
+      seatsHeld: 2,
+      segments: [{ flightId, cabinId }],
+    };
+    bookingModel.find.mockReturnValue({ exec: jest.fn().mockResolvedValue([booking]) });
+    bookingModel.findOneAndUpdate
+      .mockReturnValueOnce({
+        exec: jest.fn().mockResolvedValue({ ...booking, status: 'cancelled' }),
+      })
+      .mockReturnValueOnce({ exec: jest.fn().mockResolvedValue({}) });
+    flightModel.findOneAndUpdate.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: flightId }),
+    });
+    paymentsService.createRefund.mockResolvedValue({ _id: refundId });
+
+    await service.cancelAllForFlight(flightId.toString());
+
+    expect(flightModel.findOneAndUpdate.mock.calls[0][1]).toEqual({
+      $inc: { 'cabins.$.bookedSeats': -2, 'cabins.$.availableSeats': 2 },
+    });
+    expect(paymentsService.createRefund).toHaveBeenCalledWith(
+      paymentId.toString(),
+      250,
+      100,
+      'Airline cancelled flight',
+    );
+  });
+
+  it('returns distinct confirmed passenger ids and detects any flight booking', async () => {
+    const flightId = new Types.ObjectId();
+    const userId = new Types.ObjectId();
+    bookingModel.find.mockReturnValue({
+      exec: jest.fn().mockResolvedValue([
+        { userId, segments: [] },
+        { userId, segments: [] },
+      ]),
+    });
+    await expect(service.findConfirmedUserIdsForFlight(flightId.toString())).resolves.toEqual([
+      userId.toString(),
+    ]);
+    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: 'booking' }) });
+    await expect(service.hasBookings(flightId.toString())).resolves.toBe(true);
+  });
+
+  it('detects upcoming confirmed segments for account deactivation checks', async () => {
+    const flightId = new Types.ObjectId();
+    bookingModel.find.mockReturnValue({
+      exec: jest.fn().mockResolvedValue([
+        { segments: [{ flightId }] },
+      ]),
+    });
+    flightsService.findById.mockResolvedValue({
+      departureTime: new Date(Date.now() + 60_000),
+    });
+
+    await expect(service.hasUpcomingConfirmed(new Types.ObjectId().toString())).resolves.toBe(
+      true,
+    );
+    expect(bookingModel.find).toHaveBeenCalledWith({
+      userId: expect.any(Types.ObjectId),
+      status: 'confirmed',
+    });
+  });
+
+  it('exports only the moderator airline flight passengers as escaped CSV', async () => {
+    const flightId = new Types.ObjectId();
+    const airlineId = new Types.ObjectId();
+    const cabinId = new Types.ObjectId();
+    flightsService.findById.mockResolvedValue({ airlineId });
+    bookingModel.find.mockReturnValue({
+      sort: jest.fn().mockReturnThis(),
+      exec: jest.fn().mockResolvedValue([
+        {
+          bookingReference: 'FLCSV123456',
+          segments: [{ flightId, cabinClass: 'economy', cabinId }],
+          passengers: [{ fullName: '=HYPERLINK("bad")' }],
+          seatsHeld: 1,
+          status: 'confirmed',
+        },
+      ]),
+    });
+
+    const csv = await service.exportFlightPassengersCsv(
+      flightId.toString(),
+      airlineId.toString(),
+    );
+
+    expect(csv).toContain('"Booking Reference","Passenger Name","Cabin","Seats","Status"');
+    expect(csv).toContain('"FLCSV123456","\'=HYPERLINK(""bad"")","economy","1","confirmed"');
   });
 });

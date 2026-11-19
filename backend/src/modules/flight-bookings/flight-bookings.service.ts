@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -133,6 +134,223 @@ export class FlightBookingsService {
         );
       }
     }
+  }
+
+  /** GEN-11: complete a confirmed booking only after its last segment arrives. */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async completeArrivedBookings(): Promise<void> {
+    const candidates = await this.flightBookingModel
+      .find({ status: 'confirmed' })
+      .exec();
+    const now = new Date();
+    for (const booking of candidates) {
+      const lastSegment = booking.segments[booking.segments.length - 1];
+      if (!lastSegment) continue;
+      const lastFlight = await this.flightsService.findById(
+        lastSegment.flightId.toString(),
+      );
+      if (lastFlight.arrivalTime > now) continue;
+      await this.flightBookingModel
+        .findOneAndUpdate(
+          { _id: booking._id, status: 'confirmed' },
+          { $set: { status: 'completed' } },
+          { new: true },
+        )
+        .exec();
+    }
+  }
+
+  /** FLT-06: cancel bookings that include a provider-cancelled flight. */
+  async cancelAllForFlight(flightId: string): Promise<void> {
+    const flightObjectId = new Types.ObjectId(flightId);
+    const candidates = await this.flightBookingModel
+      .find({
+        'segments.flightId': flightObjectId,
+        status: { $in: ['pending_payment', 'confirmed'] },
+      })
+      .exec();
+
+    for (const candidate of candidates) {
+      if (candidate.status === 'pending_payment') {
+        const expired = await this.flightBookingModel
+          .findOneAndUpdate(
+            { _id: candidate._id, status: 'pending_payment' },
+            { $set: { status: 'expired' } },
+            { new: true },
+          )
+          .exec();
+        if (!expired) continue;
+        for (const segment of expired.segments) {
+          await this.changeHeldSeats(
+            segment.flightId.toString(),
+            segment.cabinId.toString(),
+            expired.seatsHeld,
+            'release',
+          );
+        }
+        if (expired.paymentId) {
+          await this.paymentsService.cancelPayment(expired.paymentId.toString());
+        } else {
+          await this.paymentsService.cancelPaymentsForBooking(
+            'flight',
+            expired._id.toString(),
+          );
+        }
+        // TODO(Member 6): notify pending passenger that provider cancellation ended the hold.
+        continue;
+      }
+
+      const cancelled = await this.flightBookingModel
+        .findOneAndUpdate(
+          { _id: candidate._id, status: 'confirmed' },
+          { $set: { status: 'cancelled', cancelledBy: 'provider' } },
+          { new: true },
+        )
+        .exec();
+      if (!cancelled) continue;
+      for (const segment of cancelled.segments) {
+        await this.changeHeldSeats(
+          segment.flightId.toString(),
+          segment.cabinId.toString(),
+          cancelled.seatsHeld,
+          'cancel-confirmed',
+        );
+      }
+      if (cancelled.paymentId && cancelled.totalPrice > 0) {
+        const refund = await this.paymentsService.createRefund(
+          cancelled.paymentId.toString(),
+          cancelled.totalPrice,
+          100,
+          'Airline cancelled flight',
+        );
+        const refundId = (refund as { _id?: Types.ObjectId })._id;
+        if (refundId) {
+          await this.flightBookingModel
+            .findOneAndUpdate(
+              { _id: cancelled._id, status: 'cancelled' },
+              { $set: { refundId } },
+              { new: true },
+            )
+            .exec();
+        }
+      }
+      // TODO(Member 6): notify confirmed passenger about provider cancellation/refund.
+    }
+  }
+
+  /** FLT-05: passenger IDs for notification when a flight changes. */
+  async findConfirmedUserIdsForFlight(flightId: string): Promise<string[]> {
+    const bookings = await this.flightBookingModel
+      .find({
+        'segments.flightId': new Types.ObjectId(flightId),
+        status: 'confirmed',
+      })
+      .exec();
+    return [...new Set(bookings.map((booking) => booking.userId.toString()))];
+  }
+
+  /** FLT-05: prevent edits to any flight with an associated booking. */
+  async hasBookings(flightId: string): Promise<boolean> {
+    const booking = await this.flightBookingModel
+      .findOne({ 'segments.flightId': new Types.ObjectId(flightId) })
+      .exec();
+    return Boolean(booking);
+  }
+
+  /** ACC-12: a user has an upcoming booking while any confirmed segment is in future. */
+  async hasUpcomingConfirmed(userId: string): Promise<boolean> {
+    const bookings = await this.flightBookingModel
+      .find({ userId: new Types.ObjectId(userId), status: 'confirmed' })
+      .exec();
+    const now = new Date();
+    for (const booking of bookings) {
+      for (const segment of booking.segments) {
+        const flight = await this.flightsService.findById(segment.flightId.toString());
+        if (flight.departureTime > now) return true;
+      }
+    }
+    return false;
+  }
+
+  /** FLT-29: paginated flight bookings, scoped to the moderator's own airline. */
+  async listFlightBookingsForModerator(
+    flightId: string,
+    providerId: string | undefined,
+    page = 1,
+  ) {
+    const flight = await this.flightsService.findById(flightId);
+    if (!providerId || flight.airlineId.toString() !== providerId) {
+      throw new ForbiddenException('This flight is outside your airline');
+    }
+    const filter = {
+      'segments.flightId': new Types.ObjectId(flightId),
+      status: { $in: ['confirmed', 'cancelled'] },
+    };
+    const result = await paginate(this.flightBookingModel, filter, page, {
+      sort: { createdAt: -1 },
+    });
+    const data = result.data.map((booking) => {
+      const segment = booking.segments.find(
+        (item) => item.flightId.toString() === flightId,
+      );
+      return {
+        bookingReference: booking.bookingReference,
+        passengerNames: booking.passengers.map((passenger) => passenger.fullName),
+        cabin: segment?.cabinClass,
+        seats: booking.seatsHeld,
+        status: booking.status,
+      };
+    });
+    return {
+      ...result,
+      data,
+      seatsRemainingPerCabin: flight.cabins.map((cabin) => ({
+        cabinId: (cabin as typeof cabin & { _id?: Types.ObjectId })._id?.toString(),
+        cabinClass: cabin.cabinClass,
+        seatsRemaining: cabin.availableSeats,
+      })),
+    };
+  }
+
+  /** FLT-29: CSV passenger download for the airline moderator's own flight. */
+  async exportFlightPassengersCsv(
+    flightId: string,
+    providerId: string | undefined,
+  ): Promise<string> {
+    const flight = await this.flightsService.findById(flightId);
+    if (!providerId || flight.airlineId.toString() !== providerId) {
+      throw new ForbiddenException('This flight is outside your airline');
+    }
+    const bookings = await this.flightBookingModel
+      .find({
+        'segments.flightId': new Types.ObjectId(flightId),
+        status: { $in: ['confirmed', 'cancelled'] },
+      })
+      .sort({ createdAt: -1 })
+      .exec();
+    const rows = [
+      ['Booking Reference', 'Passenger Name', 'Cabin', 'Seats', 'Status'],
+    ];
+    for (const booking of bookings) {
+      const segment = booking.segments.find(
+        (item) => item.flightId.toString() === flightId,
+      );
+      for (const passenger of booking.passengers) {
+        rows.push([
+          booking.bookingReference ?? '',
+          passenger.fullName,
+          segment?.cabinClass ?? '',
+          String(booking.seatsHeld),
+          booking.status,
+        ]);
+      }
+    }
+    return rows.map((row) => row.map((value) => this.csvCell(value)).join(',')).join('\r\n');
+  }
+
+  private csvCell(value: string): string {
+    const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+    return `"${safe.replace(/"/g, '""')}"`;
   }
 
   /** FLT-23: called only after PaymentsService verifies a Stripe success webhook. */

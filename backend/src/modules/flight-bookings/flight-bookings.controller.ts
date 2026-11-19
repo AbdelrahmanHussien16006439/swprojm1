@@ -17,12 +17,16 @@ import {
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { Role } from '../../common/enums/role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
 import { AcceptPoliciesDto } from './dto/accept-policies.dto';
 import { CancelFlightBookingDto } from './dto/cancel-flight-booking.dto';
 import { MyBookingsQueryDto } from './dto/my-bookings-query.dto';
+import { ModeratorBookingsQueryDto } from './dto/my-bookings-query.dto';
 import { FlightBookingsService } from './flight-bookings.service';
 import { BadRequestException, NotImplementedException } from '@nestjs/common';
 
@@ -130,5 +134,49 @@ export class BookingPoliciesController {
     if (type !== 'flight') {
       throw new BadRequestException('Booking type must be flight or hotel');
     }
+  }
+}
+
+@ApiTags('flights')
+@ApiCookieAuth('access_token')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.AIRLINE_MODERATOR)
+@Controller('flights')
+export class FlightModeratorBookingsController {
+  constructor(private readonly flightBookingsService: FlightBookingsService) {}
+
+  @Get(':id/bookings')
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiOperation({ summary: 'List bookings and cabin inventory for my flight (FLT-29)' })
+  bookings(
+    @Param('id', ParseObjectIdPipe) flightId: string,
+    @Query() query: ModeratorBookingsQueryDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.flightBookingsService.listFlightBookingsForModerator(
+      flightId,
+      user.providerId,
+      query.page ?? 1,
+    );
+  }
+
+  @Get(':id/passengers/export')
+  @ApiProduces('text/csv')
+  @ApiOperation({ summary: 'Download my flight passenger list as CSV (FLT-29)' })
+  async exportPassengers(
+    @Param('id', ParseObjectIdPipe) flightId: string,
+    @CurrentUser() user: JwtUser,
+    @Res() response: Response,
+  ): Promise<void> {
+    const csv = await this.flightBookingsService.exportFlightPassengersCsv(
+      flightId,
+      user.providerId,
+    );
+    response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="flight-${flightId}-passengers.csv"`,
+    );
+    response.end(csv);
   }
 }
