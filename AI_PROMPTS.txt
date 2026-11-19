@@ -503,3 +503,25 @@ explicitly UTC pending Member 5 airport timezone support. Stripe authentication,
 connection and rate-limit errors now return a clear 503; other Stripe API errors
 return 502, while card declines return 400. Build and all unit tests passed.
 ================================================
+================================================
+### Member 4 — 2026-11-19 18:01 — FLT-29, FLT-06, FLT-05, ACC-12, GEN-11
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: FLT-29, FLT-06 (booking support), FLT-05 (booking lookup), ACC-12, GEN-11
+Prompt:
+"Implement task 8 from TEAM_PLAN.md: FlightBookingsService.cancelAllForFlight,
+findConfirmedUserIdsForFlight, hasBookings, and hasUpcomingConfirmed; add the
+airline moderator's own-flight paginated bookings endpoint and CSV passenger
+export; and mark confirmed bookings completed every minute only after their
+last segment arrival. Use existing moderator guards, enforce provider ownership,
+return only confirmed/cancelled rows with cabin inventory, refund provider
+cancellations at 100%, release affected seats and pending holds, and leave clear
+Member 6 notification TODOs. Add unit tests, build/test, and commit only my
+modules and AI_PROMPTS.txt."
+How the output was used:
+Added the four shared service methods, provider-cancellation handling with full
+refunds and inventory release, guarded moderator bookings/CSV endpoints, and a
+GEN-11 completion cron based on the last segment arrival. Member 6 notification
+hooks remain marked TODO. Added coverage for ownership, listing, cancellation,
+CSV escaping, shared lookups, and completion timing. Build and unit tests passed.
+================================================
