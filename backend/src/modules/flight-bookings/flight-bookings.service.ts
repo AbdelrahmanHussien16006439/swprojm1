@@ -10,6 +10,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { randomBytes } from 'crypto';
+import PDFDocument from 'pdfkit';
 import { AirlinesService } from '../airlines/airlines.service';
 import { FlightStatus } from '../flights/flights.constants';
 import { Flight } from '../flights/schemas/flight.schema';
@@ -25,6 +26,7 @@ import {
   MIN_ADULT_PASSENGERS,
 } from './flight-bookings.constants';
 import { CreateBookingSummaryDto } from './dto/create-booking-summary.dto';
+import { paginate } from '../../common/utils/pagination';
 
 @Injectable()
 export class FlightBookingsService {
@@ -206,11 +208,250 @@ export class FlightBookingsService {
     // TODO(Member 6): notify the user about confirmation when NotificationsService exists.
   }
 
+  async findMine(
+    userId: string,
+    page = 1,
+    group?: 'upcoming' | 'past' | 'cancelled',
+  ) {
+    const filter: Record<string, unknown> = { userId };
+    if (group === 'upcoming') filter.status = 'confirmed';
+    if (group === 'past') filter.status = 'completed';
+    if (group === 'cancelled') filter.status = 'cancelled';
+    const result = await paginate(this.flightBookingModel, filter, page, {
+      sort: { createdAt: -1 },
+    });
+    const data = await Promise.all(
+      result.data.map((booking) => this.toBookingListItem(booking)),
+    );
+    return { ...result, data };
+  }
+
+  async getMine(bookingId: string, userId: string) {
+    const booking = await this.getOwnedBooking(bookingId, userId);
+    const flights = await this.getFlightDetails(booking);
+    const paymentDetails = await this.paymentsService.getBookingPaymentDetails(
+      bookingId,
+      userId,
+      booking.paymentId?.toString(),
+    );
+    return {
+      ...booking.toObject(),
+      flights,
+      payment: paymentDetails.payment,
+      refund: paymentDetails.refund,
+    };
+  }
+
+  async getRefundPreview(bookingId: string, userId: string) {
+    const booking = await this.getOwnedBooking(bookingId, userId);
+    if (booking.status !== 'confirmed') {
+      throw new BadRequestException('Only confirmed bookings can be cancelled');
+    }
+    const outbound = booking.segments[0];
+    const flight = await this.flightsService.findById(outbound.flightId.toString());
+    const now = new Date();
+    if (flight.departureTime <= now) {
+      throw new BadRequestException('A booking cannot be cancelled after departure');
+    }
+    const tiers = this.getAcceptedCancellationTiers(booking);
+    const daysRemaining = Math.floor(
+      (flight.departureTime.getTime() - now.getTime()) / (24 * 60 * 60 * 1000),
+    );
+    const refundPercent = this.paymentsService.calculateRefundPercent(
+      tiers,
+      daysRemaining,
+    );
+    const refundAmount = this.paymentsService.roundToPlatformCurrency(
+      (booking.totalPrice * refundPercent) / 100,
+    );
+    return {
+      bookingId: booking._id.toString(),
+      totalPrice: booking.totalPrice,
+      currency: this.paymentsService.getPlatformCurrency(),
+      refundPercent,
+      refundAmount,
+      daysRemaining,
+    };
+  }
+
+  async cancelBooking(bookingId: string, userId: string, confirm: boolean) {
+    if (!confirm) throw new BadRequestException('Cancellation must be confirmed');
+    const booking = await this.getOwnedBooking(bookingId, userId);
+    const preview = await this.getRefundPreview(bookingId, userId);
+    if (preview.refundAmount > 0 && !booking.paymentId) {
+      throw new ConflictException('The booking has no successful payment to refund');
+    }
+
+    const cancelled = await this.flightBookingModel
+      .findOneAndUpdate(
+        { _id: bookingId, userId, status: 'confirmed' },
+        { $set: { status: 'cancelled', cancelledBy: 'user' } },
+        { new: true },
+      )
+      .exec();
+    if (!cancelled) {
+      throw new BadRequestException('Booking is no longer confirmed');
+    }
+
+    const released: FlightBooking['segments'] = [];
+    try {
+      for (const segment of cancelled.segments) {
+        await this.changeHeldSeats(
+          segment.flightId.toString(),
+          segment.cabinId.toString(),
+          cancelled.seatsHeld,
+          'cancel-confirmed',
+        );
+        released.push(segment);
+      }
+    } catch (error) {
+      for (const segment of released.reverse()) {
+        await this.changeHeldSeats(
+          segment.flightId.toString(),
+          segment.cabinId.toString(),
+          cancelled.seatsHeld,
+          'revert-cancel',
+        );
+      }
+      await this.flightBookingModel
+        .findOneAndUpdate(
+          { _id: bookingId, status: 'cancelled', cancelledBy: 'user' },
+          { $set: { status: 'confirmed' }, $unset: { cancelledBy: 1 } },
+          { new: true },
+        )
+        .exec();
+      throw error;
+    }
+
+    let refund: unknown = null;
+    if (preview.refundAmount > 0 && cancelled.paymentId) {
+      refund = await this.paymentsService.createRefund(
+        cancelled.paymentId.toString(),
+        preview.refundAmount,
+        preview.refundPercent,
+        'User flight booking cancellation',
+      );
+      const refundId = (refund as { _id?: Types.ObjectId })._id;
+      if (refundId) {
+        await this.flightBookingModel
+          .findOneAndUpdate(
+            { _id: bookingId, status: 'cancelled' },
+            { $set: { refundId } },
+            { new: true },
+          )
+          .exec();
+      }
+    }
+
+    // TODO(Member 6): notify the user about cancellation/refund when NotificationsService exists.
+    return { booking: cancelled, refund, refundPreview: preview };
+  }
+
+  async generateETicketPdf(bookingId: string, userId: string) {
+    const booking = await this.getOwnedBooking(bookingId, userId);
+    if (booking.status !== 'confirmed') {
+      throw new BadRequestException('An e-ticket is available only for confirmed bookings');
+    }
+    const flights = await this.getFlightDetails(booking);
+    const chunks: Buffer[] = [];
+    const document = new PDFDocument({ size: 'A4', margin: 48 });
+    const buffer = await new Promise<Buffer>((resolve, reject) => {
+      document.on('data', (chunk: Buffer) => chunks.push(chunk));
+      document.on('end', () => resolve(Buffer.concat(chunks)));
+      document.on('error', reject);
+      document.fontSize(20).text('Flight e-ticket', { align: 'center' });
+      document.moveDown();
+      document.fontSize(12).text(`Booking reference: ${booking.bookingReference ?? 'Pending'}`);
+      document.text(`Status: ${booking.status}`);
+      document.text(`Total: ${booking.totalPrice} ${this.paymentsService.getPlatformCurrency()}`);
+      document.moveDown();
+      document.fontSize(15).text('Flight segments');
+      for (const flight of flights) {
+        document
+          .fontSize(11)
+          .text(`${flight.flightNumber}: ${flight.departureAirportId} → ${flight.arrivalAirportId}`)
+          .text(`Departure: ${new Date(flight.departureTime).toISOString()} (UTC)`)
+          .text(`Arrival: ${new Date(flight.arrivalTime).toISOString()} (UTC)`)
+          .text(`Cabin: ${flight.cabinClass}`)
+          .moveDown(0.5);
+      }
+      document.fontSize(15).text('Passengers');
+      for (const passenger of booking.passengers) {
+        document
+          .fontSize(11)
+          .text(`${passenger.fullName} — ${passenger.type} — ID: ${passenger.documentNumber}`)
+          .text(`Extra bags: ${passenger.extraBags}, weight per bag: ${passenger.extraBagsWeightKg} kg`);
+      }
+      // TODO(Member 5): resolve airport time zones and display local departure/arrival times.
+      document.end();
+    });
+    return {
+      filename: `e-ticket-${booking.bookingReference ?? bookingId}.pdf`,
+      buffer,
+    };
+  }
+
+  private async getOwnedBooking(bookingId: string, userId: string) {
+    const booking = await this.flightBookingModel
+      .findOne({ _id: bookingId, userId })
+      .exec();
+    if (!booking) throw new NotFoundException('Booking not found');
+    return booking;
+  }
+
+  private async toBookingListItem(booking: FlightBooking) {
+    const flights = await this.getFlightDetails(booking);
+    return {
+      id: (booking as unknown as { _id: Types.ObjectId })._id.toString(),
+      bookingReference: booking.bookingReference,
+      flights,
+      passengers: booking.passengers.map(({ fullName, type }) => ({ fullName, type })),
+      cabin: booking.segments.map(({ cabinClass }) => cabinClass),
+      status: booking.status,
+    };
+  }
+
+  private async getFlightDetails(booking: FlightBooking) {
+    return Promise.all(
+      booking.segments.map(async (segment) => {
+        const flight = await this.flightsService.findById(segment.flightId.toString());
+        return {
+          flightId: segment.flightId.toString(),
+          flightNumber: flight.flightNumber,
+          departureAirportId: flight.departureAirportId.toString(),
+          arrivalAirportId: flight.arrivalAirportId.toString(),
+          departureTime: flight.departureTime,
+          arrivalTime: flight.arrivalTime,
+          cabinClass: segment.cabinClass,
+          fare: segment.fare,
+        };
+      }),
+    );
+  }
+
+  private getAcceptedCancellationTiers(
+    booking: FlightBooking,
+  ): { daysBefore: number; refundPercent: number }[] {
+    const snapshot = booking.policyAcceptance?.policySnapshot as
+      | { cancellationTiers?: { daysBefore: number; refundPercent: number }[] }
+      | undefined;
+    if (!snapshot || !Array.isArray(snapshot.cancellationTiers)) {
+      throw new BadRequestException('Accepted cancellation policy is missing');
+    }
+    return snapshot.cancellationTiers;
+  }
+
   private async changeHeldSeats(
     flightId: string,
     cabinId: string,
     seats: number,
-    action: 'hold' | 'release' | 'confirm' | 'revert-confirm',
+    action:
+      | 'hold'
+      | 'release'
+      | 'confirm'
+      | 'revert-confirm'
+      | 'cancel-confirmed'
+      | 'revert-cancel',
   ): Promise<void> {
     const cabinObjectId = new Types.ObjectId(cabinId);
     const filter: Record<string, unknown> = {
@@ -234,11 +475,21 @@ export class FlightBookingsService {
         $elemMatch: { _id: cabinObjectId, heldSeats: { $gte: seats } },
       };
       inc = { 'cabins.$.heldSeats': -seats, 'cabins.$.bookedSeats': seats };
-    } else {
+    } else if (action === 'revert-confirm') {
       filter.cabins = {
         $elemMatch: { _id: cabinObjectId, bookedSeats: { $gte: seats } },
       };
       inc = { 'cabins.$.bookedSeats': -seats, 'cabins.$.heldSeats': seats };
+    } else if (action === 'cancel-confirmed') {
+      filter.cabins = {
+        $elemMatch: { _id: cabinObjectId, bookedSeats: { $gte: seats } },
+      };
+      inc = { 'cabins.$.bookedSeats': -seats, 'cabins.$.availableSeats': seats };
+    } else {
+      filter.cabins = {
+        $elemMatch: { _id: cabinObjectId, availableSeats: { $gte: seats } },
+      };
+      inc = { 'cabins.$.availableSeats': -seats, 'cabins.$.bookedSeats': seats };
     }
 
     const updated = await this.flightModel

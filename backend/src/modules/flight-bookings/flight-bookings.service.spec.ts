@@ -15,6 +15,7 @@ describe('FlightBookingsService policies', () => {
   let bookingModel: {
     create: jest.Mock;
     find: jest.Mock;
+    countDocuments: jest.Mock;
     findById: jest.Mock;
     findOne: jest.Mock;
     findOneAndUpdate: jest.Mock;
@@ -26,12 +27,18 @@ describe('FlightBookingsService policies', () => {
     cancelPayment: jest.Mock;
     cancelPaymentsForBooking: jest.Mock;
     findSucceededPaymentIdForBooking: jest.Mock;
+    getBookingPaymentDetails: jest.Mock;
+    calculateRefundPercent: jest.Mock;
+    roundToPlatformCurrency: jest.Mock;
+    getPlatformCurrency: jest.Mock;
+    createRefund: jest.Mock;
   };
 
   beforeEach(() => {
     bookingModel = {
       create: jest.fn(),
       find: jest.fn(),
+      countDocuments: jest.fn(),
       findById: jest.fn(),
       findOne: jest.fn(),
       findOneAndUpdate: jest.fn(),
@@ -52,6 +59,11 @@ describe('FlightBookingsService policies', () => {
       cancelPayment: jest.fn(),
       cancelPaymentsForBooking: jest.fn(),
       findSucceededPaymentIdForBooking: jest.fn(),
+      getBookingPaymentDetails: jest.fn().mockResolvedValue({ payment: null, refund: null }),
+      calculateRefundPercent: jest.fn().mockReturnValue(50),
+      roundToPlatformCurrency: jest.fn((amount: number) => Math.round(amount * 100) / 100),
+      getPlatformCurrency: jest.fn().mockReturnValue('USD'),
+      createRefund: jest.fn(),
     };
     service = new FlightBookingsService(
       bookingModel as unknown as Model<FlightBooking>,
@@ -575,5 +587,160 @@ describe('FlightBookingsService policies', () => {
     expect(flightModel.findOneAndUpdate.mock.calls[0][1]).toEqual({
       $inc: { 'cabins.$.heldSeats': -2, 'cabins.$.bookedSeats': 2 },
     });
+  });
+
+  it('lists only the owner’s upcoming confirmed bookings with page size ten', async () => {
+    const booking = {
+      _id: new Types.ObjectId(),
+      bookingReference: 'FLABC123456',
+      segments: [],
+      passengers: [{ fullName: 'Alex', type: 'adult' }],
+      status: 'confirmed',
+    };
+    const query = {
+      sort: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      exec: jest.fn().mockResolvedValue([booking]),
+    };
+    bookingModel.find.mockReturnValue(query);
+    bookingModel.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
+
+    const result = await service.findMine('user-1', 1, 'upcoming');
+
+    expect(bookingModel.find).toHaveBeenCalledWith({
+      userId: 'user-1',
+      status: 'confirmed',
+    });
+    expect(query.limit).toHaveBeenCalledWith(10);
+    expect(result).toMatchObject({
+      page: 1,
+      limit: 10,
+      total: 1,
+      data: [{ bookingReference: 'FLABC123456', status: 'confirmed' }],
+    });
+  });
+
+  it('previews the refund using accepted outbound cancellation tiers', async () => {
+    const bookingId = new Types.ObjectId();
+    const flightId = new Types.ObjectId();
+    const booking = {
+      _id: bookingId,
+      status: 'confirmed',
+      totalPrice: 100,
+      segments: [{ flightId }],
+      policyAcceptance: {
+        policySnapshot: {
+          cancellationTiers: [
+            { daysBefore: 30, refundPercent: 100 },
+            { daysBefore: 7, refundPercent: 50 },
+            { daysBefore: 0, refundPercent: 0 },
+          ],
+        },
+      },
+    };
+    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(booking) });
+    flightsService.findById.mockResolvedValue({
+      departureTime: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000 + 60_000),
+    });
+
+    await expect(
+      service.getRefundPreview(bookingId.toString(), 'user-1'),
+    ).resolves.toMatchObject({
+      bookingId: bookingId.toString(),
+      totalPrice: 100,
+      currency: 'USD',
+      refundPercent: 50,
+      refundAmount: 50,
+      daysRemaining: 10,
+    });
+    expect(paymentsService.calculateRefundPercent).toHaveBeenCalledWith(
+      booking.policyAcceptance.policySnapshot.cancellationTiers,
+      10,
+    );
+  });
+
+  it('cancels a confirmed booking, releases booked seats and records a positive Stripe refund', async () => {
+    const bookingId = new Types.ObjectId();
+    const flightId = new Types.ObjectId();
+    const cabinId = new Types.ObjectId();
+    const paymentId = new Types.ObjectId();
+    const refundId = new Types.ObjectId();
+    const booking = {
+      _id: bookingId,
+      status: 'confirmed',
+      totalPrice: 100,
+      paymentId,
+      segments: [{ flightId, cabinId }],
+      seatsHeld: 2,
+      policyAcceptance: {
+        policySnapshot: { cancellationTiers: [{ daysBefore: 0, refundPercent: 50 }] },
+      },
+    };
+    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(booking) });
+    bookingModel.findOneAndUpdate
+      .mockReturnValueOnce({
+        exec: jest.fn().mockResolvedValue({ ...booking, status: 'cancelled', cancelledBy: 'user' }),
+      })
+      .mockReturnValueOnce({ exec: jest.fn().mockResolvedValue({ refundId }) });
+    flightsService.findById.mockResolvedValue({
+      departureTime: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+    });
+    paymentsService.createRefund.mockResolvedValue({ _id: refundId, status: 'refunded' });
+    flightModel.findOneAndUpdate.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: flightId }),
+    });
+
+    const result = await service.cancelBooking(bookingId.toString(), 'user-1', true);
+
+    expect(bookingModel.findOneAndUpdate.mock.calls[0][0]).toMatchObject({
+      _id: bookingId.toString(),
+      userId: 'user-1',
+      status: 'confirmed',
+    });
+    expect(flightModel.findOneAndUpdate.mock.calls[0][1]).toEqual({
+      $inc: { 'cabins.$.bookedSeats': -2, 'cabins.$.availableSeats': 2 },
+    });
+    expect(paymentsService.createRefund).toHaveBeenCalledWith(
+      paymentId.toString(),
+      50,
+      50,
+      'User flight booking cancellation',
+    );
+    expect(result.refund).toMatchObject({ status: 'refunded' });
+  });
+
+  it('generates a PDF e-ticket only for the booking owner', async () => {
+    const bookingId = new Types.ObjectId();
+    const flightId = new Types.ObjectId();
+    const booking = {
+      _id: bookingId,
+      status: 'confirmed',
+      bookingReference: 'FLPDF123456',
+      totalPrice: 100,
+      segments: [{ flightId, cabinClass: 'economy', fare: 100 }],
+      passengers: [
+        {
+          fullName: 'Alex Traveller',
+          type: 'adult',
+          documentNumber: 'P12345678',
+          extraBags: 1,
+          extraBagsWeightKg: 20,
+        },
+      ],
+    };
+    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(booking) });
+    flightsService.findById.mockResolvedValue({
+      flightNumber: 'AB123',
+      departureAirportId: new Types.ObjectId(),
+      arrivalAirportId: new Types.ObjectId(),
+      departureTime: new Date('2035-05-01T15:00:00.000Z'),
+      arrivalTime: new Date('2035-05-01T17:00:00.000Z'),
+    });
+
+    const ticket = await service.generateETicketPdf(bookingId.toString(), 'user-1');
+
+    expect(ticket.filename).toBe('e-ticket-FLPDF123456.pdf');
+    expect(ticket.buffer.subarray(0, 5).toString()).toBe('%PDF-');
   });
 });

@@ -2,7 +2,10 @@ import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AirlinesModule } from '../airlines/airlines.module';
 import { FlightsModule } from '../flights/flights.module';
-import { BookingPoliciesController } from './flight-bookings.controller';
+import {
+  BookingPoliciesController,
+  FlightBookingsController,
+} from './flight-bookings.controller';
 import { FlightBookingSummaryController } from './flight-bookings.summary.controller';
 import { FlightBookingsService } from './flight-bookings.service';
 import { FlightBooking, FlightBookingSchema } from './schemas/flight-booking.schema';
@@ -20,7 +23,11 @@ import { PaymentsModule } from '../payments/payments.module';
     ]),
   ],
   providers: [FlightBookingsService],
-  controllers: [BookingPoliciesController, FlightBookingSummaryController],
+  controllers: [
+    BookingPoliciesController,
+    FlightBookingSummaryController,
+    FlightBookingsController,
+  ],
   exports: [FlightBookingsService, MongooseModule],
 })
 export class FlightBookingsModule {}

@@ -2,6 +2,7 @@ import {
   BadRequestException,
   NotFoundException,
   NotImplementedException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Model, Types } from 'mongoose';
@@ -123,6 +124,22 @@ describe('PaymentsService', () => {
       expect.objectContaining({ amount: 10.5, currency: 'USD', status: 'pending' }),
     );
     expect(JSON.stringify(paymentModel.create.mock.calls)).not.toContain('pm_card_visa');
+  });
+
+  it('returns a clear 503 when Stripe rejects the configured credentials', async () => {
+    stripe.paymentIntents.create.mockRejectedValue({
+      type: 'StripeAuthenticationError',
+    });
+
+    const error = await service
+      .createPayment('flight', 'booking-1', 25, 'user-1')
+      .catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(ServiceUnavailableException);
+    expect(error).toMatchObject({
+      status: 503,
+      message:
+        'Stripe is temporarily unavailable; check the configured test credentials and try again.',
+    });
   });
 
   it('rejects payment for someone else’s booking as not found', async () => {
