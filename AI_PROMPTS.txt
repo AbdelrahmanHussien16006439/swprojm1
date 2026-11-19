@@ -661,3 +661,22 @@ Added the three timestamped models and registered them in their owner modules.
 Exported HotelBookingsService and implemented its confirmed-booking and active
 room-night lookup helpers. Build and the full unit test suite passed.
 ================================================
+### Member 6 — 2026-11-19 22:34 Africa/Cairo — HTL-16, HTL-17, HTL-18
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirements: HTL-16, HTL-17, HTL-18
+Prompt:
+"Implement Member 6 task 3: a validated POST /api/hotel-bookings multi-room
+hold; hold all room-nights with the booking in one MongoDB transaction and rely
+on the unique room/date index for concurrent conflicts; include policy callback
+methods, payment-success confirmation, expiry cleanup and tests. Allow adults=0
+per room, require at least one adult across the whole reservation, and test a
+second room occupied only by children. Do not change other members' modules."
+How the output was used:
+Added the user-only hold endpoint, DTOs and ten-minute transaction-backed holds,
+policy callbacks, payment-success confirmation and notification, and expiry
+cleanup with payment cancellation. Room occupancy, date availability and adult
+rules are enforced; a child-only second room is covered by a test. Build, all
+unit tests and formatting checks passed. Member 4's payment dispatch and Member
+5's RoomNight availability exclusions remain external integrations.
+================================================
