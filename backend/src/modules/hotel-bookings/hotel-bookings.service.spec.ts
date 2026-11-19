@@ -12,6 +12,7 @@ describe('HotelBookingsService', () => {
     findOneAndUpdate: jest.Mock;
     countDocuments: jest.Mock;
     updateOne: jest.Mock;
+    updateMany: jest.Mock;
   };
   let roomNightModel: {
     find: jest.Mock;
@@ -36,6 +37,7 @@ describe('HotelBookingsService', () => {
   };
   let notificationsService: { notify: jest.Mock };
   let usersService: { findPublicProfile: jest.Mock };
+  let reviewsService: { createForBooking: jest.Mock };
 
   beforeEach(() => {
     bookingModel = {
@@ -45,6 +47,7 @@ describe('HotelBookingsService', () => {
       findOneAndUpdate: jest.fn(),
       countDocuments: jest.fn(),
       updateOne: jest.fn(),
+      updateMany: jest.fn(),
     };
     roomNightModel = {
       find: jest.fn(),
@@ -79,6 +82,7 @@ describe('HotelBookingsService', () => {
     };
     notificationsService = { notify: jest.fn().mockResolvedValue(undefined) };
     usersService = { findPublicProfile: jest.fn() };
+    reviewsService = { createForBooking: jest.fn() };
     service = new HotelBookingsService(
       bookingModel as never,
       roomNightModel as never,
@@ -91,6 +95,7 @@ describe('HotelBookingsService', () => {
       paymentsService as never,
       notificationsService as never,
       usersService as never,
+      reviewsService as never,
     );
   });
 
@@ -337,6 +342,48 @@ describe('HotelBookingsService', () => {
       ),
     ).rejects.toThrow('Hotel not found');
     expect(bookingModel.find).not.toHaveBeenCalled();
+  });
+
+  it("allows a review only for the owner's completed reservation", async () => {
+    const userId = new Types.ObjectId();
+    const booking = makeReservation(userId, new Types.ObjectId(), 'completed');
+    bookingModel.findOne.mockReturnValue(query(booking));
+    reviewsService.createForBooking.mockResolvedValue({ id: 'review-id' });
+
+    await expect(
+      service.createReview(booking._id.toString(), userId.toString(), {
+        rating: 5,
+        text: 'Great',
+      }),
+    ).resolves.toEqual({ id: 'review-id' });
+    expect(reviewsService.createForBooking).toHaveBeenCalledWith(
+      userId.toString(),
+      (booking.hotelId as { _id: Types.ObjectId })._id.toString(),
+      booking._id.toString(),
+      { rating: 5, text: 'Great' },
+    );
+  });
+
+  it('rejects reviews for reservations not yet completed', async () => {
+    const userId = new Types.ObjectId();
+    const booking = makeReservation(userId, new Types.ObjectId(), 'confirmed');
+    bookingModel.findOne.mockReturnValue(query(booking));
+
+    await expect(
+      service.createReview(booking._id.toString(), userId.toString(), {
+        rating: 5,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(reviewsService.createForBooking).not.toHaveBeenCalled();
+  });
+
+  it('completes confirmed reservations after their check-out date', async () => {
+    bookingModel.updateMany.mockReturnValue(query({ modifiedCount: 1 }));
+    await service.completeCheckedOutReservations();
+    const [filter, update] = bookingModel.updateMany.mock.calls[0];
+    expect(filter.status).toBe('confirmed');
+    expect(filter.checkOut.$lt).toBeInstanceOf(Date);
+    expect(update).toEqual({ $set: { status: 'completed' } });
   });
 
   it('returns payment and refund details for an owned reservation', async () => {

@@ -4,6 +4,7 @@ import { HotelsModule } from '../hotels/hotels.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { UsersModule } from '../users/users.module';
+import { ReviewsModule } from '../reviews/reviews.module';
 import { HotelBookingsController } from './hotel-bookings.controller';
 import { HotelModeratorReservationsController } from './hotel-moderator-reservations.controller';
 import { HotelBookingsService } from './hotel-bookings.service';
@@ -21,6 +22,7 @@ import { RoomNight, RoomNightSchema } from './schemas/room-night.schema';
     forwardRef(() => PaymentsModule),
     NotificationsModule,
     UsersModule,
+    ReviewsModule,
     MongooseModule.forFeature([
       { name: HotelBooking.name, schema: HotelBookingSchema },
       { name: RoomNight.name, schema: RoomNightSchema },
