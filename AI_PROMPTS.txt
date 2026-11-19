@@ -563,3 +563,21 @@ added the five shared HotelsService methods. Build passed and all 28 test suites
 ================================================
 ================================================
 ================================================
+### Member 5 — 2026-11-19 20:09 — HTL-01, HTL-02, HTL-09, HTL-10
+Student: Member 5
+Tool: ChatGPT / Codex
+Related Requirements: HTL-01, HTL-02, HTL-09, HTL-10
+Prompt:
+"Implement Member 5 Task 3 from TEAM_PLAN.md: admin hotel creation, public hotel
+details, own-hotel moderator profile edits, and moderator hotel policy updates.
+Validate city and country against seeded reference data, enforce role and owner
+checks, add DTO validation, Swagger docs and tests. Leave review and room
+availability integration as TODOs if Member 6's models/services are absent.
+Change only the hotels module and AI_PROMPTS.txt."
+How the output was used:
+Added guarded hotel create, edit and policy routes; public profile lookup;
+reference-data checks for consistent city/country ObjectId links; cancellation
+tier and local-time validation; and Member 6 dependency TODOs for reviews and
+date-specific available rooms. Build passed and all 29 test suites (177 tests)
+passed.
+================================================
