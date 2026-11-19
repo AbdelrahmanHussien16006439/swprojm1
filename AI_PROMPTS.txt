@@ -369,3 +369,23 @@ How the output was used:
 Added the three schemas and schema tests for ObjectId path types, allowed
 statuses and absence of card fields. Backend build and unit tests were run.
 ================================================
+
+================================================
+### Member 4 — 2026-11-19 12:24 — PAY-01, PAY-02, PAY-03, PAY-04, FLT-09
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: PAY-01, PAY-02, PAY-03, PAY-04, FLT-09
+Prompt:
+"Implement task 2 in the payments module from TEAM_PLAN.md: PaymentsService
+(createPayment, cancelPayment, createRefund, calculateRefundPercent) and
+POST /api/payments with optional testPaymentMethod. Enforce ownership, valid
+pending holds, accepted policies, server-computed prices, one platform currency,
+and hotel 501 until that booking module exists. Add DTO validation, Swagger
+annotations and unit tests. Do not edit outside my modules and AI_PROMPTS.txt,
+read backend/.env, or push."
+How the output was used:
+Added the authenticated create-payment endpoint, Stripe PaymentIntent/refund
+service operations, server-side flight booking checks, currency conversion to
+Stripe minor units, FLT-09 tier calculation, and service tests. Build and all
+unit tests passed.
+================================================

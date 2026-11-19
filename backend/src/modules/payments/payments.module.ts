@@ -1,6 +1,37 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { MongooseModule } from '@nestjs/mongoose';
+import Stripe from 'stripe';
+import {
+  FlightBooking,
+  FlightBookingSchema,
+} from '../flight-bookings/schemas/flight-booking.schema';
+import { Payment, PaymentSchema } from './schemas/payment.schema';
+import { Refund, RefundSchema } from './schemas/refund.schema';
+import { PaymentsController } from './payments.controller';
+import { PaymentsService } from './payments.service';
+import { STRIPE_CLIENT } from './payments.constants';
 
 // Owner: Member 4 — see docs/TEAM_PLAN.md Section 7.
 // Remember to export your service(s) AND MongooseModule (TEAM_PLAN 3.2).
-@Module({})
+@Module({
+  imports: [
+    MongooseModule.forFeature([
+      { name: Payment.name, schema: PaymentSchema },
+      { name: Refund.name, schema: RefundSchema },
+      { name: FlightBooking.name, schema: FlightBookingSchema },
+    ]),
+  ],
+  providers: [
+    PaymentsService,
+    {
+      provide: STRIPE_CLIENT,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) =>
+        new Stripe(config.getOrThrow<string>('STRIPE_SECRET_KEY')),
+    },
+  ],
+  controllers: [PaymentsController],
+  exports: [PaymentsService, MongooseModule],
+})
 export class PaymentsModule {}
