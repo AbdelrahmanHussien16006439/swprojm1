@@ -447,3 +447,22 @@ Section 10 per-segment default. Tests cover passenger age bands, infant limits,
 baggage limits, summary totals and the no-write behavior. Build and unit tests
 passed.
 ================================================
+
+================================================
+### Member 4 — 2026-11-19 15:17 — FLT-22, FLT-23, PAY-01, GEN-11
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: FLT-22, FLT-23, PAY-01, GEN-11
+Prompt:
+"Implement task 6 from TEAM_PLAN.md: atomic 10-minute flight seat holds,
+round-trip rollback, expiry cron with inventory release and PaymentIntent
+cancellation, and confirmation only through the verified Stripe webhook with
+booking reference and held-to-booked counters. Use forwardRef for the
+Payments/FlightBookings cycle, preserve ObjectId conventions, leave a TODO for
+Member 6 notifications, add tests, build/test and commit only my modules plus
+AI_PROMPTS.txt."
+How the output was used:
+Added POST /api/flight-bookings/hold, atomic seat counter transitions, expiry
+cron and verified-payment confirmation callback. Notifications remain a marked
+Member 6 TODO. Build and all unit tests passed.
+================================================

@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Model, Types } from 'mongoose';
 import { AirlinesService } from '../airlines/airlines.service';
 import { FlightsService } from '../flights/flights.service';
@@ -9,14 +13,29 @@ import { FlightBookingsService } from './flight-bookings.service';
 describe('FlightBookingsService policies', () => {
   let service: FlightBookingsService;
   let bookingModel: {
+    create: jest.Mock;
+    find: jest.Mock;
+    findById: jest.Mock;
     findOne: jest.Mock;
     findOneAndUpdate: jest.Mock;
   };
   let airlinesService: { getModeratorPolicies: jest.Mock };
   let flightsService: { findById: jest.Mock };
+  let flightModel: { findOneAndUpdate: jest.Mock };
+  let paymentsService: {
+    cancelPayment: jest.Mock;
+    cancelPaymentsForBooking: jest.Mock;
+    findSucceededPaymentIdForBooking: jest.Mock;
+  };
 
   beforeEach(() => {
-    bookingModel = { findOne: jest.fn(), findOneAndUpdate: jest.fn() };
+    bookingModel = {
+      create: jest.fn(),
+      find: jest.fn(),
+      findById: jest.fn(),
+      findOne: jest.fn(),
+      findOneAndUpdate: jest.fn(),
+    };
     airlinesService = {
       findById: jest.fn().mockResolvedValue({
         isActive: true,
@@ -28,10 +47,18 @@ describe('FlightBookingsService policies', () => {
       }),
     };
     flightsService = { findById: jest.fn() };
+    flightModel = { findOneAndUpdate: jest.fn() };
+    paymentsService = {
+      cancelPayment: jest.fn(),
+      cancelPaymentsForBooking: jest.fn(),
+      findSucceededPaymentIdForBooking: jest.fn(),
+    };
     service = new FlightBookingsService(
       bookingModel as unknown as Model<FlightBooking>,
       airlinesService as unknown as AirlinesService,
       flightsService as unknown as FlightsService,
+      flightModel as never,
+      paymentsService as never,
     );
   });
 
@@ -271,5 +298,184 @@ describe('FlightBookingsService policies', () => {
     await expect(
       service.createSummary(dto([{ ...adult, extraBags: 1, extraBagsWeightKg: 24 }])),
     ).rejects.toThrow('exceeds the selected cabin weight limit');
+  });
+
+  it('atomically holds seats and creates a ten-minute pending booking without accepting policies', async () => {
+    const flightId = new Types.ObjectId();
+    const cabinId = new Types.ObjectId();
+    const airlineId = new Types.ObjectId();
+    const userId = new Types.ObjectId().toString();
+    const summary = {
+      tripType: 'one_way',
+      segments: [
+        {
+          flight: { flightId: flightId.toString() },
+          cabin: {
+            cabinId: cabinId.toString(),
+            cabinClass: 'economy',
+            farePerSeat: 100,
+          },
+        },
+      ],
+      passengers: [
+        { type: 'adult', fullName: 'A', dateOfBirth: new Date('1990-01-01'), documentNumber: 'A1' },
+        { type: 'child', fullName: 'C', dateOfBirth: new Date('2020-01-01'), documentNumber: 'C1' },
+        { type: 'infant', fullName: 'I', dateOfBirth: new Date('2025-01-01'), documentNumber: 'I1' },
+      ],
+      baggage: { totalFee: 20 },
+      totalPrice: 220,
+    };
+    jest.spyOn(service, 'createSummary').mockResolvedValue(summary as never);
+    flightsService.findById.mockResolvedValue({ airlineId });
+    flightModel.findOneAndUpdate.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: flightId }),
+    });
+    bookingModel.create.mockResolvedValue({ _id: new Types.ObjectId(), status: 'pending_payment' });
+
+    const result = await service.holdSeats(
+      {
+        outbound: { flightId: flightId.toString(), cabinId: cabinId.toString() },
+        passengers: [],
+      } as never,
+      userId,
+    );
+
+    expect(flightModel.findOneAndUpdate).toHaveBeenCalledWith(
+      {
+        _id: flightId.toString(),
+        'cabins._id': cabinId,
+        status: 'scheduled',
+        cabins: { $elemMatch: { _id: cabinId, availableSeats: { $gte: 2 } } },
+      },
+      { $inc: { 'cabins.$.availableSeats': -2, 'cabins.$.heldSeats': 2 } },
+      { new: true },
+    );
+    const savedBooking = bookingModel.create.mock.calls[0][0];
+    expect(savedBooking).toMatchObject({
+      userId: new Types.ObjectId(userId),
+      airlineId,
+      tripType: 'one_way',
+      seatsHeld: 2,
+      baggageFee: 20,
+      totalPrice: 220,
+      status: 'pending_payment',
+      policyAcceptance: null,
+    });
+    expect(savedBooking.holdExpiresAt.getTime()).toBeGreaterThan(Date.now() + 9 * 60 * 1000);
+    expect(savedBooking.holdExpiresAt.getTime()).toBeLessThanOrEqual(Date.now() + 10 * 60 * 1000);
+    expect(result.summary).toBe(summary);
+  });
+
+  it('rolls back the outbound hold if the return segment cannot be held', async () => {
+    const outboundId = new Types.ObjectId();
+    const returnId = new Types.ObjectId();
+    const cabinId = new Types.ObjectId();
+    const summary = {
+      passengers: [{ type: 'adult' }],
+      segments: [],
+    };
+    jest.spyOn(service, 'createSummary').mockResolvedValue(summary as never);
+    flightModel.findOneAndUpdate
+      .mockReturnValueOnce({ exec: jest.fn().mockResolvedValue({ _id: outboundId }) })
+      .mockReturnValueOnce({ exec: jest.fn().mockResolvedValue(null) })
+      .mockReturnValueOnce({ exec: jest.fn().mockResolvedValue({ _id: outboundId }) });
+
+    await expect(
+      service.holdSeats(
+        {
+          outbound: { flightId: outboundId.toString(), cabinId: cabinId.toString() },
+          return: { flightId: returnId.toString(), cabinId: cabinId.toString() },
+          passengers: [],
+        } as never,
+        new Types.ObjectId().toString(),
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(flightModel.findOneAndUpdate).toHaveBeenCalledTimes(3);
+    expect(flightModel.findOneAndUpdate.mock.calls[2][1]).toEqual({
+      $inc: { 'cabins.$.heldSeats': -1, 'cabins.$.availableSeats': 1 },
+    });
+    expect(bookingModel.create).not.toHaveBeenCalled();
+  });
+
+  it('expires a pending hold, releases its seats and cancels its payments', async () => {
+    const bookingId = new Types.ObjectId();
+    const flightId = new Types.ObjectId();
+    const cabinId = new Types.ObjectId();
+    const expired = {
+      _id: bookingId,
+      segments: [{ flightId, cabinId }],
+      seatsHeld: 1,
+      paymentId: null,
+    };
+    bookingModel.find.mockReturnValue({ exec: jest.fn().mockResolvedValue([expired]) });
+    bookingModel.findOneAndUpdate.mockReturnValue({
+      exec: jest.fn().mockResolvedValue(expired),
+    });
+    flightModel.findOneAndUpdate.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: flightId }),
+    });
+
+    await service.expirePendingBookings();
+
+    expect(bookingModel.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _id: bookingId,
+        status: 'pending_payment',
+        holdExpiresAt: { $lte: expect.any(Date) },
+      }),
+      { $set: { status: 'expired' } },
+      { new: true },
+    );
+    expect(flightModel.findOneAndUpdate.mock.calls[0][1]).toEqual({
+      $inc: { 'cabins.$.heldSeats': -1, 'cabins.$.availableSeats': 1 },
+    });
+    expect(paymentsService.cancelPaymentsForBooking).toHaveBeenCalledWith(
+      'flight',
+      bookingId.toString(),
+    );
+  });
+
+  it('confirms only after a succeeded payment and transfers held seats to booked', async () => {
+    const bookingId = new Types.ObjectId();
+    const flightId = new Types.ObjectId();
+    const cabinId = new Types.ObjectId();
+    const paymentId = new Types.ObjectId();
+    const booking = {
+      _id: bookingId,
+      status: 'pending_payment',
+      holdExpiresAt: new Date(Date.now() + 60_000),
+      segments: [{ flightId, cabinId }],
+      seatsHeld: 2,
+    };
+    bookingModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue(booking) });
+    paymentsService.findSucceededPaymentIdForBooking.mockResolvedValue(paymentId.toString());
+    bookingModel.findOneAndUpdate.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({
+        ...booking,
+        status: 'confirmed',
+        bookingReference: 'FL1234567890',
+        paymentId,
+      }),
+    });
+    flightModel.findOneAndUpdate.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({ _id: flightId }),
+    });
+
+    await service.onPaymentSucceeded(bookingId.toString());
+
+    expect(bookingModel.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _id: bookingId.toString(),
+        status: 'pending_payment',
+        holdExpiresAt: { $gt: expect.any(Date) },
+      }),
+      expect.objectContaining({
+        $set: expect.objectContaining({ status: 'confirmed', bookingReference: expect.any(String) }),
+      }),
+      { new: true },
+    );
+    expect(flightModel.findOneAndUpdate.mock.calls[0][1]).toEqual({
+      $inc: { 'cabins.$.heldSeats': -2, 'cabins.$.bookedSeats': 2 },
+    });
   });
 });
