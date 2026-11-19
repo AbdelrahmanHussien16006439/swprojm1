@@ -525,3 +525,22 @@ GEN-11 completion cron based on the last segment arrival. Member 6 notification
 hooks remain marked TODO. Added coverage for ownership, listing, cancellation,
 CSV escaping, shared lookups, and completion timing. Build and unit tests passed.
 ================================================
+### Member 5 — 2026-11-19 19:23 — GEN-12, FLT-02
+Student: Member 5
+Tool: ChatGPT / Codex
+Related Requirements: GEN-12, FLT-02
+Prompt:
+"Implement Task 1 from TEAM_PLAN.md in the reference-data module: official-data
+schemas, idempotent seed from docs/requirements/reference-data CSVs, the exact
+ReferenceDataService methods, and public paginated lookup endpoints for airports,
+countries, cities, and currencies. Preserve source identifiers and use ObjectId
+references between related records. Add Swagger DTOs and unit tests; do not run
+the seed or modify files outside reference-data and AI_PROMPTS.txt."
+How the output was used:
+Added Country, City, Airport, Currency and Attraction schemas; an upsert-only
+seed script; service lookups and public paginated endpoints. Source identifier
+values are retained, related records use ObjectId references, and CSVs remain in
+the official docs directory. Build passed and all 26 test suites (158 tests)
+passed. The shared database seed was not run.
+================================================
+================================================
