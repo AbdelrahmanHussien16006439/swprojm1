@@ -680,3 +680,19 @@ rules are enforced; a child-only second room is covered by a test. Build, all
 unit tests and formatting checks passed. Member 4's payment dispatch and Member
 5's RoomNight availability exclusions remain external integrations.
 ================================================
+### Member 6 — 2026-11-19 22:45 Africa/Cairo — HTL-20
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirement: HTL-20
+Prompt:
+"Implement Member 6 task 4: owner-only paginated hotel reservation list with
+upcoming/past/cancelled filters and full reservation details, including hotel,
+rooms, dates, guests, total, status and payment/refund status. Use shared
+pagination and guards, add Swagger documentation and focused tests, and edit
+only Member 6 module folders plus AI_PROMPTS.txt."
+How the output was used:
+Added GET /api/hotel-bookings with group filters and GET /api/hotel-bookings/:id
+with private-resource ownership checks, hotel/room summaries and payment/refund
+status. Both use the shared Mongoose models and the list uses the shared
+10-item paginator. Build, all unit tests and formatting checks passed.
+================================================

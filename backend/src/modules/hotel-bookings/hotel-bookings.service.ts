@@ -11,13 +11,16 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { randomBytes } from 'crypto';
 import { Connection, HydratedDocument, Model, Types } from 'mongoose';
+import { paginate } from '../../common/utils/pagination';
 import { Hotel } from '../hotels/schemas/hotel.schema';
 import { Room } from '../hotels/schemas/room.schema';
 import { HotelsService } from '../hotels/hotels.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { Payment } from '../payments/schemas/payment.schema';
+import { Refund } from '../payments/schemas/refund.schema';
 import { PaymentsService } from '../payments/payments.service';
 import { CreateHotelBookingDto } from './dto/create-hotel-booking.dto';
+import { MyHotelBookingsQueryDto } from './dto/my-hotel-bookings-query.dto';
 import { HOTEL_BOOKING_HOLD_MINUTES } from './hotel-bookings.constants';
 import { HotelBooking } from './schemas/hotel-booking.schema';
 import { RoomNight } from './schemas/room-night.schema';
@@ -37,6 +40,8 @@ export class HotelBookingsService {
     private readonly roomModel: Model<Room>,
     @InjectModel(Payment.name)
     private readonly paymentModel: Model<Payment>,
+    @InjectModel(Refund.name)
+    private readonly refundModel: Model<Refund>,
     @InjectConnection() private readonly connection: Connection,
     private readonly hotelsService: HotelsService,
     @Inject(forwardRef(() => PaymentsService))
@@ -277,6 +282,60 @@ export class HotelBookingsService {
     return booking.totalPrice;
   }
 
+  /** HTL-20: return the caller's paginated reservation summaries. */
+  async findMine(userId: string, query: MyHotelBookingsQueryDto) {
+    const filter: Record<string, unknown> = {
+      userId: new Types.ObjectId(userId),
+    };
+    if (query.group === 'upcoming') filter.status = 'confirmed';
+    if (query.group === 'past') filter.status = 'completed';
+    if (query.group === 'cancelled') filter.status = 'cancelled';
+
+    const result = await paginate(this.hotelBookingModel, filter, query.page, {
+      sort: { createdAt: -1, _id: -1 },
+      populate: 'hotelId',
+    });
+    return {
+      ...result,
+      data: result.data.map((booking) => this.toReservationSummary(booking)),
+    };
+  }
+
+  /** HTL-20: load complete details, hiding bookings owned by another user. */
+  async getMine(bookingId: string, userId: string) {
+    const booking = await this.hotelBookingModel
+      .findOne({
+        _id: new Types.ObjectId(bookingId),
+        userId: new Types.ObjectId(userId),
+      })
+      .populate('hotelId')
+      .exec();
+    if (!booking) throw new NotFoundException('Hotel booking not found');
+
+    const paymentDetails = await this.getPaymentDetails(booking, userId);
+    const bookingData = booking.toObject() as unknown as Record<
+      string,
+      unknown
+    >;
+    delete bookingData.hotelId;
+    return {
+      ...bookingData,
+      bookingReference: booking.bookingReference ?? null,
+      hotelId: this.toHotelSummary(booking.hotelId).id,
+      hotel: this.toHotelSummary(booking.hotelId),
+      rooms: booking.rooms.map((room) => ({
+        roomId: room.roomId.toString(),
+        roomName: room.roomName,
+        adults: room.adults,
+        children: room.children,
+        guests: room.adults + room.children.length,
+        pricePerNight: room.pricePerNight,
+      })),
+      payment: paymentDetails.payment,
+      refund: paymentDetails.refund,
+    };
+  }
+
   /**
    * Called after Stripe webhook verification. TODO (Member 4): dispatch hotel
    * payments here; PaymentsService currently implements flight dispatch only.
@@ -434,6 +493,100 @@ export class HotelBookingsService {
       .lean()
       .exec();
     return roomNight !== null;
+  }
+
+  private toReservationSummary(booking: HotelBooking) {
+    const document = booking as HotelBooking & { _id: Types.ObjectId };
+    return {
+      id: document._id.toString(),
+      bookingReference: booking.bookingReference ?? null,
+      hotelId: this.toHotelSummary(booking.hotelId).id,
+      hotel: this.toHotelSummary(booking.hotelId),
+      rooms: booking.rooms.map((room) => ({
+        roomId: room.roomId.toString(),
+        roomName: room.roomName,
+        adults: room.adults,
+        children: room.children,
+        guests: room.adults + room.children.length,
+        pricePerNight: room.pricePerNight,
+      })),
+      checkIn: this.toDateLabel(booking.checkIn),
+      checkOut: this.toDateLabel(booking.checkOut),
+      nights: booking.nights,
+      totalPrice: booking.totalPrice,
+      status: booking.status,
+      createdAt: booking.createdAt,
+    };
+  }
+
+  private toHotelSummary(value: unknown) {
+    const hotel = value as {
+      _id?: Types.ObjectId;
+      name?: string;
+      address?: string;
+      stars?: number;
+      cityId?: unknown;
+      countryId?: unknown;
+    };
+    const id = hotel?._id?.toString() ?? String(value);
+    return {
+      id,
+      name: hotel?.name ?? null,
+      address: hotel?.address ?? null,
+      stars: hotel?.stars ?? null,
+      cityId: this.referenceId(hotel?.cityId),
+      countryId: this.referenceId(hotel?.countryId),
+    };
+  }
+
+  private referenceId(value: unknown): string | null {
+    if (value === null || value === undefined) return null;
+    const reference = value as { _id?: Types.ObjectId; toString(): string };
+    return reference._id?.toString() ?? reference.toString();
+  }
+
+  private async getPaymentDetails(booking: HotelBooking, userId: string) {
+    const bookingId = (booking as HotelBooking & { _id: Types.ObjectId })._id;
+    const baseFilter = {
+      bookingType: 'hotel',
+      bookingId,
+      userId: new Types.ObjectId(userId),
+    };
+    let payment = booking.paymentId
+      ? await this.paymentModel
+          .findOne({ ...baseFilter, _id: booking.paymentId })
+          .exec()
+      : null;
+    if (!payment) {
+      payment = await this.paymentModel
+        .findOne(baseFilter)
+        .sort({ createdAt: -1 })
+        .exec();
+    }
+    if (!payment) return { payment: null, refund: null };
+
+    const refund = await this.refundModel
+      .findOne({ paymentId: payment._id })
+      .sort({ createdAt: -1 })
+      .exec();
+    return {
+      payment: {
+        id: payment._id.toString(),
+        amount: payment.amount,
+        currency: payment.currency,
+        status: payment.status,
+        createdAt: payment.createdAt,
+      },
+      refund: refund
+        ? {
+            id: refund._id.toString(),
+            amount: refund.amount,
+            refundPercent: refund.refundPercent,
+            status: refund.status,
+            createdAt: refund.createdAt,
+          }
+        : null,
+    };
   }
 
   private async findOwnedBooking(bookingId: string, userId: string) {
