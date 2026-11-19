@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AirlinesModule } from '../airlines/airlines.module';
+import { FlightsModule } from '../flights/flights.module';
 import { BookingPoliciesController } from './flight-bookings.controller';
+import { FlightBookingSummaryController } from './flight-bookings.summary.controller';
 import { FlightBookingsService } from './flight-bookings.service';
 import { FlightBooking, FlightBookingSchema } from './schemas/flight-booking.schema';
 
@@ -10,12 +12,13 @@ import { FlightBooking, FlightBookingSchema } from './schemas/flight-booking.sch
 @Module({
   imports: [
     AirlinesModule,
+    FlightsModule,
     MongooseModule.forFeature([
       { name: FlightBooking.name, schema: FlightBookingSchema },
     ]),
   ],
   providers: [FlightBookingsService],
-  controllers: [BookingPoliciesController],
+  controllers: [BookingPoliciesController, FlightBookingSummaryController],
   exports: [FlightBookingsService, MongooseModule],
 })
 export class FlightBookingsModule {}
