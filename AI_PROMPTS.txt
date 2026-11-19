@@ -408,3 +408,22 @@ state handling, retry and private payment/refund lookup routes. The verified
 success callback to FlightBookingsService remains marked for task 6 because that
 service is not yet implemented. Build and all unit tests passed.
 ================================================
+
+================================================
+### Member 4 — 2026-11-19 13:18 — PAY-02, PAY-04
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: PAY-02, PAY-04
+Prompt:
+"Implement task 4 from TEAM_PLAN.md: GET/POST booking policies and accept-policies
+for flights, require ownership and save an acceptance timestamp plus policy
+snapshot, return 501 for hotel policies until Member 6's module exists. Also fix
+Stripe PaymentIntent creation to use automatic_payment_methods with
+allow_redirects 'never' and add a test. Stay within Member 4 modules and
+AI_PROMPTS.txt, do not read backend/.env or push."
+How the output was used:
+Added the flight booking policies controller/service and acceptance DTO, with
+ownership, pending-hold checks and atomic acceptance persistence. Added the
+Stripe configuration regression assertion. Backend build and all unit tests
+passed.
+================================================

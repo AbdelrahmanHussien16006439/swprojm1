@@ -105,7 +105,11 @@ describe('PaymentsService', () => {
     ).resolves.toEqual({ paymentId: expect.any(String), clientSecret: 'secret_test' });
     expect(bookingModel.findOne).toHaveBeenCalledWith({ _id: bookingId, userId: 'user-1' });
     expect(stripe.paymentIntents.create).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: 1050, currency: 'usd' }),
+      expect.objectContaining({
+        amount: 1050,
+        currency: 'usd',
+        automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+      }),
     );
     expect(stripe.paymentIntents.confirm).toHaveBeenCalledWith('pi_test', {
       payment_method: 'pm_card_visa',
