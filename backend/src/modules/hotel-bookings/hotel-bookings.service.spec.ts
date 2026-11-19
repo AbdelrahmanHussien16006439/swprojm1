@@ -11,6 +11,7 @@ describe('HotelBookingsService', () => {
     find: jest.Mock;
     findOneAndUpdate: jest.Mock;
     countDocuments: jest.Mock;
+    updateOne: jest.Mock;
   };
   let roomNightModel: {
     find: jest.Mock;
@@ -26,7 +27,13 @@ describe('HotelBookingsService', () => {
   let connection: { startSession: jest.Mock };
   let session: { withTransaction: jest.Mock; endSession: jest.Mock };
   let hotelsService: { findById: jest.Mock; markRoomsReserved: jest.Mock };
-  let paymentsService: { cancelPayment: jest.Mock };
+  let paymentsService: {
+    cancelPayment: jest.Mock;
+    calculateRefundPercent: jest.Mock;
+    roundToPlatformCurrency: jest.Mock;
+    getPlatformCurrency: jest.Mock;
+    createRefund: jest.Mock;
+  };
   let notificationsService: { notify: jest.Mock };
 
   beforeEach(() => {
@@ -36,6 +43,7 @@ describe('HotelBookingsService', () => {
       find: jest.fn(),
       findOneAndUpdate: jest.fn(),
       countDocuments: jest.fn(),
+      updateOne: jest.fn(),
     };
     roomNightModel = {
       find: jest.fn(),
@@ -59,7 +67,15 @@ describe('HotelBookingsService', () => {
       findById: jest.fn(),
       markRoomsReserved: jest.fn().mockResolvedValue(undefined),
     };
-    paymentsService = { cancelPayment: jest.fn().mockResolvedValue(undefined) };
+    paymentsService = {
+      cancelPayment: jest.fn().mockResolvedValue(undefined),
+      calculateRefundPercent: jest.fn().mockReturnValue(50),
+      roundToPlatformCurrency: jest.fn(
+        (amount: number) => Math.round(amount * 100) / 100,
+      ),
+      getPlatformCurrency: jest.fn().mockReturnValue('USD'),
+      createRefund: jest.fn(),
+    };
     notificationsService = { notify: jest.fn().mockResolvedValue(undefined) };
     service = new HotelBookingsService(
       bookingModel as never,
@@ -317,6 +333,96 @@ describe('HotelBookingsService', () => {
         new Types.ObjectId().toString(),
       ),
     ).rejects.toThrow('Hotel booking not found');
+  });
+
+  it('previews the refund using accepted tiers and whole days to check-in', async () => {
+    const userId = new Types.ObjectId();
+    const booking = makeReservation(userId, new Types.ObjectId(), 'confirmed');
+    const checkIn = futureDate(3);
+    booking.checkIn = new Date(`${checkIn}T00:00:00.000Z`);
+    booking.policyAcceptance = {
+      acceptedAt: new Date(),
+      policySnapshot: {
+        cancellationTiers: [
+          { daysBefore: 2, refundPercent: 50 },
+          { daysBefore: 5, refundPercent: 90 },
+        ],
+      },
+    };
+    bookingModel.findOne.mockReturnValue(query(booking));
+
+    const result = await service.getRefundPreview(
+      booking._id.toString(),
+      userId.toString(),
+    );
+
+    expect(paymentsService.calculateRefundPercent).toHaveBeenCalledWith(
+      booking.policyAcceptance.policySnapshot.cancellationTiers,
+      3,
+    );
+    expect(result).toMatchObject({
+      totalPrice: 200,
+      currency: 'USD',
+      refundPercent: 50,
+      refundAmount: 100,
+      daysRemaining: 3,
+    });
+  });
+
+  it('cancels the whole booking, releases room-nights and creates its refund', async () => {
+    const userId = new Types.ObjectId();
+    const booking = makeReservation(userId, new Types.ObjectId(), 'confirmed');
+    booking.checkIn = new Date(`${futureDate(3)}T00:00:00.000Z`);
+    booking.policyAcceptance = {
+      acceptedAt: new Date(),
+      policySnapshot: {
+        cancellationTiers: [{ daysBefore: 0, refundPercent: 50 }],
+      },
+    };
+    bookingModel.findOne.mockReturnValue(query(booking));
+    const payment = { _id: new Types.ObjectId(), status: 'succeeded' };
+    paymentModel.findOne.mockReturnValue(query(payment));
+    const cancelled = { ...booking, status: 'cancelled', cancelledBy: 'user' };
+    bookingModel.findOneAndUpdate.mockReturnValue(query(cancelled));
+    roomNightModel.deleteMany.mockReturnValue(query({ deletedCount: 2 }));
+    const refund = {
+      _id: new Types.ObjectId(),
+      amount: 100,
+      refundPercent: 50,
+      status: 'refunded',
+    };
+    paymentsService.createRefund.mockResolvedValue(refund);
+    bookingModel.updateOne.mockReturnValue(query({ modifiedCount: 1 }));
+
+    const result = await service.cancelBooking(
+      booking._id.toString(),
+      userId.toString(),
+      true,
+    );
+
+    expect(cancelled.status).toBe('cancelled');
+    expect(roomNightModel.deleteMany).toHaveBeenCalledWith({
+      hotelBookingId: booking._id,
+    });
+    expect(paymentsService.createRefund).toHaveBeenCalledWith(
+      payment._id.toString(),
+      100,
+      50,
+      'User hotel booking cancellation',
+    );
+    expect(result.refund).toBe(refund);
+    expect(notificationsService.notify).toHaveBeenCalledTimes(2);
+  });
+
+  it('requires explicit confirmation before cancelling', async () => {
+    await expect(
+      service.cancelBooking(
+        new Types.ObjectId().toString(),
+        new Types.ObjectId().toString(),
+        false,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(bookingModel.findOne).not.toHaveBeenCalled();
   });
 
   it('expires a hold, releases room-nights, and cancels its pending payment', async () => {

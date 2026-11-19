@@ -21,6 +21,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { CreateHotelBookingDto } from './dto/create-hotel-booking.dto';
+import { CancelHotelBookingDto } from './dto/cancel-hotel-booking.dto';
 import { MyHotelBookingsQueryDto } from './dto/my-hotel-bookings-query.dto';
 import { HotelBookingsService } from './hotel-bookings.service';
 import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
@@ -56,6 +57,31 @@ export class HotelBookingsController {
     @CurrentUser() user: JwtUser,
   ) {
     return this.hotelBookingsService.getMine(bookingId, user.sub);
+  }
+
+  @Get(':id/refund-preview')
+  @ApiParam({ name: 'id', example: '665f1d4a2a8c7b4e5f123456' })
+  @ApiOperation({ summary: 'Preview the refund for a confirmed hotel booking' })
+  refundPreview(
+    @Param('id', ParseObjectIdPipe) bookingId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelBookingsService.getRefundPreview(bookingId, user.sub);
+  }
+
+  @Post(':id/cancel')
+  @ApiParam({ name: 'id', example: '665f1d4a2a8c7b4e5f123456' })
+  @ApiOperation({ summary: 'Cancel a confirmed hotel booking before check-in' })
+  cancel(
+    @Param('id', ParseObjectIdPipe) bookingId: string,
+    @Body() dto: CancelHotelBookingDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelBookingsService.cancelBooking(
+      bookingId,
+      user.sub,
+      dto.confirm,
+    );
   }
 
   @Post()

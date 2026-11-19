@@ -336,6 +336,126 @@ export class HotelBookingsService {
     };
   }
 
+  /** HTL-21: calculate the whole-reservation refund from accepted policy tiers. */
+  async getRefundPreview(bookingId: string, userId: string) {
+    const booking = await this.findOwnedBooking(bookingId, userId);
+    return this.calculateHotelRefundPreview(booking);
+  }
+
+  /** HTL-21: cancel the entire confirmed reservation and release all nights. */
+  async cancelBooking(bookingId: string, userId: string, confirm: boolean) {
+    if (!confirm) {
+      throw new BadRequestException('Cancellation must be confirmed');
+    }
+    const booking = await this.findOwnedBooking(bookingId, userId);
+    const refundPreview = this.calculateHotelRefundPreview(booking);
+    let refundPaymentId: Types.ObjectId | undefined;
+
+    if (refundPreview.refundAmount > 0) {
+      const payment = booking.paymentId
+        ? await this.paymentModel
+            .findOne({
+              _id: booking.paymentId,
+              bookingType: 'hotel',
+              bookingId: (booking as HotelBooking & { _id: Types.ObjectId })
+                ._id,
+              userId: new Types.ObjectId(userId),
+              status: 'succeeded',
+            })
+            .exec()
+        : await this.paymentModel
+            .findOne({
+              bookingType: 'hotel',
+              bookingId: (booking as HotelBooking & { _id: Types.ObjectId })
+                ._id,
+              userId: new Types.ObjectId(userId),
+              status: 'succeeded',
+            })
+            .sort({ createdAt: -1 })
+            .exec();
+      if (!payment) {
+        throw new ConflictException(
+          'The booking has no successful payment to refund',
+        );
+      }
+      refundPaymentId = payment._id;
+    }
+
+    const session = await this.connection.startSession();
+    const cancellation: { booking?: HydratedDocument<HotelBooking> } = {};
+    try {
+      await session.withTransaction(async () => {
+        const today = this.utcToday();
+        const cancelled = await this.hotelBookingModel
+          .findOneAndUpdate(
+            {
+              _id: (booking as HotelBooking & { _id: Types.ObjectId })._id,
+              userId: new Types.ObjectId(userId),
+              status: 'confirmed',
+              checkIn: { $gt: today },
+            },
+            { $set: { status: 'cancelled', cancelledBy: 'user' } },
+            { new: true },
+          )
+          .session(session)
+          .exec();
+        if (!cancelled) {
+          throw new BadRequestException(
+            'Booking is no longer confirmed or is on/after check-in date',
+          );
+        }
+        cancellation.booking = cancelled;
+        await this.roomNightModel
+          .deleteMany({ hotelBookingId: cancelled._id })
+          .session(session)
+          .exec();
+      });
+    } finally {
+      await session.endSession();
+    }
+    const cancelled = cancellation.booking;
+    if (!cancelled) {
+      throw new ConflictException('The reservation could not be cancelled');
+    }
+
+    let refund: Refund | null = null;
+    if (refundPreview.refundAmount > 0 && refundPaymentId) {
+      refund = await this.paymentsService.createRefund(
+        refundPaymentId.toString(),
+        refundPreview.refundAmount,
+        refundPreview.refundPercent,
+        'User hotel booking cancellation',
+      );
+      const refundId = (refund as Refund & { _id?: Types.ObjectId })._id;
+      if (refundId) {
+        cancelled.refundId = refundId;
+        await this.hotelBookingModel
+          .updateOne(
+            { _id: cancelled._id, status: 'cancelled' },
+            { $set: { refundId } },
+          )
+          .exec();
+      }
+    }
+
+    await this.notificationsService.notify(
+      userId,
+      'BOOKING_CANCELLED',
+      `Your hotel reservation ${cancelled.bookingReference ?? cancelled._id.toString()} has been cancelled.`,
+      `/hotel-bookings/${cancelled._id.toString()}`,
+    );
+    if (refund) {
+      await this.notificationsService.notify(
+        userId,
+        'REFUND_CREATED',
+        `A refund of ${refundPreview.refundAmount} ${this.paymentsService.getPlatformCurrency()} for hotel reservation ${cancelled.bookingReference ?? cancelled._id.toString()} is ${refund.status}.`,
+        `/hotel-bookings/${cancelled._id.toString()}`,
+      );
+    }
+
+    return { booking: cancelled, refund, refundPreview };
+  }
+
   /**
    * Called after Stripe webhook verification. TODO (Member 4): dispatch hotel
    * payments here; PaymentsService currently implements flight dispatch only.
@@ -589,6 +709,54 @@ export class HotelBookingsService {
     };
   }
 
+  private calculateHotelRefundPreview(booking: HotelBooking) {
+    if (booking.status !== 'confirmed') {
+      throw new BadRequestException(
+        'Only confirmed reservations can be cancelled',
+      );
+    }
+    const today = this.utcToday();
+    const checkIn = new Date(booking.checkIn);
+    checkIn.setUTCHours(0, 0, 0, 0);
+    if (checkIn.getTime() <= today.getTime()) {
+      throw new BadRequestException(
+        'A reservation cannot be cancelled on or after the check-in date',
+      );
+    }
+    const policySnapshot = booking.policyAcceptance?.policySnapshot as
+      | {
+          cancellationTiers?: { daysBefore: number; refundPercent: number }[];
+        }
+      | null
+      | undefined;
+    if (!Array.isArray(policySnapshot?.cancellationTiers)) {
+      throw new BadRequestException(
+        'Accepted hotel cancellation policy is missing',
+      );
+    }
+    const daysRemaining = Math.floor(
+      (checkIn.getTime() - today.getTime()) / (24 * 60 * 60 * 1000),
+    );
+    const refundPercent = this.paymentsService.calculateRefundPercent(
+      policySnapshot.cancellationTiers,
+      daysRemaining,
+    );
+    const refundAmount = this.paymentsService.roundToPlatformCurrency(
+      (booking.totalPrice * refundPercent) / 100,
+    );
+    return {
+      bookingId: (
+        booking as HotelBooking & { _id: Types.ObjectId }
+      )._id.toString(),
+      bookingReference: booking.bookingReference ?? null,
+      totalPrice: booking.totalPrice,
+      currency: this.paymentsService.getPlatformCurrency(),
+      refundPercent,
+      refundAmount,
+      daysRemaining,
+    };
+  }
+
   private async findOwnedBooking(bookingId: string, userId: string) {
     const booking = await this.hotelBookingModel
       .findOne({
@@ -701,5 +869,11 @@ export class HotelBookingsService {
 
   private toDateLabel(date: Date): string {
     return date.toISOString().slice(0, 10);
+  }
+
+  private utcToday(): Date {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    return today;
   }
 }

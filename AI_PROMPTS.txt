@@ -696,3 +696,19 @@ with private-resource ownership checks, hotel/room summaries and payment/refund
 status. Both use the shared Mongoose models and the list uses the shared
 10-item paginator. Build, all unit tests and formatting checks passed.
 ================================================
+### Member 6 — 2026-11-19 22:55 Africa/Cairo — HTL-21
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirement: HTL-21
+Prompt:
+"Implement Member 6 task 5: owner-only GET refund preview and POST whole-booking
+cancel for confirmed hotel reservations, before the check-in date. Use the
+accepted hotel cancellation tiers on the full total, PaymentsService.createRefund,
+release all room-nights transactionally, update the refund reference, notify the
+user, and add DTOs, Swagger docs and focused tests."
+How the output was used:
+Added refund preview and cancellation routes with ownership checks and the
+whole-calendar-day rule. Cancellation updates status and deletes every room-night
+in one MongoDB transaction; eligible refunds use PaymentsService and notify the
+user. Build, all unit tests and formatting checks passed.
+================================================
