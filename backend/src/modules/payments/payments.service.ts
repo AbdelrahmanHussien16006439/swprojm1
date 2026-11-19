@@ -1,10 +1,12 @@
 import {
+  BadGatewayException,
   BadRequestException,
   Inject,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
   NotImplementedException,
+  ServiceUnavailableException,
   forwardRef,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -64,12 +66,17 @@ export class PaymentsService {
       throw new BadRequestException('Payment amount must be greater than zero');
     }
 
-    const intent = await this.stripe.paymentIntents.create({
-      amount: this.toStripeAmount(amount),
-      currency: this.platformCurrency.toLowerCase(),
-      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
-      metadata: { bookingType, bookingId, userId },
-    });
+    let intent: Stripe.PaymentIntent;
+    try {
+      intent = await this.stripe.paymentIntents.create({
+        amount: this.toStripeAmount(amount),
+        currency: this.platformCurrency.toLowerCase(),
+        automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+        metadata: { bookingType, bookingId, userId },
+      });
+    } catch (error) {
+      this.throwStripeGatewayException(error);
+    }
     if (!intent.client_secret) {
       await this.stripe.paymentIntents.cancel(intent.id).catch(() => undefined);
       throw new InternalServerErrorException('Stripe did not return a client secret');
@@ -96,9 +103,12 @@ export class PaymentsService {
         await this.stripe.paymentIntents.confirm(intent.id, {
           payment_method: testPaymentMethod,
         });
-      } catch {
+      } catch (error) {
         // Stripe's signed webhook records failure. Booking state remains pending_payment.
-        throw new BadRequestException('Stripe could not confirm this test payment method');
+        if (this.isStripeCardError(error)) {
+          throw new BadRequestException('Stripe declined this test payment method');
+        }
+        this.throwStripeGatewayException(error);
       }
     }
 
@@ -112,7 +122,11 @@ export class PaymentsService {
     if (!payment) throw new NotFoundException('Payment not found');
     if (payment.status !== 'pending' && payment.status !== 'failed') return;
 
-    await this.stripe.paymentIntents.cancel(payment.stripePaymentIntentId);
+    try {
+      await this.stripe.paymentIntents.cancel(payment.stripePaymentIntentId);
+    } catch (error) {
+      this.throwStripeGatewayException(error);
+    }
     payment.status = 'cancelled';
     await payment.save();
   }
@@ -225,9 +239,12 @@ export class PaymentsService {
         throw new BadRequestException('Stripe did not return a client secret');
       }
       return { paymentId: payment._id.toString(), clientSecret: retried.client_secret };
-    } catch {
+    } catch (error) {
       // The signed payment_failed event remains the source of persisted failure state.
-      throw new BadRequestException('Stripe could not confirm this retry');
+      if (this.isStripeCardError(error)) {
+        throw new BadRequestException('Stripe declined this retry payment method');
+      }
+      this.throwStripeGatewayException(error);
     }
   }
 
@@ -306,6 +323,51 @@ export class PaymentsService {
     };
   }
 
+  async getBookingPaymentDetails(
+    bookingId: string,
+    userId: string,
+    paymentId?: string,
+  ) {
+    let payment = paymentId
+      ? await this.paymentModel
+          .findOne({ _id: paymentId, bookingType: 'flight', bookingId, userId })
+          .exec()
+      : null;
+    if (!payment) {
+      payment = await this.paymentModel
+        .findOne({ bookingType: 'flight', bookingId, userId, status: 'succeeded' })
+        .sort({ createdAt: -1 })
+        .exec();
+    }
+    if (!payment) {
+      payment = await this.paymentModel
+        .findOne({ bookingType: 'flight', bookingId, userId })
+        .sort({ createdAt: -1 })
+        .exec();
+    }
+    if (!payment) return { payment: null, refund: null };
+    const refund = await this.refundModel
+      .findOne({ paymentId: payment._id })
+      .sort({ createdAt: -1 })
+      .exec();
+    return {
+      payment: {
+        id: payment._id.toString(),
+        amount: payment.amount,
+        currency: payment.currency,
+        status: payment.status,
+      },
+      refund: refund
+        ? {
+            id: refund._id.toString(),
+            amount: refund.amount,
+            refundPercent: refund.refundPercent,
+            status: refund.status,
+          }
+        : null,
+    };
+  }
+
   async getRefund(refundId: string, user: JwtUser) {
     const refund = await this.refundModel.findById(refundId).exec();
     if (!refund) throw new NotFoundException('Refund not found');
@@ -379,15 +441,55 @@ export class PaymentsService {
   }
 
   private toStripeAmount(amount: number): number {
-    const exponent = STRIPE_ZERO_DECIMAL_CURRENCIES.has(this.platformCurrency)
-      ? 0
-      : STRIPE_THREE_DECIMAL_CURRENCIES.has(this.platformCurrency)
-        ? 3
-        : 2;
+    const exponent = this.getCurrencyExponent();
     const minorUnits = Math.round(amount * 10 ** exponent);
     if (!Number.isSafeInteger(minorUnits) || minorUnits < 1) {
       throw new BadRequestException('Amount is too small or too large for Stripe');
     }
     return minorUnits;
+  }
+
+  roundToPlatformCurrency(amount: number): number {
+    const factor = 10 ** this.getCurrencyExponent();
+    return Math.round((amount + Number.EPSILON) * factor) / factor;
+  }
+
+  getPlatformCurrency(): string {
+    return this.platformCurrency;
+  }
+
+  private getCurrencyExponent(): number {
+    return STRIPE_ZERO_DECIMAL_CURRENCIES.has(this.platformCurrency)
+      ? 0
+      : STRIPE_THREE_DECIMAL_CURRENCIES.has(this.platformCurrency)
+        ? 3
+        : 2;
+  }
+
+  private isStripeCardError(error: unknown): boolean {
+    return this.getStripeErrorType(error) === 'StripeCardError';
+  }
+
+  private getStripeErrorType(error: unknown): string | undefined {
+    if (typeof error !== 'object' || error === null || !('type' in error)) {
+      return undefined;
+    }
+    const type = (error as { type?: unknown }).type;
+    return typeof type === 'string' ? type : undefined;
+  }
+
+  private throwStripeGatewayException(error: unknown): never {
+    const type = this.getStripeErrorType(error);
+    if (!type?.startsWith('Stripe')) throw error;
+    if (
+      type === 'StripeAuthenticationError' ||
+      type === 'StripeConnectionError' ||
+      type === 'StripeRateLimitError'
+    ) {
+      throw new ServiceUnavailableException(
+        'Stripe is temporarily unavailable; check the configured test credentials and try again.',
+      );
+    }
+    throw new BadGatewayException('Stripe could not process the payment request.');
   }
 }

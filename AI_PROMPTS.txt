@@ -483,3 +483,23 @@ Removed the null default from bookingReference and verified its sparse unique
 index. Confirmation rollback now unsets it. Added tests for insert-failure seat
 release and two distinct pending holds. Build and all unit tests passed.
 ================================================
+================================================
+### Member 4 — 2026-11-19 16:54 — FLT-23, FLT-25, FLT-26, PAY-01
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: FLT-23, FLT-25, FLT-26, PAY-01
+Prompt:
+"Implement task 7: my bookings list and detail, refund preview and cancellation,
+and confirmed-booking e-ticket PDF. Keep all ownership checks, release booked
+seats atomically on cancellation, create Stripe refunds according to accepted
+cancellation policy, and include DTO validation, Swagger and tests. Also map
+Stripe credential/service errors to clear 502/503 responses instead of bare
+500s. Do not implement airport-local times until Member 5 provides timezone
+support."
+How the output was used:
+Added paginated booking groups and owner-only booking details, refund preview,
+cancellation with booked-seat release, and a PDF e-ticket. PDF segment times are
+explicitly UTC pending Member 5 airport timezone support. Stripe authentication,
+connection and rate-limit errors now return a clear 503; other Stripe API errors
+return 502, while card declines return 400. Build and all unit tests passed.
+================================================
