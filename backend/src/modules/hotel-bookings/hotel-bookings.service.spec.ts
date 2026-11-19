@@ -10,6 +10,7 @@ describe('HotelBookingsService', () => {
     create: jest.Mock;
     find: jest.Mock;
     findOneAndUpdate: jest.Mock;
+    countDocuments: jest.Mock;
   };
   let roomNightModel: {
     find: jest.Mock;
@@ -21,6 +22,7 @@ describe('HotelBookingsService', () => {
   let hotelModel: { findById: jest.Mock };
   let roomModel: { find: jest.Mock };
   let paymentModel: { findOne: jest.Mock; find: jest.Mock };
+  let refundModel: { findOne: jest.Mock };
   let connection: { startSession: jest.Mock };
   let session: { withTransaction: jest.Mock; endSession: jest.Mock };
   let hotelsService: { findById: jest.Mock; markRoomsReserved: jest.Mock };
@@ -33,6 +35,7 @@ describe('HotelBookingsService', () => {
       create: jest.fn(),
       find: jest.fn(),
       findOneAndUpdate: jest.fn(),
+      countDocuments: jest.fn(),
     };
     roomNightModel = {
       find: jest.fn(),
@@ -44,6 +47,7 @@ describe('HotelBookingsService', () => {
     hotelModel = { findById: jest.fn() };
     roomModel = { find: jest.fn() };
     paymentModel = { findOne: jest.fn(), find: jest.fn() };
+    refundModel = { findOne: jest.fn() };
     session = {
       withTransaction: jest.fn(async (callback: () => Promise<void>) =>
         callback(),
@@ -63,6 +67,7 @@ describe('HotelBookingsService', () => {
       hotelModel as never,
       roomModel as never,
       paymentModel as never,
+      refundModel as never,
       connection as never,
       hotelsService as never,
       paymentsService as never,
@@ -234,6 +239,86 @@ describe('HotelBookingsService', () => {
     ).resolves.toBe(true);
   });
 
+  it("lists only the caller's reservations with the selected group and pagination", async () => {
+    const userId = new Types.ObjectId();
+    const hotelId = new Types.ObjectId();
+    const booking = makeReservation(userId, hotelId, 'confirmed');
+    bookingModel.find.mockReturnValue(query([booking]));
+    bookingModel.countDocuments.mockReturnValue(query(1));
+
+    const result = await service.findMine(userId.toString(), {
+      page: 2,
+      group: 'upcoming',
+    } as never);
+
+    const filter = bookingModel.find.mock.calls[0][0];
+    expect(filter.userId.toString()).toBe(userId.toString());
+    expect(filter.status).toBe('confirmed');
+    expect(result).toMatchObject({
+      page: 2,
+      limit: 10,
+      total: 1,
+      totalPages: 1,
+    });
+    expect(result.data[0]).toMatchObject({
+      bookingReference: 'HTL123456',
+      hotel: { id: hotelId.toString(), name: 'Test Hotel' },
+      rooms: [{ adults: 1, children: [7], guests: 2 }],
+      status: 'confirmed',
+    });
+  });
+
+  it('returns payment and refund details for an owned reservation', async () => {
+    const userId = new Types.ObjectId();
+    const hotelId = new Types.ObjectId();
+    const booking = makeReservation(userId, hotelId, 'completed');
+    booking.toObject = () => ({
+      _id: booking._id,
+      userId,
+      hotelId: booking.hotelId,
+      status: booking.status,
+    });
+    bookingModel.findOne.mockReturnValue(query(booking));
+    const payment = {
+      _id: new Types.ObjectId(),
+      amount: 300,
+      currency: 'USD',
+      status: 'succeeded',
+      createdAt: new Date('2026-11-01T00:00:00.000Z'),
+    };
+    const refund = {
+      _id: new Types.ObjectId(),
+      amount: 150,
+      refundPercent: 50,
+      status: 'refunded',
+      createdAt: new Date('2026-11-02T00:00:00.000Z'),
+    };
+    paymentModel.findOne.mockReturnValue(query(payment));
+    refundModel.findOne.mockReturnValue(query(refund));
+
+    const result = await service.getMine(
+      (booking as unknown as { _id: Types.ObjectId })._id.toString(),
+      userId.toString(),
+    );
+
+    expect(bookingModel.findOne.mock.calls[0][0].userId.toString()).toBe(
+      userId.toString(),
+    );
+    expect(result.payment).toMatchObject({ status: 'succeeded', amount: 300 });
+    expect(result.refund).toMatchObject({ status: 'refunded', amount: 150 });
+    expect(result.hotel.name).toBe('Test Hotel');
+  });
+
+  it("hides another user's reservation as not found", async () => {
+    bookingModel.findOne.mockReturnValue(query(null));
+    await expect(
+      service.getMine(
+        new Types.ObjectId().toString(),
+        new Types.ObjectId().toString(),
+      ),
+    ).rejects.toThrow('Hotel booking not found');
+  });
+
   it('expires a hold, releases room-nights, and cancels its pending payment', async () => {
     const bookingId = new Types.ObjectId();
     const candidate = { _id: bookingId };
@@ -256,9 +341,52 @@ describe('HotelBookingsService', () => {
 function query<T>(value: T) {
   const result = {
     session: jest.fn().mockReturnThis(),
+    sort: jest.fn().mockReturnThis(),
+    skip: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    populate: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    lean: jest.fn().mockReturnThis(),
     exec: jest.fn().mockResolvedValue(value),
   };
   return result;
+}
+
+function makeReservation(
+  userId: Types.ObjectId,
+  hotelId: Types.ObjectId,
+  status:
+    'pending_payment' | 'confirmed' | 'completed' | 'expired' | 'cancelled',
+) {
+  return {
+    _id: new Types.ObjectId(),
+    userId,
+    hotelId: {
+      _id: hotelId,
+      name: 'Test Hotel',
+      address: '1 Test Street',
+      stars: 4,
+      cityId: new Types.ObjectId(),
+      countryId: new Types.ObjectId(),
+    },
+    rooms: [
+      {
+        roomId: new Types.ObjectId(),
+        roomName: 'Family room',
+        pricePerNight: 100,
+        adults: 1,
+        children: [7],
+      },
+    ],
+    checkIn: new Date('2026-12-10T00:00:00.000Z'),
+    checkOut: new Date('2026-12-12T00:00:00.000Z'),
+    nights: 2,
+    totalPrice: 200,
+    status,
+    bookingReference: 'HTL123456',
+    createdAt: new Date('2026-11-01T00:00:00.000Z'),
+    paymentId: null,
+  } as any;
 }
 
 function futureDate(days: number): string {

@@ -1,5 +1,19 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
-import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiCookieAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
@@ -7,7 +21,9 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { CreateHotelBookingDto } from './dto/create-hotel-booking.dto';
+import { MyHotelBookingsQueryDto } from './dto/my-hotel-bookings-query.dto';
 import { HotelBookingsService } from './hotel-bookings.service';
+import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
 
 @ApiTags('hotel-bookings')
 @ApiCookieAuth('access_token')
@@ -16,6 +32,31 @@ import { HotelBookingsService } from './hotel-bookings.service';
 @Controller('hotel-bookings')
 export class HotelBookingsController {
   constructor(private readonly hotelBookingsService: HotelBookingsService) {}
+
+  @Get()
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({
+    name: 'group',
+    required: false,
+    enum: ['upcoming', 'past', 'cancelled'],
+  })
+  @ApiOperation({ summary: 'List your hotel reservations' })
+  findMine(
+    @Query() query: MyHotelBookingsQueryDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelBookingsService.findMine(user.sub, query);
+  }
+
+  @Get(':id')
+  @ApiParam({ name: 'id', example: '665f1d4a2a8c7b4e5f123456' })
+  @ApiOperation({ summary: 'Get full details for one of your hotel bookings' })
+  getMine(
+    @Param('id', ParseObjectIdPipe) bookingId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelBookingsService.getMine(bookingId, user.sub);
+  }
 
   @Post()
   @ApiOperation({
