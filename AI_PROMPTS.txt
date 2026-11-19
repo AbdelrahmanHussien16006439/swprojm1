@@ -353,3 +353,19 @@ Types.ObjectId for id matching; the image-count $expr compares array sizes.
 Potential legacy string ids: posts.authorId, comments.postId/comments.authorId,
 likes.postId/likes.userId, reports.reporterId/reports.targetId/reports.resolvedBy.
 ================================================
+
+================================================
+### Member 4 — 2026-11-19 12:05 — PAY-01, PAY-03, PAY-04, FLT-12
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: PAY-01, PAY-03, PAY-04, FLT-12
+Prompt:
+"Implement task 1 from my Member 4 plan: add the Payment, Refund and
+FlightBooking Mongoose schemas with the exact TEAM_PLAN names, statuses and
+fields. Use explicit ObjectId schema types with refs, never persist card data,
+add ObjectId guard tests, stay within my module folders and AI_PROMPTS.txt,
+build and run tests, then commit without pushing."
+How the output was used:
+Added the three schemas and schema tests for ObjectId path types, allowed
+statuses and absence of card fields. Backend build and unit tests were run.
+================================================
