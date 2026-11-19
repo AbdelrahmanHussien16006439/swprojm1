@@ -1,7 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -12,6 +15,7 @@ import {
   ApiBadRequestResponse,
   ApiCookieAuth,
   ApiCreatedResponse,
+  ApiConflictResponse,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -29,6 +33,9 @@ import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { UpdateHotelDto } from './dto/update-hotel.dto';
 import { UpdateHotelPoliciesDto } from './dto/update-hotel-policies.dto';
+import { CreateRoomDto } from './dto/create-room.dto';
+import { UpdateRoomDto } from './dto/update-room.dto';
+import { RoomDateRangeDto, UpdateRoomAvailabilityDto } from './dto/room-date-range.dto';
 import { HotelsService } from './hotels.service';
 
 @ApiTags('hotels')
@@ -95,5 +102,101 @@ export class HotelsController {
     @CurrentUser() user: JwtUser,
   ) {
     return this.hotelsService.updatePolicies(id, dto, user);
+  }
+
+  @Post(':id/rooms')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Add a room to my hotel (HTL-03)' })
+  @ApiCreatedResponse({ description: 'Room created.' })
+  @ApiBadRequestResponse({ description: 'Invalid room fields.' })
+  @ApiConflictResponse({ description: 'Room name already exists in this hotel.' })
+  @ApiUnauthorizedResponse({ description: 'Login required.' })
+  @ApiForbiddenResponse({ description: 'Hotel moderator role required.' })
+  @ApiNotFoundResponse({ description: 'Hotel not found or not owned by user.' })
+  createRoom(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @Body() dto: CreateRoomDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.createRoom(hotelId, dto, user);
+  }
+
+  @Patch(':id/rooms/:roomId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Edit or deactivate a room in my hotel (HTL-05, HTL-06)' })
+  @ApiOkResponse({ description: 'Room updated.' })
+  @ApiBadRequestResponse({ description: 'Invalid room fields.' })
+  @ApiConflictResponse({ description: 'Room name already exists in this hotel.' })
+  @ApiUnauthorizedResponse({ description: 'Login required.' })
+  @ApiForbiddenResponse({ description: 'Hotel moderator role required.' })
+  @ApiNotFoundResponse({ description: 'Hotel or room not found or not owned by user.' })
+  updateRoom(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @Param('roomId', ParseObjectIdPipe) roomId: string,
+    @Body() dto: UpdateRoomDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.updateRoom(hotelId, roomId, dto, user);
+  }
+
+  @Delete(':id/rooms/:roomId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Delete a room that has never been reserved (HTL-06)' })
+  @ApiConflictResponse({ description: 'Room has already been reserved.' })
+  @ApiNotFoundResponse({ description: 'Hotel or room not found or not owned by user.' })
+  deleteRoom(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @Param('roomId', ParseObjectIdPipe) roomId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.deleteRoom(hotelId, roomId, user);
+  }
+
+  @Post(':id/rooms/:roomId/availability')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Add an available date range to a room (HTL-04)' })
+  @ApiCreatedResponse({ description: 'Availability range added.' })
+  @ApiBadRequestResponse({ description: 'Invalid or overlapping availability range.' })
+  @ApiUnauthorizedResponse({ description: 'Login required.' })
+  @ApiForbiddenResponse({ description: 'Hotel moderator role required.' })
+  @ApiNotFoundResponse({ description: 'Hotel or room not found or not owned by user.' })
+  addAvailability(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @Param('roomId', ParseObjectIdPipe) roomId: string,
+    @Body() dto: RoomDateRangeDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.addAvailability(hotelId, roomId, dto, user);
+  }
+
+  @Patch(':id/rooms/:roomId/availability')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({
+    summary: 'Edit bookable and blocked date ranges (HTL-05, HTL-06)',
+    description: 'Provided arrays replace their existing ranges; omit an array to leave it unchanged.',
+  })
+  @ApiOkResponse({ description: 'Room availability ranges updated.' })
+  @ApiBadRequestResponse({ description: 'Invalid or overlapping availability ranges.' })
+  @ApiUnauthorizedResponse({ description: 'Login required.' })
+  @ApiForbiddenResponse({ description: 'Hotel moderator role required.' })
+  @ApiNotFoundResponse({ description: 'Hotel or room not found or not owned by user.' })
+  updateAvailability(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @Param('roomId', ParseObjectIdPipe) roomId: string,
+    @Body() dto: UpdateRoomAvailabilityDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.updateAvailability(hotelId, roomId, dto, user);
   }
 }
