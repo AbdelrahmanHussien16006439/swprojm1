@@ -6,6 +6,7 @@ import {
 import { Model } from 'mongoose';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ReferenceDataService } from '../reference-data/reference-data.service';
+import { UploadsService } from '../uploads/uploads.service';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { HotelsService } from './hotels.service';
 import { Hotel } from './schemas/hotel.schema';
@@ -31,6 +32,10 @@ describe('HotelsService basics', () => {
     findCity: jest.Mock;
     findCountry: jest.Mock;
   };
+  let uploadsService: {
+    saveImage: jest.Mock;
+    deleteImage: jest.Mock;
+  };
 
   beforeEach(() => {
     hotelModel = {
@@ -51,10 +56,15 @@ describe('HotelsService basics', () => {
       findCity: jest.fn(),
       findCountry: jest.fn(),
     };
+    uploadsService = {
+      saveImage: jest.fn(),
+      deleteImage: jest.fn(),
+    };
     service = new HotelsService(
       hotelModel as unknown as Model<Hotel>,
       roomModel as unknown as Model<Room>,
       referenceDataService as unknown as ReferenceDataService,
+      uploadsService as unknown as UploadsService,
     );
   });
 
@@ -377,5 +387,92 @@ describe('HotelsService basics', () => {
       service.deleteRoom(hotelId, roomId, { providerId: hotelId } as JwtUser),
     ).resolves.toBeUndefined();
     expect(roomModel.deleteOne).toHaveBeenCalledWith({ _id: roomId, hotelId });
+  });
+
+  it('uploads a photo through UploadsService and atomically adds it below the limit', async () => {
+    const hotelId = '64b000000000000000000001';
+    const image = { id: 'photo-uuid', url: '/uploads/photo-uuid.jpg' };
+    const updated = { photos: [image] };
+    hotelModel.findById.mockReturnValue({
+      populate: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue({ _id: hotelId, photos: [] }),
+      }),
+    });
+    uploadsService.saveImage.mockResolvedValue(image);
+    hotelModel.findOneAndUpdate.mockReturnValue({
+      populate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue(updated) }),
+    });
+
+    await expect(
+      service.addPhoto(hotelId, {} as Express.Multer.File, { providerId: hotelId } as JwtUser),
+    ).resolves.toBe(updated);
+    expect(uploadsService.saveImage).toHaveBeenCalledTimes(1);
+    expect(hotelModel.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: hotelId, 'photos.4': { $exists: false } },
+      { $push: { photos: image } },
+      { new: true, runValidators: true },
+    );
+    expect(uploadsService.deleteImage).not.toHaveBeenCalled();
+  });
+
+  it('rejects a sixth photo before writing a file', async () => {
+    const hotelId = '64b000000000000000000001';
+    hotelModel.findById.mockReturnValue({
+      populate: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue({
+          _id: hotelId,
+          photos: Array.from({ length: 5 }, (_, index) => ({ id: `photo-${index}` })),
+        }),
+      }),
+    });
+
+    await expect(
+      service.addPhoto(hotelId, {} as Express.Multer.File, { providerId: hotelId } as JwtUser),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(uploadsService.saveImage).not.toHaveBeenCalled();
+  });
+
+  it('cleans up an uploaded file if the atomic photo add loses a race', async () => {
+    const hotelId = '64b000000000000000000001';
+    const image = { id: 'photo-uuid', url: '/uploads/photo-uuid.jpg' };
+    hotelModel.findById.mockReturnValue({
+      populate: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue({ _id: hotelId, photos: [] }),
+      }),
+    });
+    uploadsService.saveImage.mockResolvedValue(image);
+    hotelModel.findOneAndUpdate.mockReturnValue({
+      populate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue(null) }),
+    });
+
+    await expect(
+      service.addPhoto(hotelId, {} as Express.Multer.File, { providerId: hotelId } as JwtUser),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(uploadsService.deleteImage).toHaveBeenCalledWith(image.id);
+  });
+
+  it('removes the hotel photo record and its managed file', async () => {
+    const hotelId = '64b000000000000000000001';
+    const photoId = 'photo-uuid';
+    const photo = { id: photoId, url: '/uploads/photo-uuid.jpg' };
+    const updated = { photos: [] };
+    hotelModel.findById.mockReturnValue({
+      populate: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue({ _id: hotelId, photos: [photo] }),
+      }),
+    });
+    hotelModel.findOneAndUpdate.mockReturnValue({
+      populate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue(updated) }),
+    });
+
+    await expect(
+      service.removePhoto(hotelId, photoId, { providerId: hotelId } as JwtUser),
+    ).resolves.toBe(updated);
+    expect(hotelModel.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: hotelId, 'photos.id': photoId },
+      { $pull: { photos: { id: photoId } } },
+      { new: true, runValidators: true },
+    );
+    expect(uploadsService.deleteImage).toHaveBeenCalledWith(photoId);
   });
 });

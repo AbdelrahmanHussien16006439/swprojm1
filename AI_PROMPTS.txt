@@ -599,3 +599,18 @@ everReserved deletion protection. Confirmed/pending reservation overlap checks
 remain TODOs because Member 6's RoomNight service is not in develop. Build
 passed and all 30 test suites (187 tests) passed.
 ================================================
+### Member 5 — 2026-11-19 21:00 — HTL-01, GEN-08
+Student: Member 5
+Tool: ChatGPT / Codex
+Related Requirements: HTL-01, GEN-08
+Prompt:
+"Implement Member 5 Task 5: hotel moderator photo upload/removal endpoints using
+Member 2's UploadsService. Enforce JPG/PNG and 5 MB through the shared service,
+max 5 photos per hotel, ownership, Swagger docs and cleanup on database failure.
+Add unit tests, build/test, and edit only hotels plus AI_PROMPTS.txt."
+How the output was used:
+Added guarded multipart photo upload and owner-only removal. Uploads use the
+shared UploadsService, enforce the five-photo limit atomically, and clean up the
+uploaded file if the database write fails. Build passed and all 30 test suites
+(191 tests) passed.
+================================================
