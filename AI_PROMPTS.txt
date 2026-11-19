@@ -623,3 +623,12 @@ Prompt:
 How the output was used:
 Added validated search and available-room query endpoints, availability and occupancy matching, inclusive price bounds, rating filtering, sorting and pagination. Build passed and all 31 test suites (197 tests) passed. RoomNight reservation exclusion remains marked for Member 6 integration.
 ================================================
+### Member 5 — 2026-11-19 21:40 — HTL-08
+Student: Member 5
+Tool: ChatGPT / Codex
+Related Requirement: HTL-08
+Prompt:
+"Implement Member 5 Task 7: GET /api/hotels/:id/availability for an owner hotel moderator. Accept an inclusive from/to date range and return each room's status for every date as Available, Booked (with reservation reference), or Blocked. Follow the Member 5 file-scope rules, add DTO validation, Swagger docs and unit tests, build/test, and leave the Booked part marked TODO if Member 6's RoomNight support is missing."
+How the output was used:
+Added an owner-only calendar endpoint with inclusive UTC dates and Available/Blocked statuses from room activation, availability and blocked ranges. Booked status and reservation references remain a TODO because Member 6's RoomNight support is not in develop. Build passed and all 32 test suites (201 tests) passed.
+================================================
