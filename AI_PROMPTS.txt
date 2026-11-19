@@ -778,3 +778,19 @@ The backend build and full unit test suite passed. GitHub was unreachable from
 this machine during the required develop pull; the local tracking branch was
 already up to date.
 ================================================
+### Member 7 — 2026-11-20 01:57 Africa/Cairo — ITN-05, ITN-07, ITN-08, ITN-09
+Student: Member 7
+Tool: ChatGPT / Codex
+Related Requirement: ITN-05, ITN-07, ITN-08, ITN-09
+Prompt:
+"Implement Member 7 task 2: add, edit, confirm-delete, and reorder itinerary days;
+validate seeded cities and the 60-day limit; compute day numbers and UTC calendar
+dates from array order; return consecutive city groups with day counts and
+currency-separated subtotals. Keep all edits in the itineraries module and this
+AI log, then build, test, commit, push, and open a PR."
+How the output was used:
+Added guarded day endpoints and owner-checked service operations. Day sequence and
+calendar dates are computed in API responses; day removal drops linked transport
+costs, and city groups calculate subtotals without mixing currencies. Build and
+all 246 unit tests passed.
+================================================

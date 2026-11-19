@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Schema as MongooseSchema, Types } from 'mongoose';
+import { MAX_ITINERARY_DAYS } from '../itineraries.constants';
 
 export type ItineraryDocument = HydratedDocument<Itinerary>;
 
@@ -45,6 +46,8 @@ export const ItineraryBudgetEntrySchema = SchemaFactory.createForClass(Itinerary
 
 @Schema()
 export class ItineraryDay {
+  _id: Types.ObjectId;
+
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'City', required: true })
   cityId: Types.ObjectId;
 
@@ -111,7 +114,7 @@ export class Itinerary {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', default: null })
   originalAuthorId?: Types.ObjectId;
 
-  @Prop({ type: [ItineraryDaySchema], default: [], validate: [(value: ItineraryDay[]) => value.length <= 60, 'days cannot contain more than 60 items'] })
+  @Prop({ type: [ItineraryDaySchema], default: [], validate: [(value: ItineraryDay[]) => value.length <= MAX_ITINERARY_DAYS, 'days cannot contain more than 60 items'] })
   days: ItineraryDay[];
 
   @Prop({ type: [ItineraryTransportCostSchema], default: [] })

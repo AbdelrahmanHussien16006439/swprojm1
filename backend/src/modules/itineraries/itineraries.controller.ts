@@ -18,7 +18,10 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
 import { CreateItineraryDto } from './dto/create-itinerary.dto';
+import { CreateItineraryDayDto } from './dto/create-itinerary-day.dto';
 import { ListItinerariesQueryDto } from './dto/list-itineraries-query.dto';
+import { ReorderItineraryDayDto } from './dto/reorder-itinerary-day.dto';
+import { UpdateItineraryDayDto } from './dto/update-itinerary-day.dto';
 import { UpdateItineraryDto } from './dto/update-itinerary.dto';
 import { ItinerariesService } from './itineraries.service';
 
@@ -79,5 +82,60 @@ export class ItinerariesController {
   ) {
     await this.itinerariesService.delete(id, dto, user);
     return { message: 'Itinerary deleted' };
+  }
+
+  @Post(':id/days')
+  @ApiOperation({ summary: 'Add a day to an itinerary (ITN-05, ITN-09)' })
+  @ApiCreatedResponse({ description: 'Day added; day numbers, dates, and city groups are computed' })
+  @ApiBadRequestResponse({ description: 'Invalid city, position, or itinerary already has 60 days' })
+  @ApiNotFoundResponse({ description: 'Itinerary or city not found' })
+  addDay(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Body() dto: CreateItineraryDayDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.itinerariesService.addDay(id, dto, user);
+  }
+
+  // Keep reorder above the :dayId route so "reorder" is not parsed as a day id.
+  @Patch(':id/days/reorder')
+  @ApiOperation({ summary: 'Move a day and recompute day numbers, dates, and city groups (ITN-08, ITN-09)' })
+  @ApiOkResponse({ description: 'Day reordered' })
+  @ApiBadRequestResponse({ description: 'Invalid position or day id' })
+  @ApiNotFoundResponse({ description: 'Itinerary or day not found' })
+  reorderDay(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Body() dto: ReorderItineraryDayDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.itinerariesService.reorderDay(id, dto, user);
+  }
+
+  @Patch(':id/days/:dayId')
+  @ApiOperation({ summary: 'Edit a day city or notes (ITN-05)' })
+  @ApiOkResponse({ description: 'Day updated' })
+  @ApiBadRequestResponse({ description: 'Invalid day fields' })
+  @ApiNotFoundResponse({ description: 'Itinerary, day, or city not found' })
+  updateDay(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Param('dayId', ParseObjectIdPipe) dayId: string,
+    @Body() dto: UpdateItineraryDayDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.itinerariesService.updateDay(id, dayId, dto, user);
+  }
+
+  @Delete(':id/days/:dayId')
+  @ApiOperation({ summary: 'Delete a day after confirmation and renumber remaining days (ITN-07)' })
+  @ApiOkResponse({ description: 'Day deleted; associated transport costs removed' })
+  @ApiBadRequestResponse({ description: 'confirm must be true' })
+  @ApiNotFoundResponse({ description: 'Itinerary or day not found' })
+  deleteDay(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Param('dayId', ParseObjectIdPipe) dayId: string,
+    @Body() dto: ConfirmActionDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.itinerariesService.deleteDay(id, dayId, dto, user);
   }
 }
