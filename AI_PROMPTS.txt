@@ -794,3 +794,19 @@ calendar dates are computed in API responses; day removal drops linked transport
 costs, and city groups calculate subtotals without mixing currencies. Build and
 all 246 unit tests passed.
 ================================================
+### Member 7 — 2026-11-20 02:14 Africa/Cairo — ITN-10, ITN-12
+Student: Member 7
+Tool: ChatGPT / Codex
+Related Requirement: ITN-10, ITN-12
+Prompt:
+"Implement Member 7 task 3: add/edit/delete activities on itinerary days and attach
+or remove activity images through the existing UploadsService. Enforce supported
+currency for optional activity cost and the five-image limit; keep edits in the
+itineraries folder plus AI_PROMPTS.txt. Build, test, commit, push, and prepare a
+PR. Carry forward the city-group budget subtotal for the budget tasks."
+How the output was used:
+Added owner-checked activity CRUD and image routes. Images use UploadsService;
+failed database saves remove the just-uploaded file. The group subtotal already
+aggregates currencies separately; it will be revisited with the task 4/5 budget
+endpoints to verify budget and conversion behavior. Build and all 251 tests passed.
+================================================

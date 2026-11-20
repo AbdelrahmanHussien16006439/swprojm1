@@ -5,13 +5,20 @@ import { ConfirmActionDto } from '../../common/dto/confirm-action.dto';
 import { paginate } from '../../common/utils/pagination';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ReferenceDataService } from '../reference-data/reference-data.service';
+import { UploadsService } from '../uploads/uploads.service';
+import { CreateItineraryActivityDto } from './dto/create-itinerary-activity.dto';
 import { CreateItineraryDayDto } from './dto/create-itinerary-day.dto';
 import { CreateItineraryDto } from './dto/create-itinerary.dto';
 import { ListItinerariesQueryDto } from './dto/list-itineraries-query.dto';
 import { ReorderItineraryDayDto } from './dto/reorder-itinerary-day.dto';
+import { UpdateItineraryActivityDto } from './dto/update-itinerary-activity.dto';
 import { UpdateItineraryDayDto } from './dto/update-itinerary-day.dto';
 import { UpdateItineraryDto } from './dto/update-itinerary.dto';
-import { MAX_ITINERARY_DAYS, MILLISECONDS_PER_CALENDAR_DAY } from './itineraries.constants';
+import {
+  MAX_ACTIVITY_IMAGES,
+  MAX_ITINERARY_DAYS,
+  MILLISECONDS_PER_CALENDAR_DAY,
+} from './itineraries.constants';
 import { Itinerary } from './schemas/itinerary.schema';
 
 @Injectable()
@@ -19,6 +26,7 @@ export class ItinerariesService {
   constructor(
     @InjectModel(Itinerary.name) private readonly itineraryModel: Model<Itinerary>,
     private readonly referenceDataService: ReferenceDataService,
+    private readonly uploadsService: UploadsService,
   ) {}
 
   async create(dto: CreateItineraryDto, user: JwtUser) {
@@ -147,6 +155,90 @@ export class ItinerariesService {
     return this.findOwned(id, user);
   }
 
+  async addActivity(
+    itineraryId: string,
+    dayId: string,
+    dto: CreateItineraryActivityDto,
+    user: JwtUser,
+  ) {
+    const { itinerary, day } = await this.findOwnedDay(itineraryId, dayId, user);
+    this.assertActivityMoneyPair(dto.cost, dto.currency);
+    if (dto.cost !== undefined) await this.assertSupportedCurrency(dto.currency);
+    day.activities.push({
+      name: dto.name.trim(),
+      description: dto.description.trim(),
+      time: dto.time,
+      cost: dto.cost,
+      currency: dto.currency?.toUpperCase(),
+      images: [],
+    } as any);
+    await itinerary.save();
+    return this.findOwned(itineraryId, user);
+  }
+
+  async updateActivity(
+    activityId: string,
+    dto: UpdateItineraryActivityDto,
+    user: JwtUser,
+  ) {
+    const { itinerary, activity } = await this.findOwnedActivity(activityId, user);
+    const cost = dto.cost === undefined ? activity.cost : dto.cost;
+    const currency = dto.currency === undefined ? activity.currency : dto.currency;
+    this.assertActivityMoneyPair(cost, currency);
+    if (cost !== undefined) await this.assertSupportedCurrency(currency);
+    if (dto.name !== undefined) activity.name = dto.name.trim();
+    if (dto.description !== undefined) activity.description = dto.description.trim();
+    if (dto.time !== undefined) activity.time = dto.time;
+    if (dto.cost !== undefined) activity.cost = dto.cost;
+    if (dto.currency !== undefined) activity.currency = dto.currency.toUpperCase();
+    await itinerary.save();
+    return this.findOwned(itinerary._id.toString(), user);
+  }
+
+  async deleteActivity(activityId: string, user: JwtUser) {
+    const { itinerary, day, activityIndex, activity } =
+      await this.findOwnedActivity(activityId, user);
+    const imageIds = activity.images.map((image) => image.id);
+    day.activities.splice(activityIndex, 1);
+    await itinerary.save();
+    await Promise.all(imageIds.map((imageId) => this.uploadsService.deleteImage(imageId)));
+    return this.findOwned(itinerary._id.toString(), user);
+  }
+
+  async addActivityImage(
+    activityId: string,
+    file: Express.Multer.File,
+    user: JwtUser,
+  ) {
+    const { itinerary, activity } = await this.findOwnedActivity(activityId, user);
+    if (activity.images.length >= MAX_ACTIVITY_IMAGES) {
+      throw new BadRequestException('An activity can have at most 5 images');
+    }
+    const uploaded = await this.uploadsService.saveImage(file);
+    activity.images.push(uploaded);
+    try {
+      await itinerary.save();
+    } catch (error) {
+      await this.uploadsService.deleteImage(uploaded.id);
+      throw error;
+    }
+    return this.findOwned(itinerary._id.toString(), user);
+  }
+
+  async deleteActivityImage(
+    activityId: string,
+    imageId: string,
+    user: JwtUser,
+  ) {
+    const { itinerary, activity } = await this.findOwnedActivity(activityId, user);
+    const imageIndex = activity.images.findIndex((image) => image.id === imageId);
+    if (imageIndex < 0) throw new NotFoundException('Activity image not found');
+    activity.images.splice(imageIndex, 1);
+    await itinerary.save();
+    await this.uploadsService.deleteImage(imageId);
+    return this.findOwned(itinerary._id.toString(), user);
+  }
+
   async update(id: string, dto: UpdateItineraryDto, user: JwtUser) {
     const updates: Record<string, unknown> = {};
     if (dto.title !== undefined) updates.title = dto.title.trim();
@@ -195,6 +287,42 @@ export class ItinerariesService {
     }).exec();
     if (!itinerary) throw new NotFoundException('Itinerary not found');
     return itinerary;
+  }
+
+  private async findOwnedDay(itineraryId: string, dayId: string, user: JwtUser) {
+    const itinerary = await this.findOwnedDocument(itineraryId, user);
+    const day = itinerary.days.find((candidate) => candidate._id.toString() === dayId);
+    if (!day) throw new NotFoundException('Itinerary day not found');
+    return { itinerary, day };
+  }
+
+  private async findOwnedActivity(activityId: string, user: JwtUser) {
+    const itinerary = await this.itineraryModel.findOne({
+      'days.activities._id': activityId,
+      ownerId: new Types.ObjectId(user.sub),
+    }).exec();
+    if (!itinerary) throw new NotFoundException('Activity not found');
+    for (const day of itinerary.days) {
+      const activityIndex = day.activities.findIndex(
+        (candidate) => candidate._id.toString() === activityId,
+      );
+      if (activityIndex >= 0) {
+        return { itinerary, day, activity: day.activities[activityIndex], activityIndex };
+      }
+    }
+    throw new NotFoundException('Activity not found');
+  }
+
+  private assertActivityMoneyPair(cost?: number, currency?: string) {
+    if ((cost === undefined) !== (currency === undefined)) {
+      throw new BadRequestException('cost and currency must be provided together');
+    }
+  }
+
+  private async assertSupportedCurrency(currency?: string) {
+    if (!currency || !(await this.referenceDataService.isSupportedCurrency(currency))) {
+      throw new BadRequestException('currency is not supported');
+    }
   }
 
   private withComputedDays(itinerary: any) {

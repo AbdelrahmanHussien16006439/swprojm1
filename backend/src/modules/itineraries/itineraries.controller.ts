@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiCookieAuth,
@@ -17,6 +27,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
+import { CreateItineraryActivityDto } from './dto/create-itinerary-activity.dto';
 import { CreateItineraryDto } from './dto/create-itinerary.dto';
 import { CreateItineraryDayDto } from './dto/create-itinerary-day.dto';
 import { ListItinerariesQueryDto } from './dto/list-itineraries-query.dto';
@@ -138,4 +149,19 @@ export class ItinerariesController {
   ) {
     return this.itinerariesService.deleteDay(id, dayId, dto, user);
   }
+
+  @Post(':id/days/:dayId/activities')
+  @ApiOperation({ summary: 'Add an activity to an itinerary day (ITN-10)' })
+  @ApiCreatedResponse({ description: 'Activity created' })
+  @ApiBadRequestResponse({ description: 'Invalid activity fields or unsupported currency' })
+  @ApiNotFoundResponse({ description: 'Itinerary or day not found' })
+  addActivity(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Param('dayId', ParseObjectIdPipe) dayId: string,
+    @Body() dto: CreateItineraryActivityDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.itinerariesService.addActivity(id, dayId, dto, user);
+  }
+
 }
