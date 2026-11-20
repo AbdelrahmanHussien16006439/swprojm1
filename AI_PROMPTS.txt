@@ -878,3 +878,21 @@ city identifier and derived group dates to HotelsService.search. FlightsService.
 is absent from develop, so a marked ITN-26 TODO remains with no fake endpoint.
 Build and all 267 tests passed.
 ================================================
+
+### Member 3 - 2026-11-20 - FLT-03, FLT-11, FLT-12, FLT-15, FLT-17, GEN-06
+Student: Member 3
+Tool: ChatGPT / Codex
+Related Requirement: FLT-03, FLT-11, FLT-12, FLT-15, FLT-17, GEN-06
+Prompt:
+"Implement Task 7 for the airlines and flights modules. Use ReferenceDataService
+for airports, convert airport-local flight times to UTC, validate flight creation
+and duplicate numbers, return local and UTC times, and add paginated one-way and
+round-trip search with cabin, price, seat, active-airline, and sorting filters.
+Export FlightsService.search(dto), including toAirportIds: string[]. Only edit
+airlines, flights, and AI_PROMPTS.txt; build, test, commit, and push."
+How the output was used:
+Added the scheduled-flight create/details/search endpoints and the exported search
+service method. Airport IANA zones are used for UTC persistence and local response
+times; search filters scheduled flights by active airline, seat availability, cabin,
+price, date, route, sorting, and fixed page size 10.
+================================================

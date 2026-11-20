@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AirlinesModule } from '../airlines/airlines.module';
+import { ReferenceDataModule } from '../reference-data/reference-data.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { FlightsController } from './flights.controller';
 import { FlightsService } from './flights.service';
 import { Flight, FlightSchema } from './schemas/flight.schema';
@@ -10,6 +12,8 @@ import { Flight, FlightSchema } from './schemas/flight.schema';
 @Module({
   imports: [
     AirlinesModule,
+    ReferenceDataModule,
+    NotificationsModule,
     MongooseModule.forFeature([{ name: Flight.name, schema: FlightSchema }]),
   ],
   providers: [FlightsService],
