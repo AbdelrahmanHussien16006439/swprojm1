@@ -32,6 +32,7 @@ import { CreateItineraryDto } from './dto/create-itinerary.dto';
 import { CreateItineraryBudgetDto } from './dto/create-itinerary-budget.dto';
 import { CreateItineraryTransportCostDto } from './dto/create-itinerary-transport-cost.dto';
 import { ItineraryHotelsQueryDto } from './dto/itinerary-hotels-query.dto';
+import { ItineraryFlightsQueryDto } from './dto/itinerary-flights-query.dto';
 import { CreateItineraryDayDto } from './dto/create-itinerary-day.dto';
 import { ListItinerariesQueryDto } from './dto/list-itineraries-query.dto';
 import { ReorderItineraryDayDto } from './dto/reorder-itinerary-day.dto';
@@ -219,8 +220,24 @@ export class ItinerariesController {
     return this.itinerariesService.searchHotelsForCityGroup(id, query, user);
   }
 
-  // TODO(ITN-26): Waiting for Member 3 to add/export FlightsService.search(SearchFlightsDto)
-  // with toAirportIds support. Keep GET /:id/flights unimplemented until that shared
-  // contract exists; do not duplicate flight search or airport logic here.
+  @Get(':id/flights')
+  @ApiOperation({ summary: 'Search flights to the itinerary first-day city (ITN-26)' })
+  @ApiQuery({ name: 'originAirportId', required: true, example: '665f1c2a6d3b4c5e7f8a9012' })
+  @ApiQuery({ name: 'tripType', required: true, enum: ['one_way', 'round_trip'] })
+  @ApiQuery({ name: 'departDate', required: false, example: '2027-06-15' })
+  @ApiQuery({ name: 'returnDate', required: false, example: '2027-06-22' })
+  @ApiQuery({ name: 'adults', required: false, example: 1 })
+  @ApiQuery({ name: 'children', required: false, example: 0 })
+  @ApiQuery({ name: 'infants', required: false, example: 0 })
+  @ApiOkResponse({ description: 'Flight search results for the itinerary first-day city' })
+  @ApiBadRequestResponse({ description: 'Invalid search parameters or itinerary has no days' })
+  @ApiNotFoundResponse({ description: 'Itinerary, origin airport, or destination city not found' })
+  searchFlights(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Query() query: ItineraryFlightsQueryDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.itinerariesService.searchFlightsForItinerary(id, query, user);
+  }
 
 }

@@ -60,6 +60,7 @@ describe('ItinerariesService days (ITN-05, ITN-07, ITN-08, ITN-09)', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     );
   });
 

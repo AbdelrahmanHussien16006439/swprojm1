@@ -81,6 +81,7 @@ describe('ItinerariesService budget summary (ITN-14, ITN-18)', () => {
       exchangeRates as ExchangeRatesService,
       users as UsersService,
       {} as any,
+      {} as any,
     );
   });
 

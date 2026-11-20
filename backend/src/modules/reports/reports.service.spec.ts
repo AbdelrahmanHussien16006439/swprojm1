@@ -15,6 +15,8 @@ import {
 import { Comment } from '../blog/schemas/comment.schema';
 import { Post, PostStatus } from '../blog/schemas/post.schema';
 import { User } from '../users/schemas/user.schema';
+import { Review } from '../reviews/schemas/review.schema';
+import { Itinerary } from '../itineraries/schemas/itinerary.schema';
 
 const reporterId = new Types.ObjectId();
 const targetId = new Types.ObjectId();
@@ -60,13 +62,31 @@ function makeService(overrides: Record<string, any> = {}) {
     exists: jest.fn().mockReturnValue(execResult({ _id: targetId })),
     ...overrides.userModel,
   };
+  const reviewModel: Record<string, any> = {
+    exists: jest.fn().mockReturnValue(execResult({ _id: targetId })),
+    ...overrides.reviewModel,
+  };
+  const itineraryModel: Record<string, any> = {
+    exists: jest.fn().mockReturnValue(execResult({ _id: targetId })),
+    ...overrides.itineraryModel,
+  };
   const service = new ReportsService(
     reportModel as unknown as Model<Report>,
     postModel as unknown as Model<Post>,
     commentModel as unknown as Model<Comment>,
     userModel as unknown as Model<User>,
+    reviewModel as unknown as Model<Review>,
+    itineraryModel as unknown as Model<Itinerary>,
   );
-  return { service, reportModel, postModel, commentModel, userModel };
+  return {
+    service,
+    reportModel,
+    postModel,
+    commentModel,
+    userModel,
+    reviewModel,
+    itineraryModel,
+  };
 }
 
 describe('ReportsService', () => {
@@ -215,6 +235,37 @@ describe('ReportsService', () => {
         reason: 'Hidden author post',
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
+    expect(reportModel.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [ReportTargetType.REVIEW, 'reviewModel', { _id: targetId, isHidden: false }],
+    [ReportTargetType.ITINERARY, 'itineraryModel', { _id: targetId, isPublic: true, isHidden: false }],
+  ])('checks a public, visible %s before accepting a report', async (targetType, modelKey, filter) => {
+    const { service, reviewModel, itineraryModel } = makeService();
+    await service.createReport(user, {
+      targetType,
+      targetId: targetId.toString(),
+      reason: 'Needs review',
+    } as CreateReportDto);
+
+    const model = modelKey === 'reviewModel' ? reviewModel : itineraryModel;
+    expect(model.exists).toHaveBeenCalledWith(filter);
+  });
+
+  it.each([
+    [ReportTargetType.REVIEW, 'reviewModel'],
+    [ReportTargetType.ITINERARY, 'itineraryModel'],
+  ])('returns 404 for hidden or private %s targets', async (targetType, modelKey) => {
+    const overrides = modelKey === 'reviewModel'
+      ? { reviewModel: { exists: jest.fn().mockReturnValue(execResult(null)) } }
+      : { itineraryModel: { exists: jest.fn().mockReturnValue(execResult(null)) } };
+    const { service, reportModel } = makeService(overrides);
+    await expect(service.createReport(user, {
+      targetType,
+      targetId: targetId.toString(),
+      reason: 'Private target',
+    } as CreateReportDto)).rejects.toBeInstanceOf(NotFoundException);
     expect(reportModel.create).not.toHaveBeenCalled();
   });
 

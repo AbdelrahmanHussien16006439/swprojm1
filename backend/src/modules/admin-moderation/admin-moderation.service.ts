@@ -1,7 +1,6 @@
 import {
   Injectable,
   NotFoundException,
-  NotImplementedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -13,19 +12,28 @@ import {
   ReportStatus,
   ReportTargetType,
 } from '../reports/schemas/report.schema';
+import { Review } from '../reviews/schemas/review.schema';
+import { ReviewsService } from '../reviews/reviews.service';
+import { Itinerary } from '../itineraries/schemas/itinerary.schema';
 import { ListReportsQueryDto } from './dto/list-reports-query.dto';
 import { ReportResolutionAction } from './dto/resolve-report.dto';
 
 export enum ModeratedContentType {
   POST = 'post',
   COMMENT = 'comment',
+  REVIEW = 'review',
+  ITINERARY = 'itinerary',
 }
 
 @Injectable()
 export class AdminModerationService {
   constructor(
     @InjectModel(Report.name) private readonly reportModel: Model<Report>,
+    @InjectModel(Review.name) private readonly reviewModel: Model<Review>,
+    @InjectModel(Itinerary.name)
+    private readonly itineraryModel: Model<Itinerary>,
     private readonly blogService: BlogService,
+    private readonly reviewsService: ReviewsService,
     private readonly auditLogs: AuditLogsService,
   ) {}
 
@@ -79,10 +87,19 @@ export class AdminModerationService {
     adminId: string,
     hidden: boolean,
   ): Promise<{ message: string; hidden: boolean }> {
-    if (type === ModeratedContentType.POST) {
-      await this.blogService.setPostHidden(id, hidden);
-    } else {
-      await this.blogService.setCommentHidden(id, hidden);
+    switch (type) {
+      case ModeratedContentType.POST:
+        await this.blogService.setPostHidden(id, hidden);
+        break;
+      case ModeratedContentType.COMMENT:
+        await this.blogService.setCommentHidden(id, hidden);
+        break;
+      case ModeratedContentType.REVIEW:
+        await this.setReviewHidden(id, hidden);
+        break;
+      case ModeratedContentType.ITINERARY:
+        await this.setItineraryHidden(id, hidden);
+        break;
     }
     await this.auditLogs.log(
       adminId,
@@ -99,10 +116,23 @@ export class AdminModerationService {
     id: string,
     adminId: string,
   ): Promise<{ message: string }> {
-    if (type === ModeratedContentType.POST) {
-      await this.blogService.deletePostForModeration(id);
-    } else {
-      await this.blogService.deleteCommentForModeration(id);
+    switch (type) {
+      case ModeratedContentType.POST:
+        await this.blogService.deletePostForModeration(id);
+        break;
+      case ModeratedContentType.COMMENT:
+        await this.blogService.deleteCommentForModeration(id);
+        break;
+      case ModeratedContentType.REVIEW:
+        await this.deleteReview(id);
+        break;
+      case ModeratedContentType.ITINERARY: {
+        const deleted = await this.itineraryModel
+          .findByIdAndDelete(new Types.ObjectId(id))
+          .exec();
+        if (!deleted) throw new NotFoundException('Content not found');
+        break;
+      }
     }
     await this.auditLogs.log(adminId, 'CONTENT_DELETED', type, id, {
       cascadeCleanup: type === ModeratedContentType.POST,
@@ -132,11 +162,55 @@ export class AdminModerationService {
       return;
     }
 
-    // Review and itinerary modules belong to other members and do not yet
-    // expose moderation methods. Keep the integration boundary explicit.
-    throw new NotImplementedException(
-      `Moderation for ${type} targets is pending the owning module integration`,
-    );
+    if (type === ReportTargetType.REVIEW) {
+      if (action === ReportResolutionAction.HIDE) {
+        await this.setReviewHidden(id, true);
+      } else {
+        await this.deleteReview(id);
+      }
+      return;
+    }
+    if (type === ReportTargetType.ITINERARY) {
+      if (action === ReportResolutionAction.HIDE) {
+        await this.setItineraryHidden(id, true);
+      } else {
+        const deleted = await this.itineraryModel
+          .findByIdAndDelete(new Types.ObjectId(id))
+          .exec();
+        if (!deleted) throw new NotFoundException('Content not found');
+      }
+    }
+  }
+
+  private async setReviewHidden(id: string, hidden: boolean): Promise<void> {
+    const review = await this.reviewModel
+      .findByIdAndUpdate(
+        new Types.ObjectId(id),
+        { $set: { isHidden: hidden } },
+        { new: true },
+      )
+      .exec();
+    if (!review) throw new NotFoundException('Content not found');
+    await this.reviewsService.recalculateHotelRating(review.hotelId.toString());
+  }
+
+  private async setItineraryHidden(id: string, hidden: boolean): Promise<void> {
+    const itinerary = await this.itineraryModel
+      .findByIdAndUpdate(
+        new Types.ObjectId(id),
+        { $set: { isHidden: hidden } },
+        { new: true },
+      )
+      .exec();
+    if (!itinerary) throw new NotFoundException('Content not found');
+  }
+
+  private async deleteReview(id: string): Promise<void> {
+    const review = await this.reviewModel
+      .findByIdAndDelete(new Types.ObjectId(id))
+      .exec();
+    if (!review) throw new NotFoundException('Content not found');
+    await this.reviewsService.recalculateHotelRating(review.hotelId.toString());
   }
 
   private statusForAction(action: ReportResolutionAction): ReportStatus {
