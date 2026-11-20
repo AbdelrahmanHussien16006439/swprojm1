@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { HotelsModule } from '../hotels/hotels.module';
 import { UsersModule } from '../users/users.module';
@@ -10,7 +10,7 @@ import { Review, ReviewSchema } from './schemas/review.schema';
 // Remember to export your service(s) AND MongooseModule (TEAM_PLAN 3.2).
 @Module({
   imports: [
-    HotelsModule,
+    forwardRef(() => HotelsModule),
     UsersModule,
     MongooseModule.forFeature([{ name: Review.name, schema: ReviewSchema }]),
   ],
