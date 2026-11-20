@@ -896,3 +896,17 @@ service method. Airport IANA zones are used for UTC persistence and local respon
 times; search filters scheduled flights by active airline, seat availability, cabin,
 price, date, route, sorting, and fixed page size 10.
 ================================================
+
+### Member 3 — 2026-11-20 — FLT-11 single-destination query fix
+Student: Member 3
+Tool: ChatGPT / Codex
+Related Requirement: FLT-11, FLT-12
+Prompt:
+"Fix GET /api/flights/search when one toAirportIds query value arrives as a scalar.
+Normalize it to string[], validate each value with IsMongoId, add one-way and
+round-trip regression tests, start the server once, then commit and push."
+How the output was used:
+Search DTO transformation now handles scalar, comma-delimited, and repeated query
+values consistently. Regression tests cover one-way and round-trip single-destination
+requests; build, focused tests, and server startup passed.
+================================================

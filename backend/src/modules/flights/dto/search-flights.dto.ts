@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsDateString, IsEnum, IsInt, IsMongoId, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
 import { CabinClass } from '../flights.constants';
 
 export enum FlightSortBy {
@@ -18,7 +18,14 @@ export class SearchFlightsDto {
 
   @ApiPropertyOptional({ example: '665f1c2a6d3b4c5e7f8a9013', type: [String] })
   @IsOptional()
-  @IsString({ each: true })
+  @Transform(({ value }) =>
+    value === undefined || value === ''
+      ? undefined
+      : Array.isArray(value)
+        ? value
+        : String(value).split(','),
+  )
+  @IsMongoId({ each: true })
   toAirportIds?: string[];
 
   @ApiPropertyOptional({ example: '2027-06-15' })
