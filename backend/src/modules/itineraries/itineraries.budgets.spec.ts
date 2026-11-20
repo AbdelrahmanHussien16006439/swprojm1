@@ -63,6 +63,7 @@ describe('ItinerariesService budgets and transport costs (ITN-14, ITN-16)', () =
       { saveImage: jest.fn(), deleteImage: jest.fn() } as unknown as UploadsService,
       {} as any,
       {} as any,
+      {} as any,
     );
   });
 

@@ -31,6 +31,7 @@ import { CreateItineraryActivityDto } from './dto/create-itinerary-activity.dto'
 import { CreateItineraryDto } from './dto/create-itinerary.dto';
 import { CreateItineraryBudgetDto } from './dto/create-itinerary-budget.dto';
 import { CreateItineraryTransportCostDto } from './dto/create-itinerary-transport-cost.dto';
+import { ItineraryHotelsQueryDto } from './dto/itinerary-hotels-query.dto';
 import { CreateItineraryDayDto } from './dto/create-itinerary-day.dto';
 import { ListItinerariesQueryDto } from './dto/list-itineraries-query.dto';
 import { ReorderItineraryDayDto } from './dto/reorder-itinerary-day.dto';
@@ -200,5 +201,26 @@ export class ItinerariesController {
   ) {
     return this.itinerariesService.addActivity(id, dayId, dto, user);
   }
+
+  @Get(':id/hotels')
+  @ApiOperation({ summary: 'Search hotels for one city group’s dates (ITN-25)' })
+  @ApiQuery({ name: 'groupIndex', required: true, example: 0, description: 'Zero-based city-group index' })
+  @ApiQuery({ name: 'guests', required: true, example: 2 })
+  @ApiQuery({ name: 'rooms', required: false, example: 1 })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiOkResponse({ description: 'Hotel search results for the group city and derived dates' })
+  @ApiBadRequestResponse({ description: 'Invalid group index, guest count, or stay dates' })
+  @ApiNotFoundResponse({ description: 'Itinerary or city group not found' })
+  searchHotels(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Query() query: ItineraryHotelsQueryDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.itinerariesService.searchHotelsForCityGroup(id, query, user);
+  }
+
+  // TODO(ITN-26): Waiting for Member 3 to add/export FlightsService.search(SearchFlightsDto)
+  // with toAirportIds support. Keep GET /:id/flights unimplemented until that shared
+  // contract exists; do not duplicate flight search or airport logic here.
 
 }

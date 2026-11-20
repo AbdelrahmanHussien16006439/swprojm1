@@ -9,6 +9,8 @@ import { paginate } from '../../common/utils/pagination';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ExchangeRatesService } from '../exchange-rates/exchange-rates.service';
 import { ReferenceDataService } from '../reference-data/reference-data.service';
+import { HotelsService } from '../hotels/hotels.service';
+import { SearchHotelsDto } from '../hotels/dto/search-hotels.dto';
 import { UploadsService } from '../uploads/uploads.service';
 import { UsersService } from '../users/users.service';
 import { CreateItineraryActivityDto } from './dto/create-itinerary-activity.dto';
@@ -23,6 +25,7 @@ import { UpdateItineraryDayDto } from './dto/update-itinerary-day.dto';
 import { CreateItineraryTransportCostDto } from './dto/create-itinerary-transport-cost.dto';
 import { BudgetSummaryQueryDto } from './dto/budget-summary-query.dto';
 import { PublicItinerariesQueryDto } from './dto/public-itineraries-query.dto';
+import { ItineraryHotelsQueryDto } from './dto/itinerary-hotels-query.dto';
 import { UpdateItineraryTransportCostDto } from './dto/update-itinerary-transport-cost.dto';
 import { UpdateItineraryDto } from './dto/update-itinerary.dto';
 import {
@@ -60,6 +63,7 @@ export class ItinerariesService {
     private readonly uploadsService: UploadsService,
     private readonly exchangeRatesService: ExchangeRatesService,
     private readonly usersService: UsersService,
+    private readonly hotelsService: HotelsService,
   ) {}
 
   async create(dto: CreateItineraryDto, user: JwtUser) {
@@ -517,6 +521,46 @@ export class ItinerariesService {
         rateDate,
       })),
     };
+  }
+
+  async searchHotelsForCityGroup(
+    itineraryId: string,
+    query: ItineraryHotelsQueryDto,
+    user: JwtUser,
+  ) {
+    const itinerary = await this.findOwned(itineraryId, user);
+    const group = itinerary.cityGroups[query.groupIndex];
+    if (!group) throw new NotFoundException('Itinerary city group not found');
+
+    const city = group.cityId as any;
+    const cityId =
+      typeof city === 'string'
+        ? city
+        : city?.cityId ?? city?._id?.toString();
+    if (!cityId) throw new BadRequestException('City group is missing its city');
+
+    const dayMilliseconds = MILLISECONDS_PER_CALENDAR_DAY;
+    const startDate = itinerary.startDate as Date;
+    const checkIn = new Date(
+      startDate.getTime() + (group.fromDay - 1) * dayMilliseconds,
+    )
+      .toISOString()
+      .slice(0, 10);
+    const checkOut = new Date(
+      startDate.getTime() + group.toDay * dayMilliseconds,
+    )
+      .toISOString()
+      .slice(0, 10);
+
+    const search = Object.assign(new SearchHotelsDto(), {
+      cityId,
+      checkIn,
+      checkOut,
+      guests: query.guests,
+      rooms: query.rooms ?? 1,
+      page: query.page ?? 1,
+    });
+    return this.hotelsService.search(search);
   }
 
   async update(id: string, dto: UpdateItineraryDto, user: JwtUser) {
