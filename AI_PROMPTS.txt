@@ -1016,4 +1016,12 @@ and refund outcomes, including signed Stripe refund status updates. E-tickets
 now resolve each airport timezone. Build passed and all 52 suites / 291 tests
 passed. One sanitized server startup attempt emitted a diagnostic but did not
 reach the Nest success message; no .env values were displayed.
+### Member 5 — 20/11/2026 — integration
+Student: Member 5
+Tool: ChatGPT / Codex
+Related Requirements: HTL-02, HTL-05, HTL-06, HTL-08, HTL-11, HTL-12, HTL-15
+Prompt summary:
+"Integrate Member 6's HotelBookingsService and ReviewsService into Member 5's hotels module. Replace RoomNight TODOs for hotel search, free rooms, availability calendar, booking overlaps for blocking/deactivation/deletion/availability removal, and hotel detail reviews/rating. Use forwardRef for the circular module and service dependencies."
+How the output was used:
+Connected active RoomNight lookups to search, free-room results and the calendar; the calendar now reports Booked with its booking reference when confirmed. Added overlap rejection for blocking, deactivation, deletion and removed availability dates. Hotel details now include paginated visible reviews and their rating aggregate from ReviewsService. Build passed; all 52 test suites (289 tests) passed. Nest application successfully started on port 4001 because port 4000 was occupied by an existing process.
 ================================================

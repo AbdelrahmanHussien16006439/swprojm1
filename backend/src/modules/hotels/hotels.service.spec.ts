@@ -36,6 +36,11 @@ describe('HotelsService basics', () => {
     saveImage: jest.Mock;
     deleteImage: jest.Mock;
   };
+  let hotelBookingsService: {
+    findRoomNights: jest.Mock;
+    hasActiveReservationOverlap: jest.Mock;
+  };
+  let reviewsService: { listForHotel: jest.Mock };
 
   beforeEach(() => {
     hotelModel = {
@@ -60,12 +65,46 @@ describe('HotelsService basics', () => {
       saveImage: jest.fn(),
       deleteImage: jest.fn(),
     };
+    hotelBookingsService = {
+      findRoomNights: jest.fn().mockResolvedValue([]),
+      hasActiveReservationOverlap: jest.fn().mockResolvedValue(false),
+    };
+    reviewsService = { listForHotel: jest.fn() };
     service = new HotelsService(
       hotelModel as unknown as Model<Hotel>,
       roomModel as unknown as Model<Room>,
       referenceDataService as unknown as ReferenceDataService,
       uploadsService as unknown as UploadsService,
+      hotelBookingsService as never,
+      reviewsService as never,
     );
+  });
+
+  it('adds Member 6 visible reviews and rating aggregate to hotel details', async () => {
+    const hotel = {
+      toObject: () => ({ name: 'Nile View', averageRating: 0, ratingsCount: 0 }),
+    };
+    hotelModel.findById.mockReturnValue({
+      populate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue(hotel) }),
+    });
+    const reviews = {
+      averageRating: 4.5,
+      ratingsCount: 2,
+      data: [{ rating: 5, text: 'Great' }],
+      page: 1,
+      limit: 10,
+      total: 2,
+      totalPages: 1,
+    };
+    reviewsService.listForHotel.mockResolvedValue(reviews);
+
+    await expect(service.findHotelDetails('hotel-id', { page: 1 })).resolves.toMatchObject({
+      name: 'Nile View',
+      averageRating: 4.5,
+      ratingsCount: 2,
+      reviews,
+    });
+    expect(reviewsService.listForHotel).toHaveBeenCalledWith('hotel-id', { page: 1 });
   });
 
   it('finds a hotel and populates reference data', async () => {
@@ -343,6 +382,113 @@ describe('HotelsService basics', () => {
       service.deleteRoom(hotelId, roomId, { providerId: hotelId } as JwtUser),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(roomModel.deleteOne).not.toHaveBeenCalled();
+  });
+
+  it('rejects deactivating a room with an active reservation in its availability range', async () => {
+    const hotelId = '64b000000000000000000001';
+    const roomId = '64b000000000000000000002';
+    const startDate = new Date('2026-12-01T00:00:00.000Z');
+    const endDate = new Date('2026-12-10T00:00:00.000Z');
+    hotelModel.findById.mockReturnValue({
+      populate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: hotelId }) }),
+    });
+    roomModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({
+        _id: roomId,
+        hotelId,
+        isActive: true,
+        availabilityRanges: [{ startDate, endDate }],
+      }),
+    });
+    hotelBookingsService.hasActiveReservationOverlap.mockResolvedValue(true);
+
+    await expect(
+      service.updateRoom(
+        hotelId,
+        roomId,
+        { isActive: false },
+        { providerId: hotelId } as JwtUser,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(hotelBookingsService.hasActiveReservationOverlap).toHaveBeenCalledWith(
+      roomId,
+      startDate,
+      new Date('2026-12-11T00:00:00.000Z'),
+    );
+    expect(roomModel.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects deleting a never-reserved room when an active reservation overlaps its dates', async () => {
+    const hotelId = '64b000000000000000000001';
+    const roomId = '64b000000000000000000002';
+    const availabilityRanges = [{
+      startDate: new Date('2026-12-01T00:00:00.000Z'),
+      endDate: new Date('2026-12-10T00:00:00.000Z'),
+    }];
+    hotelModel.findById.mockReturnValue({
+      populate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: hotelId }) }),
+    });
+    roomModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({
+        _id: roomId,
+        hotelId,
+        everReserved: false,
+        availabilityRanges,
+      }),
+    });
+    hotelBookingsService.hasActiveReservationOverlap.mockResolvedValue(true);
+
+    await expect(
+      service.deleteRoom(hotelId, roomId, { providerId: hotelId } as JwtUser),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(roomModel.deleteOne).not.toHaveBeenCalled();
+  });
+
+  it('rejects removing availability or blocking a range with an active reservation', async () => {
+    const hotelId = '64b000000000000000000001';
+    const roomId = '64b000000000000000000002';
+    const currentRange = {
+      startDate: new Date('2026-12-01T00:00:00.000Z'),
+      endDate: new Date('2026-12-10T00:00:00.000Z'),
+    };
+    const makeRoom = () => ({
+      _id: roomId,
+      availabilityRanges: [currentRange],
+      blockedRanges: [],
+      save: jest.fn(),
+    });
+    hotelModel.findById.mockReturnValue({
+      populate: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue({ _id: hotelId }) }),
+    });
+    hotelBookingsService.hasActiveReservationOverlap.mockResolvedValue(true);
+
+    const roomAfterAvailabilityRemoval = makeRoom();
+    roomModel.findOne.mockReturnValueOnce({
+      exec: jest.fn().mockResolvedValue(roomAfterAvailabilityRemoval),
+    });
+    await expect(
+      service.updateAvailability(
+        hotelId,
+        roomId,
+        { availabilityRanges: [] },
+        { providerId: hotelId } as JwtUser,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(roomAfterAvailabilityRemoval.save).not.toHaveBeenCalled();
+
+    const roomAfterBlock = makeRoom();
+    roomModel.findOne.mockReturnValueOnce({
+      exec: jest.fn().mockResolvedValue(roomAfterBlock),
+    });
+    await expect(
+      service.updateAvailability(
+        hotelId,
+        roomId,
+        { blockedRanges: [{ startDate: '2026-12-05', endDate: '2026-12-06' }] },
+        { providerId: hotelId } as JwtUser,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(roomAfterBlock.save).not.toHaveBeenCalled();
   });
 
   it('edits room beds, occupancy and current price without changing room identity', async () => {

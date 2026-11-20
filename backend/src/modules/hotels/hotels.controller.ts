@@ -46,6 +46,7 @@ import { UpdateRoomDto } from './dto/update-room.dto';
 import { RoomDateRangeDto, UpdateRoomAvailabilityDto } from './dto/room-date-range.dto';
 import { HotelAvailabilityQueryDto } from './dto/hotel-availability-query.dto';
 import { HotelAvailabilityCalendarQueryDto } from './dto/hotel-availability-calendar-query.dto';
+import { ListHotelReviewsQueryDto } from '../reviews/dto/list-hotel-reviews-query.dto';
 import { SearchHotelsDto } from './dto/search-hotels.dto';
 import { HotelsService } from './hotels.service';
 
@@ -77,7 +78,7 @@ export class HotelsController {
   @Get(':id/rooms/available')
   @ApiOperation({
     summary: 'List rooms available for the requested stay (HTL-15)',
-    description: 'Active reservation checks await Member 6 RoomNight support.',
+    description: 'Rooms with active reservations are excluded using Member 6 RoomNight data.',
   })
   @ApiQuery({ name: 'checkIn', required: true, example: '2026-12-10' })
   @ApiQuery({ name: 'checkOut', required: true, example: '2026-12-15' })
@@ -97,8 +98,7 @@ export class HotelsController {
   @ApiCookieAuth('access_token')
   @ApiOperation({
     summary: 'View the room availability calendar for my hotel (HTL-08)',
-    description:
-      'Returns inclusive UTC calendar dates. Booked status and reservation references await Member 6 RoomNight support.',
+    description: 'Returns inclusive UTC calendar dates, including active booking references.',
   })
   @ApiQuery({ name: 'from', required: true, example: '2026-12-10' })
   @ApiQuery({ name: 'to', required: true, example: '2026-12-15' })
@@ -131,13 +131,16 @@ export class HotelsController {
   @Get(':id')
   @ApiOperation({
     summary: 'Get a public hotel profile (HTL-02)',
-    description:
-      'Reviews and date-specific available rooms await Member 6 review and RoomNight support.',
+    description: 'Includes the visible, paginated hotel reviews and rating aggregate.',
   })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiOkResponse({ description: 'Hotel profile, policy, photos, amenities and rating.' })
   @ApiNotFoundResponse({ description: 'Hotel not found.' })
-  get(@Param('id', ParseObjectIdPipe) id: string) {
-    return this.hotelsService.findById(id);
+  get(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Query() query: ListHotelReviewsQueryDto,
+  ) {
+    return this.hotelsService.findHotelDetails(id, query);
   }
 
   @Patch(':id')
