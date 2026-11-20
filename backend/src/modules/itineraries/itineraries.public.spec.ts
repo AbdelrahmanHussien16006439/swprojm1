@@ -121,6 +121,7 @@ describe('ItinerariesService public visibility, search, and clone (ITN-20, ITN-2
       {} as UploadsService,
       {} as ExchangeRatesService,
       users as UsersService,
+      {} as any,
     );
   });
 

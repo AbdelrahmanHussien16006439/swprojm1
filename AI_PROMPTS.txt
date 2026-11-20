@@ -862,3 +862,19 @@ new embedded IDs, private visibility, and source attribution; shared image files
 remain while any cloned activity references them. Budget-summary totals now round
 to two decimals. Build and all 265 tests passed.
 ================================================
+### Member 7 — 2026-11-20 03:17 Africa/Cairo — ITN-25, ITN-26
+Student: Member 7
+Tool: ChatGPT / Codex
+Related Requirement: ITN-25, ITN-26
+Prompt:
+"Implement Member 7 task 7: expose hotel search for an itinerary city group by
+reusing the existing HotelsService.search, deriving check-in/check-out from the
+group dates and accepting guests/rooms. Check FlightsService.search first; if it
+is missing, leave ITN-26 as a clearly marked TODO without copying flight logic.
+Only edit itineraries and AI_PROMPTS.txt, then build, test, commit, and push."
+How the output was used:
+Added the guarded hotel-search endpoint and query DTO. It passes the populated
+city identifier and derived group dates to HotelsService.search. FlightsService.search
+is absent from develop, so a marked ITN-26 TODO remains with no fake endpoint.
+Build and all 267 tests passed.
+================================================

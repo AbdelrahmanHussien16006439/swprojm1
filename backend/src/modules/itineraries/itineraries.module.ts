@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ExchangeRatesModule } from '../exchange-rates/exchange-rates.module';
+import { HotelsModule } from '../hotels/hotels.module';
 import { ReferenceDataModule } from '../reference-data/reference-data.module';
 import { UploadsModule } from '../uploads/uploads.module';
 import { UsersModule } from '../users/users.module';
@@ -22,6 +23,7 @@ import { Itinerary, ItinerarySchema } from './schemas/itinerary.schema';
     UploadsModule,
     ExchangeRatesModule,
     UsersModule,
+    HotelsModule,
   ],
   controllers: [
     ItineraryPublicController,
