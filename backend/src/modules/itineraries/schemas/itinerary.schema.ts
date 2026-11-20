@@ -6,7 +6,9 @@ export type ItineraryDocument = HydratedDocument<Itinerary>;
 
 @Schema()
 export class ItineraryActivity {
-  @Prop({ required: true, trim: true, maxlength: 100 })
+  _id: Types.ObjectId;
+
+  @Prop({ required: true, trim: true })
   name: string;
 
   @Prop({ required: true, trim: true })
