@@ -5,7 +5,6 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
-  NotImplementedException,
   ServiceUnavailableException,
   forwardRef,
 } from '@nestjs/common';
@@ -15,8 +14,9 @@ import { Model, Types } from 'mongoose';
 import Stripe from 'stripe';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { Role } from '../../common/enums/role.enum';
-import { FlightBooking } from '../flight-bookings/schemas/flight-booking.schema';
 import { FlightBookingsService } from '../flight-bookings/flight-bookings.service';
+import { HotelBookingsService } from '../hotel-bookings/hotel-bookings.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { Payment } from './schemas/payment.schema';
 import { Refund } from './schemas/refund.schema';
 import {
@@ -36,13 +36,14 @@ export class PaymentsService {
     private readonly paymentModel: Model<Payment>,
     @InjectModel(Refund.name)
     private readonly refundModel: Model<Refund>,
-    @InjectModel(FlightBooking.name)
-    private readonly flightBookingModel: Model<FlightBooking>,
     private readonly configService: ConfigService,
     @Inject(STRIPE_CLIENT)
     private readonly stripe: Stripe,
     @Inject(forwardRef(() => FlightBookingsService))
     private readonly flightBookingsService: FlightBookingsService,
+    @Inject(forwardRef(() => HotelBookingsService))
+    private readonly hotelBookingsService: HotelBookingsService,
+    private readonly notificationsService: NotificationsService,
   ) {
     const currency = configService.getOrThrow<string>('PLATFORM_CURRENCY').toUpperCase();
     if (!/^[A-Z]{3}$/.test(currency)) {
@@ -59,9 +60,6 @@ export class PaymentsService {
     userId: string,
     testPaymentMethod?: string,
   ): Promise<{ paymentId: string; clientSecret: string }> {
-    if (bookingType === 'hotel') {
-      throw new NotImplementedException('Hotel payments are not available yet');
-    }
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new BadRequestException('Payment amount must be greater than zero');
     }
@@ -194,8 +192,32 @@ export class PaymentsService {
       refund.status = 'failed';
     }
     await refund.save();
-
-    // TODO(Member 6): notify the user about the refund result when NotificationsService exists.
+    if (payment.bookingType === 'flight') {
+      await this.notifyRefundSafely(
+        payment.userId.toString(),
+        'REFUND_CREATED',
+        `A refund of ${amount} ${this.platformCurrency} for your booking has been created.`,
+        payment.bookingType,
+        payment.bookingId.toString(),
+      );
+    }
+    if (refund.status === 'refunded') {
+      await this.notifyRefundSafely(
+        payment.userId.toString(),
+        'REFUND_REFUNDED',
+        `Your refund of ${amount} ${this.platformCurrency} has been completed.`,
+        payment.bookingType,
+        payment.bookingId.toString(),
+      );
+    } else if (refund.status === 'failed') {
+      await this.notifyRefundSafely(
+        payment.userId.toString(),
+        'REFUND_FAILED',
+        `Your refund of ${amount} ${this.platformCurrency} could not be processed.`,
+        payment.bookingType,
+        payment.bookingId.toString(),
+      );
+    }
     return refund;
   }
 
@@ -207,22 +229,31 @@ export class PaymentsService {
   ): Promise<{ paymentId: string; clientSecret: string }> {
     const payment = await this.paymentModel.findOne({ _id: paymentId, userId }).exec();
     if (!payment) throw new NotFoundException('Payment not found');
-    if (payment.bookingType === 'hotel') {
-      throw new NotImplementedException('Hotel payments are not available yet');
-    }
     if (payment.status !== 'failed') {
       throw new BadRequestException('Only failed payments can be retried');
     }
 
-    const booking = await this.flightBookingModel
-      .findOne({ _id: payment.bookingId, userId })
-      .exec();
-    if (!booking) throw new NotFoundException('Booking not found');
-    this.assertBookingCanBePaid(booking);
+    const amount = payment.bookingType === 'hotel'
+      ? await this.hotelBookingsService.getAmountForPayment(
+          payment.bookingId.toString(),
+          userId,
+        )
+      : await this.flightBookingsService.getAmountForPayment(
+          payment.bookingId.toString(),
+          userId,
+        );
+    if (amount !== payment.amount) {
+      throw new BadRequestException('The booking amount no longer matches this payment');
+    }
 
-    const intent = await this.stripe.paymentIntents.retrieve(
-      payment.stripePaymentIntentId,
-    );
+    let intent: Stripe.PaymentIntent;
+    try {
+      intent = await this.stripe.paymentIntents.retrieve(
+        payment.stripePaymentIntentId,
+      );
+    } catch (error) {
+      this.throwStripeGatewayException(error);
+    }
     if (intent.status !== 'requires_payment_method' && !testPaymentMethod) {
       if (!intent.client_secret) {
         throw new BadRequestException('PaymentIntent is not available for retry');
@@ -278,9 +309,15 @@ export class PaymentsService {
           payment.status = 'succeeded';
           await payment.save();
         }
-        await this.flightBookingsService.onPaymentSucceeded(
-          payment.bookingId.toString(),
-        );
+        if (payment.bookingType === 'hotel') {
+          await this.hotelBookingsService.onPaymentSucceeded(
+            payment.bookingId.toString(),
+          );
+        } else {
+          await this.flightBookingsService.onPaymentSucceeded(
+            payment.bookingId.toString(),
+          );
+        }
       }
     } else if (event.type === 'payment_intent.payment_failed') {
       await this.paymentModel
@@ -302,6 +339,34 @@ export class PaymentsService {
           { new: true },
         )
         .exec();
+    } else if (event.type === 'refund.updated' || event.type === 'refund.failed') {
+      const stripeRefund = event.data.object as Stripe.Refund;
+      const refund = await this.refundModel
+        .findOne({ stripeRefundId: stripeRefund.id })
+        .exec();
+      if (refund) {
+        const nextStatus = stripeRefund.status === 'succeeded'
+          ? 'refunded'
+          : stripeRefund.status === 'failed' || event.type === 'refund.failed'
+            ? 'failed'
+            : 'pending';
+        if (refund.status !== nextStatus) {
+          refund.status = nextStatus;
+          await refund.save();
+          const payment = await this.paymentModel.findById(refund.paymentId).exec();
+          if (payment && nextStatus !== 'pending') {
+            await this.notifyRefundSafely(
+              payment.userId.toString(),
+              nextStatus === 'refunded' ? 'REFUND_REFUNDED' : 'REFUND_FAILED',
+              nextStatus === 'refunded'
+                ? `Your refund of ${refund.amount} ${payment.currency} has been completed.`
+                : `Your refund of ${refund.amount} ${payment.currency} could not be processed.`,
+              refund.bookingType,
+              refund.bookingId.toString(),
+            );
+          }
+        }
+      }
     }
 
     return { received: true };
@@ -409,34 +474,33 @@ export class PaymentsService {
     userId: string,
     testPaymentMethod?: string,
   ): Promise<{ paymentId: string; clientSecret: string }> {
-    if (bookingType === 'hotel') {
-      throw new NotImplementedException('Hotel payments are not available yet');
-    }
-
-    const booking = await this.flightBookingModel
-      .findOne({ _id: bookingId, userId })
-      .exec();
-    if (!booking) throw new NotFoundException('Booking not found');
-    this.assertBookingCanBePaid(booking);
+    const amount = bookingType === 'hotel'
+      ? await this.hotelBookingsService.getAmountForPayment(bookingId, userId)
+      : await this.flightBookingsService.getAmountForPayment(bookingId, userId);
 
     return this.createPayment(
       bookingType,
       bookingId,
-      booking.totalPrice,
+      amount,
       userId,
       testPaymentMethod,
     );
   }
 
-  private assertBookingCanBePaid(booking: FlightBooking): void {
-    if (booking.status !== 'pending_payment') {
-      throw new BadRequestException('Booking is not pending payment');
-    }
-    if (booking.holdExpiresAt.getTime() <= Date.now()) {
-      throw new BadRequestException('Booking payment hold has expired');
-    }
-    if (!booking.policyAcceptance?.acceptedAt || !booking.policyAcceptance.policySnapshot) {
-      throw new BadRequestException('Accept booking policies before paying');
+  private async notifyRefundSafely(
+    userId: string,
+    type: string,
+    message: string,
+    bookingType: BookingType,
+    bookingId: string,
+  ): Promise<void> {
+    const link = bookingType === 'hotel'
+      ? `/hotel-bookings/${bookingId}`
+      : `/flight-bookings/${bookingId}`;
+    try {
+      await this.notificationsService.notify(userId, type, message, link);
+    } catch {
+      // Notification persistence must not change a Stripe refund outcome.
     }
   }
 

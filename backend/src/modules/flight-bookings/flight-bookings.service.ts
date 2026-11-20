@@ -10,6 +10,7 @@ import {
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { DateTime } from 'luxon';
 import { randomBytes } from 'crypto';
 import PDFDocument from 'pdfkit';
 import { AirlinesService } from '../airlines/airlines.service';
@@ -28,6 +29,8 @@ import {
 } from './flight-bookings.constants';
 import { CreateBookingSummaryDto } from './dto/create-booking-summary.dto';
 import { paginate } from '../../common/utils/pagination';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ReferenceDataService } from '../reference-data/reference-data.service';
 
 @Injectable()
 export class FlightBookingsService {
@@ -40,6 +43,8 @@ export class FlightBookingsService {
     private readonly flightModel: Model<Flight>,
     @Inject(forwardRef(() => PaymentsService))
     private readonly paymentsService: PaymentsService,
+    private readonly notificationsService: NotificationsService,
+    private readonly referenceDataService: ReferenceDataService,
   ) {}
 
   /** FLT-22: atomically hold seats for ten minutes after a fresh summary check. */
@@ -196,7 +201,12 @@ export class FlightBookingsService {
             expired._id.toString(),
           );
         }
-        // TODO(Member 6): notify pending passenger that provider cancellation ended the hold.
+        await this.notifySafely(
+          expired.userId.toString(),
+          'BOOKING_EXPIRED',
+          'Your flight booking hold expired because the airline cancelled a flight.',
+          `/flight-bookings/${expired._id.toString()}`,
+        );
         continue;
       }
 
@@ -234,7 +244,12 @@ export class FlightBookingsService {
             .exec();
         }
       }
-      // TODO(Member 6): notify confirmed passenger about provider cancellation/refund.
+      await this.notifySafely(
+        cancelled.userId.toString(),
+        'BOOKING_CANCELLED',
+        `Your flight booking ${cancelled.bookingReference ?? cancelled._id.toString()} was cancelled by the airline.`,
+        `/flight-bookings/${cancelled._id.toString()}`,
+      );
     }
   }
 
@@ -423,7 +438,12 @@ export class FlightBookingsService {
       throw error;
     }
 
-    // TODO(Member 6): notify the user about confirmation when NotificationsService exists.
+    await this.notifySafely(
+      confirmed.userId.toString(),
+      'BOOKING_CONFIRMED',
+      `Your flight booking ${confirmed.bookingReference} is confirmed.`,
+      `/flight-bookings/${(confirmed as FlightBooking & { _id: Types.ObjectId })._id.toString()}`,
+    );
   }
 
   async findMine(
@@ -561,7 +581,12 @@ export class FlightBookingsService {
       }
     }
 
-    // TODO(Member 6): notify the user about cancellation/refund when NotificationsService exists.
+    await this.notifySafely(
+      cancelled.userId.toString(),
+      'BOOKING_CANCELLED',
+      `Your flight booking ${cancelled.bookingReference ?? cancelled._id.toString()} was cancelled.`,
+      `/flight-bookings/${cancelled._id.toString()}`,
+    );
     return { booking: cancelled, refund, refundPreview: preview };
   }
 
@@ -571,6 +596,12 @@ export class FlightBookingsService {
       throw new BadRequestException('An e-ticket is available only for confirmed bookings');
     }
     const flights = await this.getFlightDetails(booking);
+    const airportDetails = await Promise.all(
+      flights.map(async (flight) => ({
+        departure: await this.referenceDataService.findAirport(flight.departureAirportId),
+        arrival: await this.referenceDataService.findAirport(flight.arrivalAirportId),
+      })),
+    );
     const chunks: Buffer[] = [];
     const document = new PDFDocument({ size: 'A4', margin: 48 });
     const buffer = await new Promise<Buffer>((resolve, reject) => {
@@ -584,12 +615,22 @@ export class FlightBookingsService {
       document.text(`Total: ${booking.totalPrice} ${this.paymentsService.getPlatformCurrency()}`);
       document.moveDown();
       document.fontSize(15).text('Flight segments');
+      let segmentIndex = 0;
       for (const flight of flights) {
+        const airports = airportDetails[segmentIndex++];
+        const departureLocal = DateTime.fromJSDate(flight.departureTime)
+          .setZone(airports.departure.timezone)
+          .toISO() ?? flight.departureTime.toISOString();
+        const arrivalLocal = DateTime.fromJSDate(flight.arrivalTime)
+          .setZone(airports.arrival.timezone)
+          .toISO() ?? flight.arrivalTime.toISOString();
         document
           .fontSize(11)
           .text(`${flight.flightNumber}: ${flight.departureAirportId} → ${flight.arrivalAirportId}`)
           .text(`Departure: ${new Date(flight.departureTime).toISOString()} (UTC)`)
           .text(`Arrival: ${new Date(flight.arrivalTime).toISOString()} (UTC)`)
+          .text(`Departure local: ${departureLocal} (${airports.departure.timezone})`)
+          .text(`Arrival local: ${arrivalLocal} (${airports.arrival.timezone})`)
           .text(`Cabin: ${flight.cabinClass}`)
           .moveDown(0.5);
       }
@@ -600,7 +641,6 @@ export class FlightBookingsService {
           .text(`${passenger.fullName} — ${passenger.type} — ID: ${passenger.documentNumber}`)
           .text(`Extra bags: ${passenger.extraBags}, weight per bag: ${passenger.extraBagsWeightKg} kg`);
       }
-      // TODO(Member 5): resolve airport time zones and display local departure/arrival times.
       document.end();
     });
     return {
@@ -970,6 +1010,15 @@ export class FlightBookingsService {
     return updated;
   }
 
+  /** PAY-01 callback: validate the caller's active hold and return its locked amount. */
+  async getAmountForPayment(bookingId: string, userId: string): Promise<number> {
+    const booking = await this.getOwnedPendingBooking(bookingId, userId);
+    if (!booking.policyAcceptance?.acceptedAt || !booking.policyAcceptance.policySnapshot) {
+      throw new BadRequestException('Accept booking policies before paying');
+    }
+    return booking.totalPrice;
+  }
+
   private async getOwnedPendingBooking(
     bookingId: string,
     userId: string,
@@ -985,5 +1034,18 @@ export class FlightBookingsService {
       throw new BadRequestException('Booking payment hold has expired');
     }
     return booking;
+  }
+
+  private async notifySafely(
+    userId: string,
+    type: string,
+    message: string,
+    link: string,
+  ): Promise<void> {
+    try {
+      await this.notificationsService.notify(userId, type, message, link);
+    } catch {
+      // A notification failure must not undo a verified payment or booking transition.
+    }
   }
 }

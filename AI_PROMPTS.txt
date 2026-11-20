@@ -994,6 +994,29 @@ to the first itinerary day's city through shared reference data and flight servi
 Round-trip return defaults to the last itinerary day's calendar date; one-way
 search omits the return date. Added DTO validation and regression coverage.
 ================================================
+================================================
+### Member 4 — 2026-11-20 16:06 — PAY-01, PAY-02, PAY-03, FLT-23, FLT-26, GEN-01
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: PAY-01, PAY-02, PAY-03, FLT-23, FLT-26, GEN-01
+Prompt:
+"Integrate Member 4's modules per docs/INTEGRATION_PROMPTS.md: dispatch flight
+and hotel policies, payment amount validation, retries and verified webhook
+success to the owning booking service; use real HotelBookingsService and
+NotificationsService exports; notify flight confirmation/cancellation and
+refund creation/refunded/failed outcomes; remove direct FlightBooking reads
+from PaymentsService. Replace available airport timezone TODOs using
+ReferenceDataService. Add integration unit tests, build/test, start the server
+once, commit and push the integration branch."
+How the output was used:
+Hotel payments, retries, policies and verified success events now dispatch to
+HotelBookingsService; the flight payment amount callback was added to
+FlightBookingsService. NotificationsService handles flight booking transitions
+and refund outcomes, including signed Stripe refund status updates. E-tickets
+now resolve each airport timezone. Build passed and all 52 suites / 291 tests
+passed. One sanitized server startup attempt emitted a diagnostic but did not
+reach the Nest success message; no .env values were displayed.
+================================================
 ### Member 5 — 20/11/2026 — integration
 Student: Member 5
 Tool: ChatGPT / Codex
