@@ -4,14 +4,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { InjectModel } from '@nestjs/mongoose';
 import * as bcrypt from 'bcrypt';
-import { Connection, FilterQuery, Model, Types } from 'mongoose';
+import { FilterQuery, Model, Types } from 'mongoose';
 import { ProviderType } from '../../common/enums/provider-type.enum';
 import { Role } from '../../common/enums/role.enum';
 import { UserStatus } from '../../common/enums/user-status.enum';
 import { escapeRegex } from '../../common/utils/escape-regex';
 import { paginate, Paginated } from '../../common/utils/pagination';
+import { ReferenceDataService } from '../reference-data/reference-data.service';
 import { ListAccountsQueryDto } from './dto/list-accounts-query.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { User, UserDocument } from './schemas/user.schema';
@@ -33,8 +34,8 @@ export interface CreateUserData {
 export class UsersService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<User>,
-    @InjectConnection() private readonly connection: Connection,
     private readonly sessionsService: SessionsService,
+    private readonly referenceDataService: ReferenceDataService,
   ) {}
 
   // ---------- Lookups (also used by other members) ----------
@@ -161,8 +162,15 @@ export class UsersService {
   }
 
   async updateProfile(id: string, dto: UpdateProfileDto) {
-    // ⏳ ACC-09: also check ReferenceDataService.isSupportedCurrency(dto.preferredCurrency)
-    // once Member 5's ReferenceDataModule is merged (format is already validated by the DTO).
+    // ACC-09: the DTO checks the format; the currency must also be supported.
+    if (
+      dto.preferredCurrency &&
+      !(await this.referenceDataService.isSupportedCurrency(dto.preferredCurrency))
+    ) {
+      throw new BadRequestException(
+        `Currency ${dto.preferredCurrency} is not supported`,
+      );
+    }
     const user = await this.userModel.findByIdAndUpdate(
       id,
       { $set: dto },
@@ -170,17 +178,6 @@ export class UsersService {
     );
     if (!user) throw new NotFoundException('User not found');
     return this.toProfile(user);
-  }
-
-  /** ACC-12: user deletes (deactivates) their own account. */
-  async deactivateOwnAccount(id: string): Promise<void> {
-    if (await this.hasUpcomingConfirmedBookings(id)) {
-      throw new BadRequestException(
-        'You cannot deactivate your account while you have upcoming confirmed bookings',
-      );
-    }
-    await this.setStatus(id, UserStatus.DEACTIVATED);
-    await this.sessionsService.revokeAllForUser(id);
   }
 
   // ---------- Admin (ACC-14, ACC-15, ACC-16) ----------
@@ -253,22 +250,5 @@ export class UsersService {
       providerId: user.providerId?.toString() ?? null,
       registeredAt: user.createdAt,
     };
-  }
-
-  /**
-   * ⏳ ACC-12 should call FlightBookingsService.hasUpcomingConfirmed (M4) and
-   * HotelBookingsService.hasUpcomingConfirmed (M6). Until those are merged this reads
-   * their collections directly (field/status names from TEAM_PLAN 3.7 / 3.8).
-   * A booking stays 'confirmed' until its trip is over (then 'completed'), so any
-   * confirmed booking counts as upcoming.
-   * TODO: replace with the two service calls once they are merged into develop.
-   */
-  private async hasUpcomingConfirmedBookings(userId: string): Promise<boolean> {
-    const filter = { userId: new Types.ObjectId(userId), status: 'confirmed' };
-    const [flights, hotels] = await Promise.all([
-      this.connection.collection('flightbookings').countDocuments(filter),
-      this.connection.collection('hotelbookings').countDocuments(filter),
-    ]);
-    return flights + hotels > 0;
   }
 }
