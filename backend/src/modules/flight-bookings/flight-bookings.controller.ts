@@ -28,7 +28,8 @@ import { CancelFlightBookingDto } from './dto/cancel-flight-booking.dto';
 import { MyBookingsQueryDto } from './dto/my-bookings-query.dto';
 import { ModeratorBookingsQueryDto } from './dto/my-bookings-query.dto';
 import { FlightBookingsService } from './flight-bookings.service';
-import { BadRequestException, NotImplementedException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
+import { HotelBookingsService } from '../hotel-bookings/hotel-bookings.service';
 
 @ApiTags('flight-bookings')
 @ApiCookieAuth('access_token')
@@ -99,7 +100,10 @@ export class FlightBookingsController {
 @UseGuards(JwtAuthGuard)
 @Controller('bookings/:type/:id')
 export class BookingPoliciesController {
-  constructor(private readonly flightBookingsService: FlightBookingsService) {}
+  constructor(
+    private readonly flightBookingsService: FlightBookingsService,
+    private readonly hotelBookingsService: HotelBookingsService,
+  ) {}
 
   @Get('policies')
   @ApiOperation({ summary: 'Get policies for an owned pending booking' })
@@ -109,7 +113,9 @@ export class BookingPoliciesController {
     @CurrentUser() user: JwtUser,
   ) {
     this.assertBookingType(type);
-    return this.flightBookingsService.getPolicies(bookingId, user.sub);
+    return type === 'hotel'
+      ? this.hotelBookingsService.getPolicies(bookingId, user.sub)
+      : this.flightBookingsService.getPolicies(bookingId, user.sub);
   }
 
   @Post('accept-policies')
@@ -124,12 +130,14 @@ export class BookingPoliciesController {
     if (dto.accepted !== true) {
       throw new BadRequestException('Policies must be accepted before payment');
     }
-    return this.flightBookingsService.acceptPolicies(bookingId, user.sub);
+    return type === 'hotel'
+      ? this.hotelBookingsService.acceptPolicies(bookingId, user.sub)
+      : this.flightBookingsService.acceptPolicies(bookingId, user.sub);
   }
 
   private assertBookingType(type: string): void {
     if (type === 'hotel') {
-      throw new NotImplementedException('Hotel booking policies are not available yet');
+      return;
     }
     if (type !== 'flight') {
       throw new BadRequestException('Booking type must be flight or hotel');

@@ -2,11 +2,9 @@ import { forwardRef, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import Stripe from 'stripe';
-import {
-  FlightBooking,
-  FlightBookingSchema,
-} from '../flight-bookings/schemas/flight-booking.schema';
 import { FlightBookingsModule } from '../flight-bookings/flight-bookings.module';
+import { HotelBookingsModule } from '../hotel-bookings/hotel-bookings.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { Payment, PaymentSchema } from './schemas/payment.schema';
 import { Refund, RefundSchema } from './schemas/refund.schema';
 import { PaymentsController, RefundsController } from './payments.controller';
@@ -18,10 +16,11 @@ import { STRIPE_CLIENT } from './payments.constants';
 @Module({
   imports: [
     forwardRef(() => FlightBookingsModule),
+    forwardRef(() => HotelBookingsModule),
+    NotificationsModule,
     MongooseModule.forFeature([
       { name: Payment.name, schema: PaymentSchema },
       { name: Refund.name, schema: RefundSchema },
-      { name: FlightBooking.name, schema: FlightBookingSchema },
     ]),
   ],
   providers: [

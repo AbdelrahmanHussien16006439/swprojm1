@@ -11,6 +11,9 @@ import { FlightBookingSummaryController } from './flight-bookings.summary.contro
 import { FlightBookingsService } from './flight-bookings.service';
 import { FlightBooking, FlightBookingSchema } from './schemas/flight-booking.schema';
 import { PaymentsModule } from '../payments/payments.module';
+import { HotelBookingsModule } from '../hotel-bookings/hotel-bookings.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { ReferenceDataModule } from '../reference-data/reference-data.module';
 
 // Owner: Member 4 — see docs/TEAM_PLAN.md Section 7.
 // Remember to export your service(s) AND MongooseModule (TEAM_PLAN 3.2).
@@ -19,6 +22,9 @@ import { PaymentsModule } from '../payments/payments.module';
     AirlinesModule,
     FlightsModule,
     forwardRef(() => PaymentsModule),
+    forwardRef(() => HotelBookingsModule),
+    NotificationsModule,
+    ReferenceDataModule,
     MongooseModule.forFeature([
       { name: FlightBooking.name, schema: FlightBookingSchema },
     ]),

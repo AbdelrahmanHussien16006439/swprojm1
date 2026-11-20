@@ -1,17 +1,17 @@
 import {
   BadRequestException,
   NotFoundException,
-  NotImplementedException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Model, Types } from 'mongoose';
 import Stripe from 'stripe';
-import { FlightBooking } from '../flight-bookings/schemas/flight-booking.schema';
 import { Payment } from './schemas/payment.schema';
 import { Refund } from './schemas/refund.schema';
 import { PaymentsService } from './payments.service';
 import { Role } from '../../common/enums/role.enum';
+import { HotelBookingsService } from '../hotel-bookings/hotel-bookings.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
@@ -22,8 +22,7 @@ describe('PaymentsService', () => {
     findOneAndUpdate: jest.Mock;
     find: jest.Mock;
   };
-  let refundModel: { create: jest.Mock; findById: jest.Mock };
-  let bookingModel: { findOne: jest.Mock };
+  let refundModel: { create: jest.Mock; findById: jest.Mock; findOne: jest.Mock };
   let stripe: {
     paymentIntents: {
       create: jest.Mock;
@@ -34,7 +33,9 @@ describe('PaymentsService', () => {
     refunds: { create: jest.Mock };
     webhooks: { constructEvent: jest.Mock };
   };
-  let flightBookingsService: { onPaymentSucceeded: jest.Mock };
+  let flightBookingsService: { onPaymentSucceeded: jest.Mock; getAmountForPayment: jest.Mock };
+  let hotelBookingsService: { onPaymentSucceeded: jest.Mock; getAmountForPayment: jest.Mock };
+  let notificationsService: { notify: jest.Mock };
 
   beforeEach(() => {
     paymentModel = {
@@ -44,9 +45,16 @@ describe('PaymentsService', () => {
       findOneAndUpdate: jest.fn(),
       find: jest.fn(),
     };
-    refundModel = { create: jest.fn(), findById: jest.fn() };
-    bookingModel = { findOne: jest.fn() };
-    flightBookingsService = { onPaymentSucceeded: jest.fn() };
+    refundModel = { create: jest.fn(), findById: jest.fn(), findOne: jest.fn() };
+    flightBookingsService = {
+      onPaymentSucceeded: jest.fn(),
+      getAmountForPayment: jest.fn().mockResolvedValue(10.5),
+    };
+    hotelBookingsService = {
+      onPaymentSucceeded: jest.fn(),
+      getAmountForPayment: jest.fn().mockResolvedValue(42),
+    };
+    notificationsService = { notify: jest.fn().mockResolvedValue(undefined) };
     stripe = {
       paymentIntents: {
         create: jest.fn().mockResolvedValue({ id: 'pi_test', client_secret: 'secret_test' }),
@@ -71,10 +79,11 @@ describe('PaymentsService', () => {
     service = new PaymentsService(
       paymentModel as unknown as Model<Payment>,
       refundModel as unknown as Model<Refund>,
-      bookingModel as unknown as Model<FlightBooking>,
       config,
       stripe as unknown as Stripe,
       flightBookingsService as never,
+      hotelBookingsService as never,
+      notificationsService as never,
     );
   });
 
@@ -96,20 +105,12 @@ describe('PaymentsService', () => {
 
   it('derives amount and currency from the owned booking and does not store the test method', async () => {
     const bookingId = new Types.ObjectId().toString();
-    bookingModel.findOne.mockReturnValue({
-      exec: jest.fn().mockResolvedValue({
-        status: 'pending_payment',
-        holdExpiresAt: new Date(Date.now() + 60_000),
-        policyAcceptance: { acceptedAt: new Date(), policySnapshot: { baggagePolicy: {} } },
-        totalPrice: 10.5,
-      }),
-    });
     paymentModel.create.mockResolvedValue({ _id: new Types.ObjectId() });
 
     await expect(
       service.createPaymentForBooking('flight', bookingId, 'user-1', 'pm_card_visa'),
     ).resolves.toEqual({ paymentId: expect.any(String), clientSecret: 'secret_test' });
-    expect(bookingModel.findOne).toHaveBeenCalledWith({ _id: bookingId, userId: 'user-1' });
+    expect(flightBookingsService.getAmountForPayment).toHaveBeenCalledWith(bookingId, 'user-1');
     expect(stripe.paymentIntents.create).toHaveBeenCalledWith(
       expect.objectContaining({
         amount: 1050,
@@ -143,35 +144,36 @@ describe('PaymentsService', () => {
   });
 
   it('rejects payment for someone else’s booking as not found', async () => {
-    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
+    flightBookingsService.getAmountForPayment.mockRejectedValue(new NotFoundException());
     await expect(
       service.createPaymentForBooking('flight', new Types.ObjectId().toString(), 'user-2'),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('rejects expired holds and unaccepted policies', async () => {
-    const booking = {
-      status: 'pending_payment',
-      holdExpiresAt: new Date(Date.now() - 1),
-      policyAcceptance: { acceptedAt: new Date(), policySnapshot: {} },
-      totalPrice: 30,
-    };
-    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(booking) });
+    flightBookingsService.getAmountForPayment.mockRejectedValueOnce(new BadRequestException());
     await expect(
       service.createPaymentForBooking('flight', 'booking-1', 'user-1'),
     ).rejects.toBeInstanceOf(BadRequestException);
 
-    booking.holdExpiresAt = new Date(Date.now() + 60_000);
-    booking.policyAcceptance = null;
+    flightBookingsService.getAmountForPayment.mockRejectedValueOnce(new BadRequestException());
     await expect(
       service.createPaymentForBooking('flight', 'booking-1', 'user-1'),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('returns 501 for hotel payments until hotel bookings are implemented', async () => {
-    await expect(
-      service.createPaymentForBooking('hotel', 'booking-1', 'user-1'),
-    ).rejects.toBeInstanceOf(NotImplementedException);
+  it('creates a hotel payment using the hotel booking callback amount', async () => {
+    paymentModel.create.mockResolvedValue({ _id: new Types.ObjectId() });
+
+    await expect(service.createPaymentForBooking('hotel', 'hotel-booking-1', 'user-1'))
+      .resolves.toMatchObject({ paymentId: expect.any(String), clientSecret: 'secret_test' });
+    expect(hotelBookingsService.getAmountForPayment).toHaveBeenCalledWith(
+      'hotel-booking-1',
+      'user-1',
+    );
+    expect(stripe.paymentIntents.create).toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: expect.objectContaining({ bookingType: 'hotel' }) }),
+    );
   });
 
   it('cancels a pending Stripe intent and records its payment state', async () => {
@@ -192,6 +194,7 @@ describe('PaymentsService', () => {
   it('creates a Stripe refund and records the returned refund id and status', async () => {
     const payment = {
       _id: new Types.ObjectId(),
+      userId: new Types.ObjectId(),
       status: 'succeeded',
       stripePaymentIntentId: 'pi_paid',
       bookingType: 'flight',
@@ -212,6 +215,75 @@ describe('PaymentsService', () => {
     });
     expect(refund).toMatchObject({ stripeRefundId: 're_test', status: 'refunded' });
     expect(refund.save).toHaveBeenCalled();
+    expect(notificationsService.notify).toHaveBeenNthCalledWith(
+      1,
+      expect.any(String),
+      'REFUND_CREATED',
+      expect.stringContaining('has been created'),
+      expect.stringContaining('/flight-bookings/'),
+    );
+    expect(notificationsService.notify).toHaveBeenCalledWith(
+      expect.any(String),
+      'REFUND_REFUNDED',
+      expect.stringContaining('has been completed'),
+      expect.stringContaining('/flight-bookings/'),
+    );
+  });
+
+  it('notifies when Stripe refund creation fails', async () => {
+    const payment = {
+      userId: new Types.ObjectId(),
+      status: 'succeeded',
+      stripePaymentIntentId: 'pi_paid',
+      bookingType: 'flight',
+      bookingId: new Types.ObjectId(),
+      amount: 80,
+    };
+    const refund = { save: jest.fn().mockResolvedValue(undefined) };
+    paymentModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue(payment) });
+    refundModel.create.mockResolvedValue(refund);
+    stripe.refunds.create.mockRejectedValue(new Error('stripe unavailable'));
+
+    await expect(service.createRefund('payment-1', 40, 50, 'user cancellation'))
+      .resolves.toBe(refund);
+    expect(refund).toMatchObject({ status: 'failed' });
+    expect(notificationsService.notify).toHaveBeenCalledWith(
+      payment.userId.toString(),
+      'REFUND_FAILED',
+      expect.stringContaining('could not be processed'),
+      expect.stringContaining('/flight-bookings/'),
+    );
+  });
+
+  it('updates and notifies a refund status from verified Stripe refund events', async () => {
+    const payment = { userId: new Types.ObjectId(), currency: 'USD' };
+    const refund = {
+      _id: new Types.ObjectId(),
+      paymentId: new Types.ObjectId(),
+      bookingType: 'flight',
+      bookingId: new Types.ObjectId(),
+      amount: 30,
+      stripeRefundId: 're_webhook',
+      status: 'pending',
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    refundModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(refund) });
+    paymentModel.findById.mockReturnValue({ exec: jest.fn().mockResolvedValue(payment) });
+    stripe.webhooks.constructEvent.mockReturnValue({
+      type: 'refund.updated',
+      data: { object: { id: 're_webhook', status: 'succeeded' } },
+    });
+
+    await service.handleWebhook(Buffer.from('{}'), 'sig_verified');
+
+    expect(refund.status).toBe('refunded');
+    expect(refund.save).toHaveBeenCalled();
+    expect(notificationsService.notify).toHaveBeenCalledWith(
+      payment.userId.toString(),
+      'REFUND_REFUNDED',
+      expect.stringContaining('has been completed'),
+      expect.stringContaining('/flight-bookings/'),
+    );
   });
 
   it('verifies webhook signatures and records succeeded payment events', async () => {
@@ -247,6 +319,48 @@ describe('PaymentsService', () => {
     );
   });
 
+  it('routes a verified hotel payment success to HotelBookingsService', async () => {
+    const payment = {
+      bookingType: 'hotel',
+      bookingId: new Types.ObjectId(),
+      status: 'pending',
+      save: jest.fn().mockResolvedValue(undefined),
+    };
+    stripe.webhooks.constructEvent.mockReturnValue({
+      type: 'payment_intent.succeeded',
+      data: { object: { id: 'pi_hotel_verified' } },
+    });
+    paymentModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(payment) });
+
+    await service.handleWebhook(Buffer.from('{}'), 'sig_verified');
+
+    expect(hotelBookingsService.onPaymentSucceeded).toHaveBeenCalledWith(
+      payment.bookingId.toString(),
+    );
+    expect(flightBookingsService.onPaymentSucceeded).not.toHaveBeenCalled();
+  });
+
+  it('routes hotel retries through HotelBookingsService amount validation', async () => {
+    const bookingId = new Types.ObjectId();
+    paymentModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({
+        _id: new Types.ObjectId(),
+        bookingType: 'hotel',
+        bookingId,
+        amount: 42,
+        stripePaymentIntentId: 'pi_hotel_retry',
+        status: 'failed',
+      }),
+    });
+
+    await expect(service.retryPayment('payment-hotel', 'user-1', 'pm_card_visa'))
+      .resolves.toMatchObject({ paymentId: expect.any(String), clientSecret: 'secret_retry' });
+    expect(hotelBookingsService.getAmountForPayment).toHaveBeenCalledWith(
+      bookingId.toString(),
+      'user-1',
+    );
+  });
+
   it('rejects invalid webhook signatures without changing payment state', async () => {
     stripe.webhooks.constructEvent.mockImplementation(() => {
       throw new Error('bad signature');
@@ -265,15 +379,9 @@ describe('PaymentsService', () => {
         userId: 'user-1',
         bookingType: 'flight',
         bookingId,
+        amount: 10.5,
         stripePaymentIntentId: 'pi_retry',
         status: 'failed',
-      }),
-    });
-    bookingModel.findOne.mockReturnValue({
-      exec: jest.fn().mockResolvedValue({
-        status: 'pending_payment',
-        holdExpiresAt: new Date(Date.now() + 60_000),
-        policyAcceptance: { acceptedAt: new Date(), policySnapshot: {} },
       }),
     });
 
@@ -281,8 +389,30 @@ describe('PaymentsService', () => {
       service.retryPayment('payment-1', 'user-1', 'pm_card_visa'),
     ).resolves.toEqual({ paymentId: expect.any(String), clientSecret: 'secret_retry' });
     expect(paymentModel.findOne).toHaveBeenCalledWith({ _id: 'payment-1', userId: 'user-1' });
+    expect(flightBookingsService.getAmountForPayment).toHaveBeenCalledWith(
+      bookingId.toString(),
+      'user-1',
+    );
     expect(stripe.paymentIntents.confirm).toHaveBeenCalledWith('pi_retry', {
       payment_method: 'pm_card_visa',
+    });
+  });
+
+  it('maps Stripe credential errors during retry lookup to 503', async () => {
+    paymentModel.findOne.mockReturnValue({
+      exec: jest.fn().mockResolvedValue({
+        _id: new Types.ObjectId(),
+        bookingType: 'flight',
+        bookingId: new Types.ObjectId(),
+        amount: 10.5,
+        stripePaymentIntentId: 'pi_retry_auth',
+        status: 'failed',
+      }),
+    });
+    stripe.paymentIntents.retrieve.mockRejectedValue({ type: 'StripeAuthenticationError' });
+
+    await expect(service.retryPayment('payment-1', 'user-1')).rejects.toMatchObject({
+      status: 503,
     });
   });
 

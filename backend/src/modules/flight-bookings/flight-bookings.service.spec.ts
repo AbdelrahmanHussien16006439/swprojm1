@@ -7,6 +7,8 @@ import {
 import { Model, Types } from 'mongoose';
 import { AirlinesService } from '../airlines/airlines.service';
 import { FlightsService } from '../flights/flights.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ReferenceDataService } from '../reference-data/reference-data.service';
 import { CreateBookingSummaryDto } from './dto/create-booking-summary.dto';
 import { FlightBooking } from './schemas/flight-booking.schema';
 import { FlightBookingsService } from './flight-bookings.service';
@@ -34,6 +36,8 @@ describe('FlightBookingsService policies', () => {
     getPlatformCurrency: jest.Mock;
     createRefund: jest.Mock;
   };
+  let notificationsService: { notify: jest.Mock };
+  let referenceDataService: { findAirport: jest.Mock };
 
   beforeEach(() => {
     bookingModel = {
@@ -66,12 +70,21 @@ describe('FlightBookingsService policies', () => {
       getPlatformCurrency: jest.fn().mockReturnValue('USD'),
       createRefund: jest.fn(),
     };
+    notificationsService = { notify: jest.fn().mockResolvedValue(undefined) };
+    referenceDataService = {
+      findAirport: jest.fn().mockResolvedValue({
+        iataCode: 'CAI',
+        timezone: 'Africa/Cairo',
+      }),
+    };
     service = new FlightBookingsService(
       bookingModel as unknown as Model<FlightBooking>,
       airlinesService as unknown as AirlinesService,
       flightsService as unknown as FlightsService,
       flightModel as never,
       paymentsService as never,
+      notificationsService as never,
+      referenceDataService as never,
     );
   });
 
@@ -97,6 +110,18 @@ describe('FlightBookingsService policies', () => {
     expect(airlinesService.getModeratorPolicies).toHaveBeenCalledWith(
       airlineId.toString(),
     );
+  });
+
+  it('returns the owned pending booking amount only after policies were accepted', async () => {
+    const booking = {
+      status: 'pending_payment',
+      holdExpiresAt: new Date(Date.now() + 60_000),
+      totalPrice: 123.45,
+      policyAcceptance: { acceptedAt: new Date(), policySnapshot: { cancellationTiers: [] } },
+    };
+    bookingModel.findOne.mockReturnValue({ exec: jest.fn().mockResolvedValue(booking) });
+
+    await expect(service.getAmountForPayment('booking-1', 'user-1')).resolves.toBe(123.45);
   });
 
   it('stores acceptedAt and a policy snapshot for an owned pending booking', async () => {
@@ -514,6 +539,7 @@ describe('FlightBookingsService policies', () => {
     const cabinId = new Types.ObjectId();
     const expired = {
       _id: bookingId,
+      userId: new Types.ObjectId(),
       segments: [{ flightId, cabinId }],
       seatsHeld: 1,
       paymentId: null,
@@ -553,6 +579,7 @@ describe('FlightBookingsService policies', () => {
     const paymentId = new Types.ObjectId();
     const booking = {
       _id: bookingId,
+      userId: new Types.ObjectId(),
       status: 'pending_payment',
       holdExpiresAt: new Date(Date.now() + 60_000),
       segments: [{ flightId, cabinId }],
@@ -588,6 +615,12 @@ describe('FlightBookingsService policies', () => {
     expect(flightModel.findOneAndUpdate.mock.calls[0][1]).toEqual({
       $inc: { 'cabins.$.heldSeats': -2, 'cabins.$.bookedSeats': 2 },
     });
+    expect(notificationsService.notify).toHaveBeenCalledWith(
+      booking.userId.toString(),
+      'BOOKING_CONFIRMED',
+      expect.stringContaining('is confirmed'),
+      `/flight-bookings/${bookingId.toString()}`,
+    );
   });
 
   it('lists only the owner’s upcoming confirmed bookings with page size ten', async () => {
@@ -627,6 +660,7 @@ describe('FlightBookingsService policies', () => {
     const flightId = new Types.ObjectId();
     const booking = {
       _id: bookingId,
+      userId: new Types.ObjectId(),
       status: 'confirmed',
       totalPrice: 100,
       segments: [{ flightId }],
@@ -669,6 +703,7 @@ describe('FlightBookingsService policies', () => {
     const refundId = new Types.ObjectId();
     const booking = {
       _id: bookingId,
+      userId: new Types.ObjectId(),
       status: 'confirmed',
       totalPrice: 100,
       paymentId,
@@ -716,6 +751,7 @@ describe('FlightBookingsService policies', () => {
     const flightId = new Types.ObjectId();
     const booking = {
       _id: bookingId,
+      userId: new Types.ObjectId(),
       status: 'confirmed',
       bookingReference: 'FLPDF123456',
       totalPrice: 100,
@@ -738,11 +774,15 @@ describe('FlightBookingsService policies', () => {
       departureTime: new Date('2035-05-01T15:00:00.000Z'),
       arrivalTime: new Date('2035-05-01T17:00:00.000Z'),
     });
+    referenceDataService.findAirport
+      .mockResolvedValueOnce({ iataCode: 'CAI', timezone: 'Africa/Cairo' })
+      .mockResolvedValueOnce({ iataCode: 'LHR', timezone: 'Europe/London' });
 
     const ticket = await service.generateETicketPdf(bookingId.toString(), 'user-1');
 
     expect(ticket.filename).toBe('e-ticket-FLPDF123456.pdf');
     expect(ticket.buffer.subarray(0, 5).toString()).toBe('%PDF-');
+    expect(referenceDataService.findAirport).toHaveBeenCalledTimes(2);
   });
 
   it('completes confirmed bookings only after the last segment has arrived', async () => {
@@ -829,6 +869,7 @@ describe('FlightBookingsService policies', () => {
     const bookingId = new Types.ObjectId();
     const booking = {
       _id: bookingId,
+      userId: new Types.ObjectId(),
       status: 'confirmed',
       paymentId,
       totalPrice: 250,
