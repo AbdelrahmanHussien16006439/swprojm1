@@ -4,6 +4,7 @@ Every team member adds entries at the BOTTOM of this file for prompts that mater
 contributed to the project. Use this format:
 
 ================================================
+### Member N — YYYY-MM-DD HH:MM — Requirement ID
 Date: YYYY-MM-DD
 Student: Student Name
 Tool: ChatGPT / Claude / Copilot / ...
@@ -13,6 +14,8 @@ Prompt:
 How the output was used:
 <what you kept, changed, or rejected>
 ================================================
+
+Start every new entry with a unique line after the ==== separator, e.g. ### Member 3 — 2026-11-18 22:50 — FLT-08, so Git doesn't glue entries together when branches merge.
 
 ================================================
 Date: 2026-11-16
@@ -1025,4 +1028,41 @@ Prompt summary:
 "Integrate Member 6's HotelBookingsService and ReviewsService into Member 5's hotels module. Replace RoomNight TODOs for hotel search, free rooms, availability calendar, booking overlaps for blocking/deactivation/deletion/availability removal, and hotel detail reviews/rating. Use forwardRef for the circular module and service dependencies."
 How the output was used:
 Connected active RoomNight lookups to search, free-room results and the calendar; the calendar now reports Booked with its booking reference when confirmed. Added overlap rejection for blocking, deactivation, deletion and removed availability dates. Hotel details now include paginated visible reviews and their rating aggregate from ReviewsService. Build passed; all 52 test suites (289 tests) passed. Nest application successfully started on port 4001 because port 4000 was occupied by an existing process.
+================================================
+### Member 1 — 2026-11-18 23:07 — GEN-07, ACC-06, ACC-13
+Date: 2026-11-18
+Student: Abdelrahman Hussien (Member 1)
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: GEN-07, ACC-06, ACC-13
+Prompt:
+"Change every @Prop({ type: Types.ObjectId }) in my schemas to
+MongooseSchema.Types.ObjectId, check that id queries in my modules still work,
+add schema guard tests, fix the reference rule in TEAM_PLAN.md 3.7, and add a
+unique header line to the AI_PROMPTS.txt format so merges stop gluing entries."
+How the output was used:
+Session.userId, User.providerId and AuditLog.actorId now use
+MongooseSchema.Types.ObjectId (they had silently become Mixed); indexes kept.
+Verified all id filters in auth/users/admin-accounts/audit-logs already pass
+ObjectIds. Added schema guard tests, corrected TEAM_PLAN.md 3.7, and added the
+### header rule to this file's format instructions.
+================================================
+### Member 1 — 2026-11-20 — ACC-09, ACC-12, ACC-13, ACC-15, ACC-16, GEN-01
+Student: Member 1
+Tool: Claude (Claude Code)
+Related Requirements: ACC-09, ACC-12, ACC-13, ACC-15, ACC-16, GEN-01
+Prompt:
+"Follow docs/INTEGRATION_PROMPTS.md (COMMON PART + Member 1 section). Replace my
+remaining stubs with the real services now in develop: AirlinesService/HotelsService
+findById for moderator creation, FlightBookingsService/HotelBookingsService
+hasUpcomingConfirmed for account deactivation, NotificationsService for suspension
+and reactivation, ReferenceDataService.isSupportedCurrency for preferredCurrency.
+Avoid module cycles, add unit tests, build, test, start the server and test the
+endpoints with real requests."
+How the output was used:
+Replaced the direct collection reads with the owning services. Booking services are
+looked up lazily through ModuleRef because both booking modules import UsersModule.
+Suspension/reactivation now send in-app notifications (a failed notification does
+not undo the change). Unsupported currencies return 400. Also merged my earlier
+ObjectId schema fix (User.providerId, Session.userId, AuditLog.actorId) that had
+never been pushed. Unit tests added; build, tests, startup and API checks passed.
 ================================================

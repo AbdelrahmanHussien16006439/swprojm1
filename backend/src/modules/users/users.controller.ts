@@ -25,6 +25,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { clearAuthCookies } from '../../common/utils/auth-cookies';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { AccountDeactivationService } from './account-deactivation.service';
 import { UsersService } from './users.service';
 
 @ApiTags('users')
@@ -32,7 +33,10 @@ import { UsersService } from './users.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly accountDeactivationService: AccountDeactivationService,
+  ) {}
 
   @Get('me')
   @ApiOperation({ summary: 'Get my full profile (ACC-11)' })
@@ -62,7 +66,7 @@ export class UsersController {
     @Body() _dto: ConfirmActionDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    await this.usersService.deactivateOwnAccount(user.sub);
+    await this.accountDeactivationService.deactivateOwnAccount(user.sub);
     clearAuthCookies(res);
     return { message: 'Your account has been deactivated' };
   }

@@ -2,16 +2,17 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
-  NotFoundException,
+  Logger,
 } from '@nestjs/common';
-import { InjectConnection } from '@nestjs/mongoose';
-import { Connection, Types } from 'mongoose';
 import { ProviderType } from '../../common/enums/provider-type.enum';
 import { Role } from '../../common/enums/role.enum';
 import { UserStatus } from '../../common/enums/user-status.enum';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { AuditAction, AuditTargetType } from '../audit-logs/audit-actions';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AirlinesService } from '../airlines/airlines.service';
+import { HotelsService } from '../hotels/hotels.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ListAccountsQueryDto } from '../users/dto/list-accounts-query.dto';
 import { UserDocument } from '../users/schemas/user.schema';
 import { SessionsService } from '../users/sessions.service';
@@ -22,11 +23,15 @@ import { SuspendAccountDto } from './dto/suspend-account.dto';
 
 @Injectable()
 export class AdminAccountsService {
+  private readonly logger = new Logger(AdminAccountsService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly sessionsService: SessionsService,
     private readonly auditLogsService: AuditLogsService,
-    @InjectConnection() private readonly connection: Connection,
+    private readonly airlinesService: AirlinesService,
+    private readonly hotelsService: HotelsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /** ACC-13: moderator linked to exactly one existing airline or hotel. */
@@ -78,8 +83,11 @@ export class AdminAccountsService {
       userId,
       { reason: dto.reason, role: target.role },
     );
-    // ⏳ ACC-15 / GEN-01: in-app notification once Member 6's NotificationsService is merged:
-    // await this.notificationsService.notify(userId, 'ACCOUNT_SUSPENDED', 'Your account has been suspended');
+    await this.notifySafely(
+      userId,
+      'ACCOUNT_SUSPENDED',
+      'Your account has been suspended by an administrator.',
+    );
 
     return this.usersService.toAccountSummary(
       await this.usersService.getByIdOrFail(userId),
@@ -102,6 +110,11 @@ export class AdminAccountsService {
       AuditTargetType.USER,
       userId,
       { role: target.role },
+    );
+    await this.notifySafely(
+      userId,
+      'ACCOUNT_REACTIVATED',
+      'Your account has been reactivated. You can log in again.',
     );
 
     return this.usersService.toAccountSummary(
@@ -147,20 +160,21 @@ export class AdminAccountsService {
     return target;
   }
 
-  /**
-   * ⏳ ACC-13 should use AirlinesService.findById (M3) / HotelsService.findById (M5).
-   * Until those modules are merged this checks their collections directly.
-   * TODO: replace with the service calls once they are merged into develop.
-   */
+  /** ACC-13: findById throws 404 if the airline (M3) or hotel (M5) doesn't exist. */
   private async assertProviderExists(type: ProviderType, providerId: string) {
-    const collection = type === ProviderType.AIRLINE ? 'airlines' : 'hotels';
-    const provider = await this.connection
-      .collection(collection)
-      .findOne({ _id: new Types.ObjectId(providerId) });
-    if (!provider) {
-      throw new NotFoundException(
-        `${type === ProviderType.AIRLINE ? 'Airline' : 'Hotel'} not found`,
-      );
+    if (type === ProviderType.AIRLINE) {
+      await this.airlinesService.findById(providerId);
+    } else {
+      await this.hotelsService.findById(providerId);
+    }
+  }
+
+  /** GEN-01: a failed notification must not undo the account change. */
+  private async notifySafely(userId: string, type: string, message: string) {
+    try {
+      await this.notificationsService.notify(userId, type, message);
+    } catch (error) {
+      this.logger.warn(`Could not send ${type} notification: ${String(error)}`);
     }
   }
 }
