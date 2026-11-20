@@ -11,6 +11,8 @@ import { ExchangeRatesService } from '../exchange-rates/exchange-rates.service';
 import { ReferenceDataService } from '../reference-data/reference-data.service';
 import { HotelsService } from '../hotels/hotels.service';
 import { SearchHotelsDto } from '../hotels/dto/search-hotels.dto';
+import { FlightsService } from '../flights/flights.service';
+import { SearchFlightsDto } from '../flights/dto/search-flights.dto';
 import { UploadsService } from '../uploads/uploads.service';
 import { UsersService } from '../users/users.service';
 import { CreateItineraryActivityDto } from './dto/create-itinerary-activity.dto';
@@ -26,6 +28,7 @@ import { CreateItineraryTransportCostDto } from './dto/create-itinerary-transpor
 import { BudgetSummaryQueryDto } from './dto/budget-summary-query.dto';
 import { PublicItinerariesQueryDto } from './dto/public-itineraries-query.dto';
 import { ItineraryHotelsQueryDto } from './dto/itinerary-hotels-query.dto';
+import { ItineraryFlightsQueryDto } from './dto/itinerary-flights-query.dto';
 import { UpdateItineraryTransportCostDto } from './dto/update-itinerary-transport-cost.dto';
 import { UpdateItineraryDto } from './dto/update-itinerary.dto';
 import {
@@ -64,6 +67,7 @@ export class ItinerariesService {
     private readonly exchangeRatesService: ExchangeRatesService,
     private readonly usersService: UsersService,
     private readonly hotelsService: HotelsService,
+    private readonly flightsService: FlightsService,
   ) {}
 
   async create(dto: CreateItineraryDto, user: JwtUser) {
@@ -561,6 +565,45 @@ export class ItinerariesService {
       page: query.page ?? 1,
     });
     return this.hotelsService.search(search);
+  }
+
+  async searchFlightsForItinerary(
+    itineraryId: string,
+    query: ItineraryFlightsQueryDto,
+    user: JwtUser,
+  ) {
+    const itinerary = await this.findOwnedDocument(itineraryId, user);
+    if (!itinerary.days.length) {
+      throw new BadRequestException('Itinerary must have at least one day to search flights');
+    }
+
+    const firstDay = itinerary.days[0];
+    const airports = await this.referenceDataService.findAirportsByCity(firstDay.cityId.toString());
+    if (!airports.length) {
+      throw new NotFoundException('No airports found for the itinerary first-day city');
+    }
+    const origin = await this.referenceDataService.findAirport(query.originAirportId);
+    const departDate = query.departDate ?? itinerary.startDate.toISOString().slice(0, 10);
+    const lastDayDate = new Date(
+      itinerary.startDate.getTime() + (itinerary.days.length - 1) * MILLISECONDS_PER_CALENDAR_DAY,
+    ).toISOString().slice(0, 10);
+    const search = Object.assign(new SearchFlightsDto(), {
+      fromAirportId: origin._id.toString(),
+      toAirportIds: airports.map((airport) => airport._id.toString()),
+      departDate,
+      returnDate: query.tripType === 'round_trip'
+        ? query.returnDate ?? lastDayDate
+        : undefined,
+      adults: query.adults,
+      children: query.children,
+      infants: query.infants,
+      cabinClass: query.cabinClass,
+      minPrice: query.minPrice,
+      maxPrice: query.maxPrice,
+      sortBy: query.sortBy,
+      page: query.page,
+    });
+    return this.flightsService.search(search);
   }
 
   async update(id: string, dto: UpdateItineraryDto, user: JwtUser) {

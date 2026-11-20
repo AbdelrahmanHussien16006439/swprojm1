@@ -72,6 +72,7 @@ describe('ItinerariesService activities (ITN-10, ITN-12)', () => {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     );
   });
 

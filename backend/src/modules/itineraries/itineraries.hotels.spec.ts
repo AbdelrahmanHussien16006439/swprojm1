@@ -61,6 +61,7 @@ describe('ItinerariesService city-group hotel search (ITN-25)', () => {
       {} as ExchangeRatesService,
       {} as UsersService,
       hotelsService as HotelsService,
+      {} as any,
     );
   });
 
