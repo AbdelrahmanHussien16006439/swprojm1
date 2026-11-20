@@ -6,7 +6,12 @@ export type AuditLogDocument = HydratedDocument<AuditLog>;
 /** GEN-07: record of an administrative action. Written only through AuditLogsService.log(). */
 @Schema({ timestamps: true })
 export class AuditLog {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true,
+  })
   actorId: Types.ObjectId;
 
   // e.g. ACCOUNT_SUSPENDED — see audit-actions.ts
