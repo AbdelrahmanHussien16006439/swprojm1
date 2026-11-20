@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -18,6 +20,7 @@ import { Review } from './schemas/review.schema';
 export class ReviewsService {
   constructor(
     @InjectModel(Review.name) private readonly reviewModel: Model<Review>,
+    @Inject(forwardRef(() => HotelsService))
     private readonly hotelsService: HotelsService,
     private readonly usersService: UsersService,
   ) {}

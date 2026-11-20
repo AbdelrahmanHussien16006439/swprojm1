@@ -48,6 +48,7 @@ export class HotelBookingsService {
     @InjectModel(Refund.name)
     private readonly refundModel: Model<Refund>,
     @InjectConnection() private readonly connection: Connection,
+    @Inject(forwardRef(() => HotelsService))
     private readonly hotelsService: HotelsService,
     @Inject(forwardRef(() => PaymentsService))
     private readonly paymentsService: PaymentsService,

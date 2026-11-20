@@ -18,11 +18,11 @@ import { RoomNight, RoomNightSchema } from './schemas/room-night.schema';
 // Remember to export your service(s) AND MongooseModule (TEAM_PLAN 3.2).
 @Module({
   imports: [
-    HotelsModule,
+    forwardRef(() => HotelsModule),
     forwardRef(() => PaymentsModule),
     NotificationsModule,
     UsersModule,
-    ReviewsModule,
+    forwardRef(() => ReviewsModule),
     MongooseModule.forFeature([
       { name: HotelBooking.name, schema: HotelBookingSchema },
       { name: RoomNight.name, schema: RoomNightSchema },

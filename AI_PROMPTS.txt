@@ -938,3 +938,17 @@ The flight cancellation controller now validates the shared confirmation DTO, so
 confirm=false or a missing confirmation returns 400 before cancellation. Tests cover
 both rejected false and accepted true values.
 ================================================
+### Member 6 — 20/11/2026 — integration fix
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirements: HTL-23, HTL-24, HTL-16, HTL-18
+Prompt:
+"Break the circular dependencies introduced when HotelsModule imports
+HotelBookingsModule and ReviewsModule. Use forwardRef on Member 6 module imports
+and inject HotelsService with forwardRef in HotelBookingsService and ReviewsService.
+Run the backend build, test suite and development server startup; then commit and
+push the fix."
+How the output was used:
+Added forwardRef to the circular module imports and HotelsService injections.
+Build, tests and startup verification are recorded with this integration fix.
+================================================
