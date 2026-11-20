@@ -47,7 +47,12 @@ describe('ItinerariesService activities (ITN-10, ITN-12)', () => {
       populate: jest.fn(),
     };
     query.populate.mockReturnValue(query);
-    model = { findOne: jest.fn().mockReturnValue(query) };
+    model = {
+      findOne: jest.fn().mockReturnValue(query),
+      countDocuments: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue(0),
+      }),
+    };
     referenceData = {
       findCountry: jest.fn(),
       findCity: jest.fn(),
@@ -168,5 +173,20 @@ describe('ItinerariesService activities (ITN-10, ITN-12)', () => {
     expect(uploads.deleteImage).toHaveBeenCalledWith(
       '550e8400-e29b-41d4-a716-446655440000',
     );
+  });
+
+  it('keeps a shared image file while another cloned activity still references it', async () => {
+    const imageId = '550e8400-e29b-41d4-a716-446655440000';
+    day.activities.push({
+      _id: new Types.ObjectId(),
+      name: 'Museum',
+      images: [{ id: imageId, url: `/uploads/${imageId}.jpg` }],
+    });
+    model.countDocuments.mockReturnValue({ exec: jest.fn().mockResolvedValue(1) });
+
+    await service.deleteActivityImage(day.activities[0]._id.toString(), imageId, user);
+
+    expect(day.activities[0].images).toHaveLength(0);
+    expect(uploads.deleteImage).not.toHaveBeenCalled();
   });
 });

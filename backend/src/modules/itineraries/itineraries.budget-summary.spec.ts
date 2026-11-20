@@ -40,7 +40,7 @@ describe('ItinerariesService budget summary (ITN-14, ITN-18)', () => {
         {
           _id: day1Id,
           cityId: cityA,
-          budgetEntries: [{ category: 'food', amount: 10, currency: 'USD' }],
+          budgetEntries: [{ category: 'food', amount: 10.01, currency: 'USD' }],
           activities: [{ cost: 5, currency: 'USD' }],
         },
         {
@@ -92,8 +92,8 @@ describe('ItinerariesService budget summary (ITN-14, ITN-18)', () => {
 
     expect(result.currency).toBe('EUR');
     expect(result.rateDate).toEqual(rateDate);
-    expect(result.total).toBeCloseTo(16.4);
-    expect(result.byCategory.find((item) => item.category === 'food')?.amount).toBe(9);
+    expect(result.total).toBe(16.41);
+    expect(result.byCategory.find((item) => item.category === 'food')?.amount).toBe(9.01);
     expect(result.byCategory.find((item) => item.category === 'accommodation')?.amount).toBeCloseTo(0.9);
     expect(result.byCategory.find((item) => item.category === 'activities')?.amount).toBe(4.5);
     expect(result.byCategory.find((item) => item.category === 'intercity transport')?.amount).toBe(2);
@@ -101,14 +101,14 @@ describe('ItinerariesService budget summary (ITN-14, ITN-18)', () => {
       expect.objectContaining({
         dayNumber: 1,
         date: new Date('2026-12-01T00:00:00.000Z'),
-        total: 15.5,
+        total: 15.51,
       }),
     );
     expect(result.byGroup[0]).toEqual(
       expect.objectContaining({ fromDay: 1, toDay: 2, dayCount: 2 }),
     );
-    expect(result.byGroup[0].budgetSubtotal).toBeCloseTo(16.4);
-    expect(exchangeRates.convert).toHaveBeenCalledWith(10, 'USD', 'EUR');
+    expect(result.byGroup[0].budgetSubtotal).toBe(16.41);
+    expect(exchangeRates.convert).toHaveBeenCalledWith(10.01, 'USD', 'EUR');
     expect(exchangeRates.convert).toHaveBeenCalledWith(30, 'EGP', 'EUR');
     expect(exchangeRates.convert).toHaveBeenCalledWith(2, 'EUR', 'EUR');
     expect(exchangeRates.convert).toHaveBeenCalledWith(0, 'EUR', 'EUR');

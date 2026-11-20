@@ -4,6 +4,7 @@ import { Model, Types } from 'mongoose';
 import { ConfirmActionDto } from '../../common/dto/confirm-action.dto';
 import { Role } from '../../common/enums/role.enum';
 import { UserStatus } from '../../common/enums/user-status.enum';
+import { escapeRegex } from '../../common/utils/escape-regex';
 import { paginate } from '../../common/utils/pagination';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ExchangeRatesService } from '../exchange-rates/exchange-rates.service';
@@ -21,6 +22,7 @@ import { UpdateItineraryBudgetDto } from './dto/update-itinerary-budget.dto';
 import { UpdateItineraryDayDto } from './dto/update-itinerary-day.dto';
 import { CreateItineraryTransportCostDto } from './dto/create-itinerary-transport-cost.dto';
 import { BudgetSummaryQueryDto } from './dto/budget-summary-query.dto';
+import { PublicItinerariesQueryDto } from './dto/public-itineraries-query.dto';
 import { UpdateItineraryTransportCostDto } from './dto/update-itinerary-transport-cost.dto';
 import { UpdateItineraryDto } from './dto/update-itinerary.dto';
 import {
@@ -232,7 +234,7 @@ export class ItinerariesService {
     const imageIds = activity.images.map((image) => image.id);
     day.activities.splice(activityIndex, 1);
     await itinerary.save();
-    await Promise.all(imageIds.map((imageId) => this.uploadsService.deleteImage(imageId)));
+    await Promise.all(imageIds.map((imageId) => this.deleteImageIfUnreferenced(imageId)));
     return this.findOwned(itinerary._id.toString(), user);
   }
 
@@ -266,7 +268,7 @@ export class ItinerariesService {
     if (imageIndex < 0) throw new NotFoundException('Activity image not found');
     activity.images.splice(imageIndex, 1);
     await itinerary.save();
-    await this.uploadsService.deleteImage(imageId);
+    await this.deleteImageIfUnreferenced(imageId);
     return this.findOwned(itinerary._id.toString(), user);
   }
 
@@ -465,7 +467,7 @@ export class ItinerariesService {
           });
         }),
       );
-      return convertedValues.reduce((sum, amount) => sum + amount, 0);
+      return this.roundMoney(convertedValues.reduce((sum, amount) => sum + amount, 0));
     };
     const convertCategories = async (categories: Record<string, CurrencyTotals>) =>
       Promise.all(
@@ -526,6 +528,7 @@ export class ItinerariesService {
     if (dto.startDate !== undefined) {
       updates.startDate = this.toCalendarDate(dto.startDate);
     }
+    if (dto.isPublic !== undefined) updates.isPublic = dto.isPublic;
     const itinerary = await this.itineraryModel
       .findOneAndUpdate(
         { _id: id, ownerId: new Types.ObjectId(user.sub) },
@@ -537,6 +540,144 @@ export class ItinerariesService {
       .exec();
     if (!itinerary) throw new NotFoundException('Itinerary not found');
     return this.withComputedDays(itinerary);
+  }
+
+  async searchPublic(query: PublicItinerariesQueryDto) {
+    if (
+      query.minDays !== undefined &&
+      query.maxDays !== undefined &&
+      query.minDays > query.maxDays
+    ) {
+      throw new BadRequestException('minDays cannot be greater than maxDays');
+    }
+
+    const filter: Record<string, any> = { isPublic: true, isHidden: false };
+    if (query.countryId) {
+      const country = await this.referenceDataService.findCountry(query.countryId);
+      filter.countryIds = country._id;
+    }
+    if (query.cityId) {
+      const city = await this.referenceDataService.findCity(query.cityId);
+      filter['days.cityId'] = city._id;
+    }
+    if (query.minDays !== undefined || query.maxDays !== undefined) {
+      const size = { $size: { $ifNull: ['$days', []] } };
+      const duration: any[] = [];
+      if (query.minDays !== undefined) duration.push({ $gte: [size, query.minDays] });
+      if (query.maxDays !== undefined) duration.push({ $lte: [size, query.maxDays] });
+      filter.$expr = { $and: duration };
+    }
+    const searchTerm = query.q?.trim();
+    if (searchTerm) {
+      const expression = new RegExp(escapeRegex(searchTerm), 'i');
+      const [countries, cities] = await Promise.all([
+        this.getAllReferencePages((page) => this.referenceDataService.listCountries(page)),
+        this.getAllReferencePages((page) => this.referenceDataService.listCities(page)),
+      ]);
+      const matchingCountryIds = countries
+        .filter((country: any) =>
+          expression.test(country.name) || expression.test(country.code),
+        )
+        .map((country: any) => country._id);
+      const matchingCityIds = cities
+        .filter((city: any) =>
+          expression.test(city.name) || expression.test(city.cityId),
+        )
+        .map((city: any) => city._id);
+      filter.$or = [
+        { title: expression },
+        { countryIds: { $in: matchingCountryIds } },
+        { 'days.cityId': { $in: matchingCityIds } },
+      ];
+    }
+
+    const candidateOwnerIds = await this.itineraryModel.distinct('ownerId', filter).exec();
+    const owners = await Promise.all(
+      candidateOwnerIds.map((ownerId) => this.usersService.findById(ownerId.toString())),
+    );
+    const activeOwnerIds = candidateOwnerIds.filter(
+      (_ownerId, index) => owners[index] && owners[index].status !== UserStatus.DEACTIVATED,
+    );
+    filter.ownerId = { $in: activeOwnerIds };
+
+    const page = await paginate(this.itineraryModel, filter, query.page, {
+      sort: { updatedAt: -1 },
+      populate: 'countryIds',
+    });
+    const data = await Promise.all(
+      page.data.map(async (itinerary) => ({
+        id: itinerary._id.toString(),
+        title: itinerary.title,
+        countries: itinerary.countryIds,
+        startDate: itinerary.startDate,
+        days: itinerary.days.length,
+        isPublic: itinerary.isPublic,
+        author: await this.usersService.findPublicProfile(itinerary.ownerId.toString()),
+      })),
+    );
+    return { ...page, data };
+  }
+
+  async findPublic(id: string) {
+    const itinerary = await this.itineraryModel
+      .findOne({ _id: id, isPublic: true, isHidden: false })
+      .populate('countryIds')
+      .populate('days.cityId')
+      .exec();
+    if (!itinerary) throw new NotFoundException('Itinerary not found');
+    const owner = await this.usersService.findById(itinerary.ownerId.toString());
+    if (!owner || owner.status === UserStatus.DEACTIVATED) {
+      throw new NotFoundException('Itinerary not found');
+    }
+    const author = await this.usersService.findPublicProfile(itinerary.ownerId.toString());
+    return { ...this.withComputedDays(itinerary), author };
+  }
+
+  async clonePublic(id: string, user: JwtUser) {
+    const source = await this.itineraryModel
+      .findOne({ _id: id, isPublic: true, isHidden: false })
+      .exec();
+    if (!source) throw new NotFoundException('Itinerary not found');
+    const originalAuthor = await this.usersService.findById(source.ownerId.toString());
+    if (!originalAuthor || originalAuthor.status === UserStatus.DEACTIVATED) {
+      throw new NotFoundException('Itinerary not found');
+    }
+    const clone = await this.itineraryModel.create({
+      ownerId: new Types.ObjectId(user.sub),
+      title: source.title,
+      countryIds: source.countryIds.map((countryId) => new Types.ObjectId(countryId.toString())),
+      startDate: source.startDate,
+      isPublic: false,
+      isHidden: false,
+      clonedFromId: source._id,
+      originalAuthorId: source.ownerId,
+      days: source.days.map((day) => ({
+        cityId: new Types.ObjectId(day.cityId.toString()),
+        notes: day.notes,
+        activities: day.activities.map((activity) => ({
+          name: activity.name,
+          description: activity.description,
+          time: activity.time,
+          cost: activity.cost,
+          currency: activity.currency,
+          images: activity.images.map((image) => ({ id: image.id, url: image.url })),
+        })),
+        budgetEntries: day.budgetEntries.map((entry) => ({
+          category: entry.category,
+          amount: entry.amount,
+          currency: entry.currency,
+          note: entry.note,
+        })),
+      })),
+      transportCosts: [],
+    });
+    const hydratedClone = await this.itineraryModel
+      .findById(clone._id)
+      .populate('countryIds')
+      .populate('days.cityId')
+      .exec();
+    if (!hydratedClone) throw new NotFoundException('Cloned itinerary not found');
+    return this.withComputedDays(hydratedClone);
   }
 
   async delete(id: string, dto: ConfirmActionDto, user: JwtUser): Promise<void> {
@@ -556,6 +697,28 @@ export class ItinerariesService {
       uniqueIds.map((id) => this.referenceDataService.findCountry(id)),
     );
     return countries.map((country) => country._id);
+  }
+
+  private async getAllReferencePages<T>(
+    fetchPage: (page: number) => Promise<{ data: T[]; totalPages: number }>,
+  ): Promise<T[]> {
+    const items: T[] = [];
+    let pageNumber = 1;
+    while (true) {
+      const page = await fetchPage(pageNumber);
+      items.push(...page.data);
+      if (pageNumber >= page.totalPages) return items;
+      pageNumber += 1;
+    }
+  }
+
+  private async deleteImageIfUnreferenced(imageId: string): Promise<void> {
+    const remainingReferences = await this.itineraryModel
+      .countDocuments({ 'days.activities.images.id': imageId })
+      .exec();
+    if (remainingReferences === 0) {
+      await this.uploadsService.deleteImage(imageId);
+    }
   }
 
   private async findOwnedDocument(id: string, user: JwtUser) {
@@ -728,6 +891,10 @@ export class ItinerariesService {
   private addMoney(totals: CurrencyTotals, currency: string, amount: number) {
     const code = currency.toUpperCase();
     totals[code] = (totals[code] ?? 0) + amount;
+  }
+
+  private roundMoney(amount: number): number {
+    return Math.round((amount + Number.EPSILON) * 100) / 100;
   }
 
   private mergeCurrencyTotals(target: CurrencyTotals, source: CurrencyTotals) {

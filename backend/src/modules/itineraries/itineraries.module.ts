@@ -5,6 +5,7 @@ import { ReferenceDataModule } from '../reference-data/reference-data.module';
 import { UploadsModule } from '../uploads/uploads.module';
 import { UsersModule } from '../users/users.module';
 import { ItinerariesController } from './itineraries.controller';
+import { ItineraryPublicController } from './itinerary-public.controller';
 import { ItineraryActivitiesController } from './itinerary-activities.controller';
 import { ItineraryBudgetsController } from './itinerary-budgets.controller';
 import { ItineraryTransportCostsController } from './itinerary-transport-costs.controller';
@@ -23,6 +24,7 @@ import { Itinerary, ItinerarySchema } from './schemas/itinerary.schema';
     UsersModule,
   ],
   controllers: [
+    ItineraryPublicController,
     ItinerariesController,
     ItineraryActivitiesController,
     ItineraryBudgetsController,
