@@ -13,7 +13,7 @@ import { Types } from 'mongoose';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { AirlinesService } from '../airlines/airlines.service';
 import { ReferenceDataService } from '../reference-data/reference-data.service';
-import { FlightBookingsService } from '../flight-bookings/flight-bookings.service';
+import type { FlightBookingsService } from '../flight-bookings/flight-bookings.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { DateTime } from 'luxon';
 import { toPaginated } from '../../common/utils/pagination';
@@ -391,6 +391,12 @@ export class FlightsService {
   }
 
   private getFlightBookingsService(): FlightBookingsService | undefined {
-    return this.moduleRef?.get<FlightBookingsService>('FlightBookingsService', { strict: false });
+    if (!this.moduleRef) return undefined;
+    // Load the token lazily so FlightBookingsService can still import FlightsService.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { FlightBookingsService: flightBookingsServiceToken } = require('../flight-bookings/flight-bookings.service') as {
+      FlightBookingsService: new (...args: never[]) => FlightBookingsService;
+    };
+    return this.moduleRef.get<FlightBookingsService>(flightBookingsServiceToken, { strict: false });
   }
 }

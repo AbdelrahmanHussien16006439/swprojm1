@@ -910,3 +910,18 @@ Search DTO transformation now handles scalar, comma-delimited, and repeated quer
 values consistently. Regression tests cover one-way and round-trip single-destination
 requests; build, focused tests, and server startup passed.
 ================================================
+### Member 3 — 2026-11-20 — FLT-05, FLT-06
+Student: Member 3
+Tool: ChatGPT / Codex
+Related Requirement: FLT-05, FLT-06
+Prompt:
+"Implement Task 8: edit scheduled flight times with airport locking when bookings
+exist, notify confirmed passengers through NotificationsService, and cancel flights
+through FlightBookingsService.cancelAllForFlight. Add focused tests, build, test,
+start the server once, commit, and push."
+How the output was used:
+Flight edits now resolve the actual FlightBookingsService provider for booking locks
+and confirmed-passenger lookups. Time changes notify passengers, airport changes are
+rejected after bookings, and cancellation delegates booking cleanup after setting
+cancelled status.
+================================================
