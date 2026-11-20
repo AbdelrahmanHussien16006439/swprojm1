@@ -29,6 +29,8 @@ import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
 import { CreateItineraryActivityDto } from './dto/create-itinerary-activity.dto';
 import { CreateItineraryDto } from './dto/create-itinerary.dto';
+import { CreateItineraryBudgetDto } from './dto/create-itinerary-budget.dto';
+import { CreateItineraryTransportCostDto } from './dto/create-itinerary-transport-cost.dto';
 import { CreateItineraryDayDto } from './dto/create-itinerary-day.dto';
 import { ListItinerariesQueryDto } from './dto/list-itineraries-query.dto';
 import { ReorderItineraryDayDto } from './dto/reorder-itinerary-day.dto';
@@ -148,6 +150,33 @@ export class ItinerariesController {
     @CurrentUser() user: JwtUser,
   ) {
     return this.itinerariesService.deleteDay(id, dayId, dto, user);
+  }
+
+  @Post(':id/days/:dayId/budgets')
+  @ApiOperation({ summary: 'Add a budget entry to an itinerary day (ITN-14)' })
+  @ApiCreatedResponse({ description: 'Budget entry created and city-group subtotals recalculated' })
+  @ApiBadRequestResponse({ description: 'Invalid amount, category, or unsupported currency' })
+  @ApiNotFoundResponse({ description: 'Itinerary or day not found' })
+  addBudgetEntry(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Param('dayId', ParseObjectIdPipe) dayId: string,
+    @Body() dto: CreateItineraryBudgetDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.itinerariesService.addBudgetEntry(id, dayId, dto, user);
+  }
+
+  @Post(':id/transport-costs')
+  @ApiOperation({ summary: 'Add a transport cost to an itinerary day (ITN-16)' })
+  @ApiCreatedResponse({ description: 'Transport cost created and city-group subtotals recalculated' })
+  @ApiBadRequestResponse({ description: 'Invalid amount, city, or unsupported currency' })
+  @ApiNotFoundResponse({ description: 'Itinerary or day not found' })
+  addTransportCost(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Body() dto: CreateItineraryTransportCostDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.itinerariesService.addTransportCost(id, dto, user);
   }
 
   @Post(':id/days/:dayId/activities')

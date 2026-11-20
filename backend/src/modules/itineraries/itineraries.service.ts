@@ -7,12 +7,16 @@ import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ReferenceDataService } from '../reference-data/reference-data.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { CreateItineraryActivityDto } from './dto/create-itinerary-activity.dto';
+import { CreateItineraryBudgetDto } from './dto/create-itinerary-budget.dto';
 import { CreateItineraryDayDto } from './dto/create-itinerary-day.dto';
 import { CreateItineraryDto } from './dto/create-itinerary.dto';
 import { ListItinerariesQueryDto } from './dto/list-itineraries-query.dto';
 import { ReorderItineraryDayDto } from './dto/reorder-itinerary-day.dto';
 import { UpdateItineraryActivityDto } from './dto/update-itinerary-activity.dto';
+import { UpdateItineraryBudgetDto } from './dto/update-itinerary-budget.dto';
 import { UpdateItineraryDayDto } from './dto/update-itinerary-day.dto';
+import { CreateItineraryTransportCostDto } from './dto/create-itinerary-transport-cost.dto';
+import { UpdateItineraryTransportCostDto } from './dto/update-itinerary-transport-cost.dto';
 import { UpdateItineraryDto } from './dto/update-itinerary.dto';
 import {
   MAX_ACTIVITY_IMAGES,
@@ -239,6 +243,104 @@ export class ItinerariesService {
     return this.findOwned(itinerary._id.toString(), user);
   }
 
+  async addBudgetEntry(
+    itineraryId: string,
+    dayId: string,
+    dto: CreateItineraryBudgetDto,
+    user: JwtUser,
+  ) {
+    const { itinerary, day } = await this.findOwnedDay(itineraryId, dayId, user);
+    await this.assertSupportedCurrency(dto.currency);
+    day.budgetEntries.push({
+      _id: new Types.ObjectId(),
+      category: dto.category,
+      amount: dto.amount,
+      currency: dto.currency.toUpperCase(),
+      note: dto.note?.trim(),
+    } as any);
+    await itinerary.save();
+    return this.findOwned(itineraryId, user);
+  }
+
+  async updateBudgetEntry(
+    budgetId: string,
+    dto: UpdateItineraryBudgetDto,
+    user: JwtUser,
+  ) {
+    const { itinerary, entry } = await this.findOwnedBudgetEntry(budgetId, user);
+    if (dto.currency !== undefined) await this.assertSupportedCurrency(dto.currency);
+    if (dto.category !== undefined) entry.category = dto.category;
+    if (dto.amount !== undefined) entry.amount = dto.amount;
+    if (dto.currency !== undefined) entry.currency = dto.currency.toUpperCase();
+    if (dto.note !== undefined) entry.note = dto.note.trim();
+    await itinerary.save();
+    return this.findOwned(itinerary._id.toString(), user);
+  }
+
+  async deleteBudgetEntry(budgetId: string, user: JwtUser) {
+    const { itinerary, day, entryIndex } = await this.findOwnedBudgetEntry(budgetId, user);
+    day.budgetEntries.splice(entryIndex, 1);
+    await itinerary.save();
+    return this.findOwned(itinerary._id.toString(), user);
+  }
+
+  async addTransportCost(
+    itineraryId: string,
+    dto: CreateItineraryTransportCostDto,
+    user: JwtUser,
+  ) {
+    const [fromCity, toCity] = await Promise.all([
+      this.referenceDataService.findCity(dto.fromCityId),
+      this.referenceDataService.findCity(dto.toCityId),
+    ]);
+    await this.assertSupportedCurrency(dto.currency);
+    const itinerary = await this.findOwnedDocument(itineraryId, user);
+    const day = itinerary.days.find((candidate) => candidate._id.toString() === dto.dayId);
+    if (!day) throw new NotFoundException('Itinerary day not found');
+    itinerary.transportCosts.push({
+      _id: new Types.ObjectId(),
+      mode: dto.mode.trim(),
+      fromCityId: fromCity._id,
+      toCityId: toCity._id,
+      amount: dto.amount,
+      currency: dto.currency.toUpperCase(),
+      dayId: day._id,
+    } as any);
+    await itinerary.save();
+    return this.findOwned(itineraryId, user);
+  }
+
+  async updateTransportCost(
+    transportCostId: string,
+    dto: UpdateItineraryTransportCostDto,
+    user: JwtUser,
+  ) {
+    const { itinerary, cost } = await this.findOwnedTransportCost(transportCostId, user);
+    const [fromCity, toCity] = await Promise.all([
+      dto.fromCityId === undefined ? undefined : this.referenceDataService.findCity(dto.fromCityId),
+      dto.toCityId === undefined ? undefined : this.referenceDataService.findCity(dto.toCityId),
+    ]);
+    if (dto.currency !== undefined) await this.assertSupportedCurrency(dto.currency);
+    if (dto.dayId !== undefined && !itinerary.days.some((day) => day._id.toString() === dto.dayId)) {
+      throw new NotFoundException('Itinerary day not found');
+    }
+    if (dto.mode !== undefined) cost.mode = dto.mode.trim();
+    if (fromCity) cost.fromCityId = fromCity._id;
+    if (toCity) cost.toCityId = toCity._id;
+    if (dto.amount !== undefined) cost.amount = dto.amount;
+    if (dto.currency !== undefined) cost.currency = dto.currency.toUpperCase();
+    if (dto.dayId !== undefined) cost.dayId = new Types.ObjectId(dto.dayId);
+    await itinerary.save();
+    return this.findOwned(itinerary._id.toString(), user);
+  }
+
+  async deleteTransportCost(transportCostId: string, user: JwtUser) {
+    const { itinerary, costIndex } = await this.findOwnedTransportCost(transportCostId, user);
+    itinerary.transportCosts.splice(costIndex, 1);
+    await itinerary.save();
+    return this.findOwned(itinerary._id.toString(), user);
+  }
+
   async update(id: string, dto: UpdateItineraryDto, user: JwtUser) {
     const updates: Record<string, unknown> = {};
     if (dto.title !== undefined) updates.title = dto.title.trim();
@@ -311,6 +413,36 @@ export class ItinerariesService {
       }
     }
     throw new NotFoundException('Activity not found');
+  }
+
+  private async findOwnedBudgetEntry(budgetId: string, user: JwtUser) {
+    const itinerary = await this.itineraryModel.findOne({
+      'days.budgetEntries._id': budgetId,
+      ownerId: new Types.ObjectId(user.sub),
+    }).exec();
+    if (!itinerary) throw new NotFoundException('Budget entry not found');
+    for (const day of itinerary.days) {
+      const entryIndex = day.budgetEntries.findIndex(
+        (entry) => entry._id.toString() === budgetId,
+      );
+      if (entryIndex >= 0) {
+        return { itinerary, day, entry: day.budgetEntries[entryIndex], entryIndex };
+      }
+    }
+    throw new NotFoundException('Budget entry not found');
+  }
+
+  private async findOwnedTransportCost(transportCostId: string, user: JwtUser) {
+    const itinerary = await this.itineraryModel.findOne({
+      'transportCosts._id': transportCostId,
+      ownerId: new Types.ObjectId(user.sub),
+    }).exec();
+    if (!itinerary) throw new NotFoundException('Transport cost not found');
+    const costIndex = itinerary.transportCosts.findIndex(
+      (cost) => cost._id.toString() === transportCostId,
+    );
+    if (costIndex < 0) throw new NotFoundException('Transport cost not found');
+    return { itinerary, cost: itinerary.transportCosts[costIndex], costIndex };
   }
 
   private assertActivityMoneyPair(cost?: number, currency?: string) {

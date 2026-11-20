@@ -4,6 +4,8 @@ import { ReferenceDataModule } from '../reference-data/reference-data.module';
 import { UploadsModule } from '../uploads/uploads.module';
 import { ItinerariesController } from './itineraries.controller';
 import { ItineraryActivitiesController } from './itinerary-activities.controller';
+import { ItineraryBudgetsController } from './itinerary-budgets.controller';
+import { ItineraryTransportCostsController } from './itinerary-transport-costs.controller';
 import { ItinerariesService } from './itineraries.service';
 import { Itinerary, ItinerarySchema } from './schemas/itinerary.schema';
 
@@ -15,7 +17,12 @@ import { Itinerary, ItinerarySchema } from './schemas/itinerary.schema';
     ReferenceDataModule,
     UploadsModule,
   ],
-  controllers: [ItinerariesController, ItineraryActivitiesController],
+  controllers: [
+    ItinerariesController,
+    ItineraryActivitiesController,
+    ItineraryBudgetsController,
+    ItineraryTransportCostsController,
+  ],
   providers: [ItinerariesService],
   exports: [ItinerariesService, MongooseModule],
 })
