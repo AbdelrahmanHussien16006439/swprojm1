@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,6 +12,9 @@ import { PAGE_SIZE, toPaginated } from '../../common/utils/pagination';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { ReferenceDataService } from '../reference-data/reference-data.service';
 import { UploadsService } from '../uploads/uploads.service';
+import { HotelBookingsService } from '../hotel-bookings/hotel-bookings.service';
+import { ReviewsService } from '../reviews/reviews.service';
+import { ListHotelReviewsQueryDto } from '../reviews/dto/list-hotel-reviews-query.dto';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { SearchHotelsDto } from './dto/search-hotels.dto';
@@ -32,6 +37,10 @@ export class HotelsService {
     @InjectModel(Room.name) private readonly roomModel: Model<Room>,
     private readonly referenceDataService: ReferenceDataService,
     private readonly uploadsService: UploadsService,
+    @Inject(forwardRef(() => HotelBookingsService))
+    private readonly hotelBookingsService: HotelBookingsService,
+    @Inject(forwardRef(() => ReviewsService))
+    private readonly reviewsService: ReviewsService,
   ) {}
 
   async create(dto: CreateHotelDto) {
@@ -48,14 +57,25 @@ export class HotelsService {
   }
 
   async findById(id: string) {
-    // TODO HTL-02: Reviews await Member 6's Review schema/service.
-    // TODO HTL-02: date-specific rooms await Member 6's RoomNight availability support.
     const hotel = await this.hotelModel
       .findById(id)
       .populate('cityId countryId')
       .exec();
     if (!hotel) throw new NotFoundException('Hotel not found');
     return hotel;
+  }
+
+  async findHotelDetails(id: string, query: ListHotelReviewsQueryDto) {
+    const [hotel, reviews] = await Promise.all([
+      this.findById(id),
+      this.reviewsService.listForHotel(id, query),
+    ]);
+    return {
+      ...hotel.toObject(),
+      averageRating: reviews.averageRating,
+      ratingsCount: reviews.ratingsCount,
+      reviews,
+    };
   }
 
   async search(dto: SearchHotelsDto) {
@@ -79,11 +99,18 @@ export class HotelsService {
       .exec();
     if (hotels.length === 0) return toPaginated([], 0, page);
 
-    // TODO HTL-11: exclude rooms with active RoomNight reservations after Member 6 merges.
     const activeRooms = await this.roomModel
       .find({ hotelId: { $in: hotels.map((hotel) => hotel._id) }, isActive: true })
       .exec();
-    const roomsByHotel = new Map<string, Room[]>();
+    const activeRoomNights = await this.hotelBookingsService.findRoomNights(
+      activeRooms.map((room) => room._id.toString()),
+      checkIn,
+      checkOut,
+    );
+    const occupiedRoomIds = new Set(
+      activeRoomNights.map((roomNight) => roomNight.roomId.toString()),
+    );
+    const roomsByHotel = new Map<string, Array<Room & { _id: Types.ObjectId }>>();
     for (const room of activeRooms) {
       const hotelId = room.hotelId.toString();
       const hotelRooms = roomsByHotel.get(hotelId) ?? [];
@@ -94,7 +121,9 @@ export class HotelsService {
     const results: Array<Record<string, unknown>> = [];
     for (const hotel of hotels) {
       const availableRooms = (roomsByHotel.get(hotel._id.toString()) ?? []).filter(
-        (room) => this.isRoomAvailableForStay(room, nights),
+        (room) =>
+          !occupiedRoomIds.has(room._id.toString()) &&
+          this.isRoomAvailableForStay(room, nights),
       );
       if (availableRooms.length < roomsRequired) continue;
 
@@ -140,15 +169,26 @@ export class HotelsService {
 
   async getFreeRooms(hotelId: string, checkInValue: string, checkOutValue: string) {
     const hotel = await this.findById(hotelId);
-    const { nights } = this.getStay(checkInValue, checkOutValue);
+    const { nights, checkIn, checkOut } = this.getStay(checkInValue, checkOutValue);
     if (!hotel.isActive) return [];
 
-    // TODO HTL-15: exclude rooms with active RoomNight reservations after Member 6 merges.
     const rooms = await this.roomModel
       .find({ hotelId, isActive: true })
       .sort({ pricePerNight: 1 })
       .exec();
-    const freeRooms = rooms.filter((room) => this.isRoomAvailableForStay(room, nights));
+    const activeRoomNights = await this.hotelBookingsService.findRoomNights(
+      rooms.map((room) => room._id.toString()),
+      checkIn,
+      checkOut,
+    );
+    const occupiedRoomIds = new Set(
+      activeRoomNights.map((roomNight) => roomNight.roomId.toString()),
+    );
+    const freeRooms = rooms.filter(
+      (room) =>
+        !occupiedRoomIds.has(room._id.toString()) &&
+        this.isRoomAvailableForStay(room, nights),
+    );
     const nightsCount = nights.length;
     return freeRooms.map((room) => ({
       ...room.toObject(),
@@ -179,12 +219,26 @@ export class HotelsService {
       dates.push(new Date(timestamp));
     }
 
-    // TODO HTL-08: overlay active RoomNight bookings and reservation references after Member 6 merges.
+    const activeRoomNights = await this.hotelBookingsService.findRoomNights(
+      rooms.map((room) => room._id.toString()),
+      from,
+      this.addUtcDays(to, 1),
+    );
+    const roomNightsByDate = new Map<string, (typeof activeRoomNights)[number]>();
+    for (const roomNight of activeRoomNights) {
+      roomNightsByDate.set(
+        `${roomNight.roomId.toString()}:${roomNight.date.toISOString().slice(0, 10)}`,
+        roomNight,
+      );
+    }
     return rooms.map((room) => ({
       roomId: room._id,
       roomName: room.name,
       dates: dates.map((date) => {
         const timestamp = date.getTime();
+        const roomNight = roomNightsByDate.get(
+          `${room._id.toString()}:${date.toISOString().slice(0, 10)}`,
+        );
         const isBlocked =
           !room.isActive ||
           (room.blockedRanges ?? []).some(
@@ -199,7 +253,13 @@ export class HotelsService {
         );
         return {
           date: date.toISOString().slice(0, 10),
-          status: !isBlocked && isAvailable ? 'Available' : 'Blocked',
+          status: roomNight ? 'Booked' : !isBlocked && isAvailable ? 'Available' : 'Blocked',
+          ...(roomNight
+            ? {
+                bookingReference: roomNight.bookingReference ?? null,
+                reservationId: roomNight.hotelBookingId.toString(),
+              }
+            : {}),
         };
       }),
     }));
@@ -286,7 +346,11 @@ export class HotelsService {
     if (dto.isActive !== undefined) update.isActive = dto.isActive;
 
     if (dto.isActive === false) {
-      // TODO HTL-06: check confirmed and pending RoomNight reservations after Member 6 merges.
+      await this.assertNoActiveReservationOverlap(
+        room._id.toString(),
+        room.availabilityRanges ?? [],
+        'A room with an active reservation cannot be deactivated',
+      );
     }
 
     const updated = await this.roomModel
@@ -306,7 +370,11 @@ export class HotelsService {
     if (room.everReserved) {
       throw new ConflictException('A room that has been reserved cannot be deleted');
     }
-    // TODO HTL-06: reject active confirmed or pending reservations after Member 6 merges.
+    await this.assertNoActiveReservationOverlap(
+      room._id.toString(),
+      room.availabilityRanges ?? [],
+      'A room with an active reservation cannot be deleted',
+    );
     await this.roomModel.deleteOne({ _id: room._id, hotelId }).exec();
   }
 
@@ -347,7 +415,15 @@ export class HotelsService {
       if (!availabilityRangesDoNotOverlap(ranges)) {
         throw new BadRequestException('Availability ranges must be valid and must not overlap');
       }
-      // TODO HTL-05: check confirmed RoomNight reservations before removing dates after Member 6 merges.
+      const removedRanges = this.getRemovedAvailabilityRanges(
+        room.availabilityRanges ?? [],
+        ranges,
+      );
+      await this.assertNoActiveReservationOverlap(
+        room._id.toString(),
+        removedRanges,
+        'Availability cannot be removed when it overlaps an active reservation',
+      );
       room.availabilityRanges = ranges;
     }
 
@@ -356,7 +432,11 @@ export class HotelsService {
       if (!hasValidRoomRangeDates(ranges)) {
         throw new BadRequestException('Blocked ranges must have valid date ranges');
       }
-      // TODO HTL-06: reject blocked dates overlapping confirmed/pending RoomNight reservations after Member 6 merges.
+      await this.assertNoActiveReservationOverlap(
+        room._id.toString(),
+        ranges,
+        'Blocked dates cannot overlap an active reservation',
+      );
       room.blockedRanges = ranges;
     }
 
@@ -460,6 +540,66 @@ export class HotelsService {
       throw new BadRequestException('endDate must be the same as or after startDate');
     }
     return { startDate, endDate } as RoomDateRange;
+  }
+
+  private async assertNoActiveReservationOverlap(
+    roomId: string,
+    ranges: RoomDateRange[],
+    message: string,
+  ): Promise<void> {
+    for (const range of ranges) {
+      if (
+        await this.hotelBookingsService.hasActiveReservationOverlap(
+          roomId,
+          range.startDate,
+          this.addUtcDays(range.endDate, 1),
+        )
+      ) {
+        throw new ConflictException(message);
+      }
+    }
+  }
+
+  private getRemovedAvailabilityRanges(
+    currentRanges: RoomDateRange[],
+    nextRanges: RoomDateRange[],
+  ): RoomDateRange[] {
+    const removedRanges: RoomDateRange[] = [];
+    for (const current of currentRanges) {
+      let remaining: RoomDateRange[] = [
+        { startDate: new Date(current.startDate), endDate: new Date(current.endDate) },
+      ];
+      for (const next of nextRanges) {
+        remaining = remaining.flatMap((segment) => {
+          if (
+            next.endDate.getTime() < segment.startDate.getTime() ||
+            next.startDate.getTime() > segment.endDate.getTime()
+          ) {
+            return [segment];
+          }
+          const pieces: RoomDateRange[] = [];
+          if (next.startDate.getTime() > segment.startDate.getTime()) {
+            pieces.push({
+              startDate: segment.startDate,
+              endDate: this.addUtcDays(next.startDate, -1),
+            });
+          }
+          if (next.endDate.getTime() < segment.endDate.getTime()) {
+            pieces.push({
+              startDate: this.addUtcDays(next.endDate, 1),
+              endDate: segment.endDate,
+            });
+          }
+          return pieces;
+        });
+      }
+      removedRanges.push(...remaining);
+    }
+    return removedRanges;
+  }
+
+  private addUtcDays(date: Date, days: number): Date {
+    return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
   }
 
   private toUtcDate(value: string): Date {

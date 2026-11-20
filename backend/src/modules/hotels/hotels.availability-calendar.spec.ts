@@ -13,6 +13,7 @@ describe('HotelsService availability calendar', () => {
   let service: HotelsService;
   let hotelModel: { findById: jest.Mock };
   let roomModel: { find: jest.Mock };
+  let hotelBookingsService: { findRoomNights: jest.Mock; hasActiveReservationOverlap: jest.Mock };
   const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
   const query = (result: unknown) => ({ exec: jest.fn().mockResolvedValue(result) });
   const owner = {
@@ -26,21 +27,28 @@ describe('HotelsService availability calendar', () => {
   beforeEach(() => {
     hotelModel = { findById: jest.fn() };
     roomModel = { find: jest.fn() };
+    hotelBookingsService = {
+      findRoomNights: jest.fn().mockResolvedValue([]),
+      hasActiveReservationOverlap: jest.fn().mockResolvedValue(false),
+    };
     service = new HotelsService(
       hotelModel as unknown as Model<Hotel>,
       roomModel as unknown as Model<Room>,
       {} as ReferenceDataService,
       {} as UploadsService,
+      hotelBookingsService as never,
+      {} as never,
     );
     hotelModel.findById.mockReturnValue({
       populate: jest.fn().mockReturnValue(query({ _id: hotelId })),
     });
   });
 
-  it('returns each inclusive date as available or blocked for every hotel room', async () => {
+  it('returns each inclusive date as available, booked or blocked for every hotel room', async () => {
+    const roomAId = new Types.ObjectId();
     roomModel.find.mockReturnValue(query([
       {
-        _id: new Types.ObjectId(),
+        _id: roomAId,
         name: 'Room A',
         isActive: true,
         availabilityRanges: [{ startDate: date('2026-12-10'), endDate: date('2026-12-12') }],
@@ -54,6 +62,14 @@ describe('HotelsService availability calendar', () => {
         blockedRanges: [],
       },
     ]));
+    hotelBookingsService.findRoomNights.mockResolvedValue([
+      {
+        roomId: roomAId,
+        date: date('2026-12-11'),
+        bookingReference: 'HTL-REF-123',
+        hotelBookingId: new Types.ObjectId(),
+      },
+    ]);
 
     const result = await service.getAvailabilityCalendar(
       hotelId.toString(),
@@ -65,10 +81,20 @@ describe('HotelsService availability calendar', () => {
     expect(roomModel.find).toHaveBeenCalledWith({ hotelId: hotelId.toString() });
     expect(result[0].dates).toEqual([
       { date: '2026-12-10', status: 'Available' },
-      { date: '2026-12-11', status: 'Blocked' },
+      {
+        date: '2026-12-11',
+        status: 'Booked',
+        bookingReference: 'HTL-REF-123',
+        reservationId: expect.any(String),
+      },
       { date: '2026-12-12', status: 'Available' },
     ]);
     expect(result[1].dates.every(({ status }) => status === 'Blocked')).toBe(true);
+    expect(hotelBookingsService.findRoomNights).toHaveBeenCalledWith(
+      [roomAId.toString(), expect.any(String)],
+      date('2026-12-10'),
+      date('2026-12-13'),
+    );
   });
 
   it('rejects a reversed date range', async () => {

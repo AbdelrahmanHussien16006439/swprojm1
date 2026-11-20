@@ -1,5 +1,7 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { HotelBookingsModule } from '../hotel-bookings/hotel-bookings.module';
+import { ReviewsModule } from '../reviews/reviews.module';
 import { ReferenceDataModule } from '../reference-data/reference-data.module';
 import { UploadsModule } from '../uploads/uploads.module';
 import { Hotel, HotelSchema } from './schemas/hotel.schema';
@@ -13,6 +15,8 @@ import { HotelsController } from './hotels.controller';
   imports: [
     ReferenceDataModule,
     UploadsModule,
+    forwardRef(() => HotelBookingsModule),
+    forwardRef(() => ReviewsModule),
     MongooseModule.forFeature([
       { name: Hotel.name, schema: HotelSchema },
       { name: Room.name, schema: RoomSchema },

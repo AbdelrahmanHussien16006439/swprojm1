@@ -15,6 +15,7 @@ describe('HotelsService search and availability', () => {
   let hotelModel: { find: jest.Mock; findById: jest.Mock };
   let roomModel: { find: jest.Mock };
   let referenceDataService: { findCity: jest.Mock; findCountry: jest.Mock };
+  let hotelBookingsService: { findRoomNights: jest.Mock; hasActiveReservationOverlap: jest.Mock };
 
   const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
   const hotel = (overrides: Record<string, unknown> = {}) => ({
@@ -46,11 +47,17 @@ describe('HotelsService search and availability', () => {
       findCity: jest.fn().mockResolvedValue({ _id: cityId }),
       findCountry: jest.fn().mockResolvedValue({ _id: countryId }),
     };
+    hotelBookingsService = {
+      findRoomNights: jest.fn().mockResolvedValue([]),
+      hasActiveReservationOverlap: jest.fn().mockResolvedValue(false),
+    };
     service = new HotelsService(
       hotelModel as unknown as Model<Hotel>,
       roomModel as unknown as Model<Room>,
       referenceDataService as unknown as ReferenceDataService,
       {} as UploadsService,
+      hotelBookingsService as never,
+      {} as never,
     );
   });
 
@@ -92,6 +99,44 @@ describe('HotelsService search and availability', () => {
 
     const result = await service.search(searchDto({ rooms: 1, guests: 2 }));
     expect(result.total).toBe(0);
+  });
+
+  it('excludes rooms with active RoomNight reservations from search and available rooms', async () => {
+    const reservedRoom = room();
+    const freeRoom = room();
+    const hotelDoc = hotel();
+    hotelModel.find.mockReturnValue({
+      populate: jest.fn().mockReturnValue(query([hotelDoc])),
+    });
+    hotelModel.findById.mockReturnValue({
+      populate: jest.fn().mockReturnValue(query({ isActive: true })),
+    });
+    roomModel.find
+      .mockReturnValueOnce(query([reservedRoom, freeRoom]))
+      .mockReturnValueOnce({
+        sort: jest.fn().mockReturnValue(query([reservedRoom, freeRoom])),
+      });
+    hotelBookingsService.findRoomNights.mockResolvedValueOnce([
+      { roomId: reservedRoom._id, date: date('2026-12-10'), bookingReference: 'HTL-BOOKED-1' },
+    ]).mockResolvedValueOnce([
+      { roomId: reservedRoom._id, date: date('2026-12-10'), bookingReference: 'HTL-BOOKED-1' },
+    ]);
+
+    const results = await service.search(searchDto({ rooms: 1, guests: 1 }));
+    const freeRooms = await service.getFreeRooms(
+      hotelId.toString(),
+      '2026-12-10',
+      '2026-12-12',
+    );
+
+    expect(results.data[0].availableRoomCount).toBe(1);
+    expect(freeRooms).toHaveLength(1);
+    expect(hotelBookingsService.findRoomNights).toHaveBeenNthCalledWith(
+      1,
+      [reservedRoom._id.toString(), freeRoom._id.toString()],
+      date('2026-12-10'),
+      date('2026-12-12'),
+    );
   });
 
   it('applies rating and price bounds inclusively and sorts by rating', async () => {
