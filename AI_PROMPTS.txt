@@ -925,3 +925,16 @@ and confirmed-passenger lookups. Time changes notify passengers, airport changes
 rejected after bookings, and cancellation delegates booking cleanup after setting
 cancelled status.
 ================================================
+### Member 3 — 2026-11-20 — FLT-06 confirmation correction
+Student: Member 3
+Tool: ChatGPT / Codex
+Related Requirement: FLT-06, GEN-14
+Prompt:
+"After pulling Member 1's merge, fix POST /api/flights/:id/cancel so the shared
+ConfirmActionDto requires confirm=true. Add a regression test for confirm=false,
+then build, test, commit, and push."
+How the output was used:
+The flight cancellation controller now validates the shared confirmation DTO, so
+confirm=false or a missing confirmation returns 400 before cancellation. Tests cover
+both rejected false and accepted true values.
+================================================
