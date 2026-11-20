@@ -827,3 +827,21 @@ ReferenceDataService validation. City-group subtotals now recompute from budget
 entries, activity costs, and transport by currency after each change. Build and
 all 255 tests passed.
 ================================================
+### Member 7 — 2026-11-20 02:43 Africa/Cairo — ITN-14, ITN-18
+Student: Member 7
+Tool: ChatGPT / Codex
+Related Requirement: ITN-14, ITN-18
+Prompt:
+"Implement Member 7 task 5: add GET /api/itineraries/:id/budget-summary with
+category/day/city-group totals, activity costs under Activities, and intercity
+transport included. Convert every amount through ExchangeRatesService.convert
+into the signed-in viewer’s preferred currency or ?currency=; return the rate date.
+Allow owners or public itinerary readers, respecting hidden and deactivated-owner
+visibility. Keep edits in itineraries and AI_PROMPTS.txt, then build, test, commit,
+and push."
+How the output was used:
+Added an optionally authenticated summary endpoint with owner/private checks,
+public visibility checks, currency selection, and conversion of all budget,
+activity, and intercity transport amounts by ExchangeRatesService. City-group
+subtotals are returned in the target currency. Build and all 259 tests passed.
+================================================
