@@ -1,0 +1,26 @@
+# Dependencies & builds
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# Secrets — never commit (.env.example is the template)
+.env
+.env.*
+!.env.example
+
+# Uploaded images (served at /uploads)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Logs & OS / editor files
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/

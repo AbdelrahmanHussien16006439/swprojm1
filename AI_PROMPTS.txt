@@ -1,0 +1,1068 @@
+AI PROMPT LOG — Travel Planning and Booking Platform (Software Project I, Winter 2026)
+
+Every team member adds entries at the BOTTOM of this file for prompts that materially
+contributed to the project. Use this format:
+
+================================================
+### Member N — YYYY-MM-DD HH:MM — Requirement ID
+Date: YYYY-MM-DD
+Student: Student Name
+Tool: ChatGPT / Claude / Copilot / ...
+Related Requirement: e.g. FLT-22
+Prompt:
+<what you asked>
+How the output was used:
+<what you kept, changed, or rejected>
+================================================
+
+Start every new entry with a unique line after the ==== separator, e.g. ### Member 3 — 2026-11-18 22:50 — FLT-08, so Git doesn't glue entries together when branches merge.
+
+================================================
+Date: 2026-11-16
+Student: Abdelrahman Hussien (Member 1)
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ACC-01, ACC-04, ACC-05, ACC-06, ACC-07a, ACC-08, ACC-09, ACC-11, ACC-12, ACC-13, ACC-14, ACC-15, ACC-16, ACC-18, ACC-19, GEN-02, GEN-05, GEN-13
+Prompt:
+"Read Team_Plan.md and proj_description.md. I am Member 1 — implement all of
+Member 1's requirements and make the folder structure well organized."
+How the output was used:
+Generated the NestJS backend skeleton (all team modules registered, main.ts with
+/api prefix, Swagger at /api/docs, global validation and error filter), the shared
+src/common/ layer (guards, decorators, pagination, ObjectId pipe), User/Session/
+AuditLog schemas, auth (register, login with lockout, refresh, logout, me,
+change-password), profile endpoints, admin account endpoints and the admin seed.
+Reviewed the code and tested every endpoint against a local MongoDB before committing.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: BLG-01, BLG-02, BLG-03, BLG-04, BLG-08, BLG-09
+Prompt:
+"Implement the Posts API endpoints per TEAM_PLAN.md for create, public list/search, mine, details, update, and delete. Use available auth guards and pagination, enforce ownership, exclude hidden/deactivated content, and clean up associated comments, likes, and uploaded images without touching other member folders."
+How the output was used:
+Added validated DTOs, controller routes, and BlogService behavior for the requested post endpoints. Registered the real User model through UsersModule, used the shared pagination helper and auth guards, and implemented ownership checks plus deletion of related comments, likes, and matching uploaded files. No comment, like, or image-upload endpoints were added.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: BLG-01, BLG-05, BLG-06
+Prompt:
+"Create the Blog module's Post, Comment, and Like Mongoose schemas per TEAM_PLAN.md. Apply tag, image, and comment limits, timestamp fields, model references, the unique post/user like index, and register/export the models from BlogModule without implementing endpoints."
+How the output was used:
+Added the three timestamped schemas with the requested references, defaults, validation limits, and unique like index; registered them in BlogModule and exported MongooseModule. No post endpoints were added.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: BLG-05, BLG-06, BLG-07, BLG-08
+Prompt:
+"Implement authenticated comments, author-owned comment edits/deletes, likes with duplicate protection and safe counts, and verify both tag-filter routes against TEAM_PLAN.md. Add tests and keep all changes in the Blog module."
+How the output was used:
+Added the requested comment and like endpoints with DTO validation, ownership enforcement, chronological detail comments, atomic like-count updates, and HTTP 409 for duplicate likes. Added the missing tag-posts route by reusing the existing public listing logic and tested the comment/like/tag service behavior.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: ITN-18
+Prompt:
+"Implement the Member 2 ITN-18 exchange-rate service per TEAM_PLAN.md, with the FXRatesAPI daily cache, scheduled and startup refresh, conversion, public latest endpoint, cached fallback, and unsupported-currency handling. Keep changes within the exchange-rates module and document/testing the Member 5 currency dependency."
+How the output was used:
+Implemented the ExchangeRate schema, service, public endpoint, cron/startup refresh, conversion, and cache fallback. The Member 5 validator integration remains isolated because ReferenceDataService is not yet present; current validation checks membership in the FX rate cache. Seven focused tests and the backend build passed.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: GEN-08
+Prompt:
+"Implement Member 2's GEN-08 uploads task in the existing NestJS backend. Accept JPG/PNG only, limit uploads to 5 MB, store them in backend/uploads with safe unique filenames, return an id and /uploads URL, expose a Swagger-documented multipart endpoint, and export a reusable UploadsService. Review the implementation and run build and end-to-end upload checks."
+How the output was used:
+Added POST /api/uploads with Swagger multipart documentation, Multer file-size limits, MIME and image-signature validation, random UUID filenames, and a reusable exported UploadsService. Verified a PNG upload returned 201 and an id/URL, the saved file was retrievable at its /uploads URL with matching SHA-256, a non-image returned 400, and a file over 5 MB returned 413. The Nest build passed. The start:dev script failed in this workspace because incremental compilation did not recreate dist, so the runtime checks used the same Nest entry point with ts-node and temporary local environment values.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: GEN-10
+Prompt:
+"Implement admin report listing and resolution plus direct hide/unhide/delete for posts and comments per TEAM_PLAN.md. Use the existing admin guards, shared pagination helper, BlogService cascade operations, and AuditLogsService; add DTO validation, Swagger docs, and focused tests. Keep review and itinerary moderation as pending owner integrations."
+How the output was used:
+Added paginated/filterable admin report listing, admin-only report resolution and direct post/comment moderation endpoints, audit logging, and focused service/controller tests. Post deletions use BlogService cascade cleanup for comments, likes, and safe image removal; comment deletion decrements the parent count safely. Review and itinerary moderation remains pending their owners' service integrations.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: GEN-09
+Prompt:
+"Implement authenticated content reporting for posts, comments, reviews, and itineraries, with a Report schema, duplicate-report HTTP 409 behavior, validation, Swagger docs, and tests. Inspect existing target models and do not create copies or fake dependencies."
+How the output was used:
+Restored the existing GEN-09 implementation from commit 17b95c1 into the develop-based GEN-10 working tree after verifying the commit was on the feature/BLG-01-blog branch but absent from develop. ReportsModule now registers its existing controller and service alongside the Report model used by GEN-10 moderation.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: ACC-15
+Prompt:
+"Implement admin airline/hotel deactivation and reactivation with existing owner services, notification recipient discovery, NotificationsService and AuditLogsService. If dependencies are placeholders, add only a documented compile-safe fail-closed stub; do not invent provider state, booking logic, or recipients. Add admin authorization, validation, and tests."
+How the output was used:
+Inspected develop and confirmed AuditLogsService and admin guards are ready, while AirlinesModule, HotelsModule, NotificationsModule, FlightBookingsModule, and HotelBookingsModule are placeholders. Added admin-only routes, provider-type/ObjectId validation, failure audit entries, and a documented integration stub that returns HTTP 501 without changing state or fabricating notification recipients. Success-path provider mutation and notifications remain unimplemented pending the owning modules.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: BLG-12
+Prompt:
+"Implement the public GET /api/authors/:id profile using UsersService.findPublicProfile and BlogService public post visibility logic. Integrate M7 public itineraries only if available; otherwise provide a clearly documented compile-safe stub without invented itinerary data. Add focused tests and keep edits in Member 2 folders and AI_PROMPTS.txt."
+How the output was used:
+Added a public author endpoint with validated ObjectId and shared page-size-10 pagination. It reuses the user profile contract and BlogService public post aggregation, including hidden/draft/deactivated-author filtering. M7's ItinerariesModule is still an empty placeholder, so a documented reader stub returns null for itineraries until M7 exposes its public author query.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: BLG-10, GEN-08
+Prompt:
+"Implement post image upload and removal routes using the existing BlogService and UploadsService. Enforce author ownership, JPG/PNG and 5 MB limits, a five-image cap, safe database/file cleanup, UUID image IDs, Swagger documentation, and focused tests."
+How the output was used:
+Added authenticated Blog endpoints to upload an image to an owned post and remove an image by upload ID. Reused UploadsService validation/storage through saveImage(), added safe UUID-based deletion, atomically updated post image references, and cleaned up newly uploaded files if the database write failed. Added Blog and Uploads service tests.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: GEN-09
+Prompt:
+"Implement authenticated content reporting for posts, comments, reviews, and itineraries, with a Report schema, duplicate-report HTTP 409 behavior, validation, Swagger docs, and tests. Inspect existing target models and do not create copies or fake dependencies."
+How the output was used:
+Added the Report schema with the required unique compound index, authenticated POST /api/reports, DTO validation, and conflict handling. Existing Post and Comment targets are checked using BlogModule models. Review and Itinerary modules have no models in this checkout, so their existence checks remain deferred; their IDs are still syntax-validated. Five focused tests passed.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: GEN-07
+Prompt:
+"Implement GET /api/admin/audit-logs using the existing AuditLog model, admin guards, DTO validation, date/actor/action filters, shared page-size-10 pagination, Swagger docs, and focused tests. Do not modify Member 1's AuditLogsService or other files."
+How the output was used:
+Added the admin-only audit-log viewer in AdminModerationModule. It queries Member 1's registered AuditLog model through the exported AuditLogsModule, validates actor and ISO date filters, checks date-range order, and uses the shared paginate() helper. The existing AuditLogsService is write-only and was left unchanged.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: Codex
+Related Requirement: GEN-08, ITN-18, BLG-*, GEN-09, GEN-10
+Prompt:
+"Prepare a local environment safely using placeholders, verify the env variable names and Git ignore status without exposing secrets, update my branch from develop, build and start the backend, then prepare Swagger verification for Member 2 endpoints. Follow TEAM_PLAN.md and only change Member 2 module files, except the requested AI prompt log."
+How the output was used:
+Compared environment variable names only, added placeholders for FXRATES_API_KEY, ADMIN_EMAIL, and ADMIN_PASSWORD, and confirmed backend/.env is ignored and untracked. Fetched and fast-forward merged origin/develop; npm run build passed. npm run start:dev failed because Node could not find backend/dist/main. A direct source launch reached MongoDB initialization but failed with an SRV DNS query timeout, so Swagger endpoint checks could not be performed. No .env values were inspected or printed.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Abdelrahman Hussien (Member 1)
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: ACC-19, ACC-11, GEN-13
+Prompt:
+"Continue my Member 1 work: read TEAM_PLAN (Sections 0, 2-7) and my requirement rows, check which of my tasks are done against the actual code, check that other members' imports from src/common/ and my modules still compile, then do the next task on its own branch."
+How the output was used:
+The review found that all Member 1 tasks already have code and that npm run build and all 73 unit tests pass. It also found one bug: Swagger registered the cookie security scheme as "cookie" while every controller uses @ApiCookieAuth('access_token'), so the lock icons pointed at a scheme that did not exist. I fixed the scheme name in main.ts. ACC-12 and ACC-13 still read the bookings/airlines/hotels collections directly until Members 3-6 merge their services. The suspension notification still waits for Member 6.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Abdelrahman Hussien (Member 1)
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: Milestone 1 deliverables (README, AI_PROMPTS.txt, Git history)
+Prompt:
+"Make README.md a complete setup guide (summary, stack, structure, setup, every env variable, seeds, Swagger login, common problems, branch workflow). Check every env variable the code reads is in .env.example. Check whether AI_PROMPTS.txt merge conflicts come from LF/CRLF line endings and add a safe .gitattributes."
+How the output was used:
+Rewrote README.md as a setup guide: an env variable table taken from the names the code actually reads, a common-problems table (querySrv DNS, bad auth, Atlas IP access, stale dist), and the PR workflow. All 8 variable names the code reads were already in .env.example. All committed files were already LF, and every AI_PROMPTS.txt commit was a pure append, so the conflicts came from several branches appending at the same place, not from CRLF. Added .gitattributes with "* text=auto" (keeps future commits LF) and "AI_PROMPTS.txt merge=union" (keeps both sides' appended entries). Renormalisation changed no files.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Abdelrahman Hussien (Member 1)
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: GEN-12 (shared MongoDB Atlas setup), team infrastructure
+Prompt:
+"Fix the Atlas SRV DNS problem for the whole team: on some Windows machines Node fails with querySrv ECONNREFUSED/ETIMEOUT even though nslookup works. Set public DNS servers in main.ts before Mongoose connects."
+How the output was used:
+Added dns.setServers() at the top of main.ts, which runs before NestFactory.create() (that is when MongooseModule opens the connection). The assistant suggested keeping the machine's own DNS servers after 8.8.8.8 and 1.1.1.1 as a fallback, so networks that block public DNS still work. I accepted that. Build, all 73 unit tests and a local start:dev connection to Atlas passed.
+================================================
+
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: Codex
+Related Requirement: BLG-01, BLG-04, BLG-10, GEN-08, GEN-09
+Prompt:
+"Fix the reported post-image deletion security issue and report-visibility leak. Remove client-supplied images from post creation, make cleanup trust only image records created by UploadsService, and prevent reports for content the caller cannot see. Apply the relevant Member 2 security cleanups without changing shared files or environment values."
+How the output was used:
+Removed images from CreatePostDto and made post creation initialize images as an empty array. Post image removal/deletion now accepts only canonical UUID-backed { id, url } upload records, leaving legacy string references untouched. Reports now require a published, visible post, a visible comment on a public post, and a non-deactivated post author; unavailable targets return 404. Added authentication to direct uploads and removed duplicate Report schema decorators. Added focused regression tests: 33 passed; npm run build passed. Swagger was not retested in this session. No arbitrary maximum was added to report reason because the requirements specify none.
+================================================
+Date: 2026-11-17
+Student: Member 2
+Tool: Codex
+Related Requirement: BLG-01, BLG-10, GEN-08, GEN-09
+Prompt:
+"Address Member 1's security and validation findings: reject client-supplied post images, ensure deletion only removes canonical files uploaded for that post, conceal private report targets, require authentication for uploads, remove duplicate report schema decorators, and cap report reasons at 500 characters. Add regression tests and verify without connecting to Atlas."
+How the output was used:
+Kept image creation server-controlled and restricted cleanup to validated upload records, including shared-reference protection. Tightened report visibility checks, guarded uploads, removed duplicate decorators, and enforced the report reason limit in both DTO and schema. Added unit coverage for image cleanup and report reason validation. `npm.cmd run build` passed; all 14 Jest suites (84 tests) passed. No Atlas or Swagger retest was run.
+================================================
+================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-01
+Prompt:
+"Implement the Member 3 airline schema, AirlinesService, and admin/public/moderator
+airline endpoints from TEAM_PLAN.md. Use the shared guards, exact model names,
+DTO validation, Swagger decorators, ownership checks, and keep edits in airlines,
+flights, and AI_PROMPTS.txt only."
+How the output was used:
+Added the timestamped Airline schema with baggage and cancellation policy fields,
+validated DTOs, guarded controller routes, exported AirlinesService, and focused
+unit tests. Logo upload and policy endpoints remain separate later task groups.
+================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-01, GEN-08
+Prompt:
+"Continue Member 3's airlines work with the airline logo endpoint. Reuse the
+existing UploadsService, enforce airline-moderator ownership, accept only the
+shared JPG/PNG and 5 MB validation, replace one existing logo, clean up old or
+new files safely, add tests and Swagger documentation, and edit only my modules
+plus AI_PROMPTS.txt."
+How the output was used:
+Added POST /api/airlines/:id/logo with guarded multipart Swagger documentation,
+UploadsService integration, replacement cleanup, failure cleanup, and focused
+unit tests. The existing logo URL is replaced atomically in the airline document.
+================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-03, FLT-30, GEN-06
+Prompt:
+"Implement the Member 3 Task 4 flight schema and exported FlightsService.findById
+from TEAM_PLAN.md, using exact UTC time, cabin, and status fields without editing
+airlines or creating airport schemas."
+How the output was used:
+Recorded the missing Task 4 AI usage entry in this commit because the Task 4 code
+was merged into develop without its corresponding log entry.
+================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-04, FLT-05
+Prompt:
+"Implement cabin creation and price/seat updates from TEAM_PLAN.md with exact
+cabin classes, DTO validation, Swagger, ownership through AirlinesService,
+atomic seat counters, duplicate-class protection, tests, and no edits to airlines."
+How the output was used:
+Added the Task 5 cabin DTOs, guarded controller routes, atomic cabin insertion and
+capacity updates, duplicate-class protection, and focused tests. Cron and
+airport-dependent flight creation remain later tasks.
+================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-09
+Prompt:
+"Implement the airline cancellation-policy endpoint from TEAM_PLAN.md: an owning
+airline moderator can replace cancellation tiers, with integer non-negative
+daysBefore values, unique thresholds, refund percentages from 0 to 100, Swagger
+documentation, ownership checks, and tests."
+How the output was used:
+Added the nested validated cancellation-tier DTO, protected PUT endpoint, atomic
+policy replacement through AirlinesService, schema uniqueness validation, and
+ownership-focused unit tests.
+================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-30
+Prompt:
+"Implement Task 6 from TEAM_PLAN.md: add the scheduled-flight status cron so
+flights whose UTC departureTime has passed become departed. Use one atomic
+updateMany filter, add a unit test, and edit only the flights module plus the
+AI usage log."
+How the output was used:
+Added the every-minute FlightsService cron and a regression test proving only
+scheduled flights with departureTime at or before now are transitioned.
+================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-04
+Prompt:
+"Fix the cabin filter ObjectId mismatch by using real Mongoose ObjectId schema
+types, validating the moderator providerId, converting ownership filters to
+ObjectId values, and adding regression tests without adding packages or editing
+airlines."
+How the output was used:
+Kept the flight reference schema guards, changed addCabin and both updateCabin
+filters to use validated ObjectIds, compared ownership as ObjectIds, and added
+a regression test for first-cabin insertion.
+================================================
+Date: 2026-11-18
+Student: Member 3
+Tool: Codex
+Related Requirement: FLT-08
+Prompt:
+"Implement the airline baggage policy endpoint from TEAM_PLAN.md: an owning
+airline moderator can set extra bag price greater than zero and maximum extra
+bags per passenger at least zero, with DTO validation, Swagger documentation,
+ownership checks, and tests."
+How the output was used:
+Added the validated baggage-policy DTO, protected PUT endpoint, atomic policy
+update through AirlinesService, and ownership-focused unit tests.
+================================================
+Date: 2026-11-19
+Student: Member 2
+Tool: Codex
+Related Requirements: BLG-01, GEN-09, GEN-10
+Prompt:
+"Fix ObjectId schema declarations in my blog and reports modules using
+MongooseSchema.Types.ObjectId while keeping Types.ObjectId TypeScript types.
+Check id comparisons and aggregation pipelines, add schema guard tests, run
+the backend build and unit tests, report affected collections, and commit only
+my modules plus AI_PROMPTS.txt with the required commit message. Do not read
+.env, add packages, or push."
+How the output was used:
+Updated Post, Comment, Like and Report ObjectId paths, preserved existing
+indexes, and added schema guard tests. Existing blog aggregations already used
+Types.ObjectId for id matching; the image-count $expr compares array sizes.
+Potential legacy string ids: posts.authorId, comments.postId/comments.authorId,
+likes.postId/likes.userId, reports.reporterId/reports.targetId/reports.resolvedBy.
+================================================
+
+================================================
+### Member 4 — 2026-11-19 12:05 — PAY-01, PAY-03, PAY-04, FLT-12
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: PAY-01, PAY-03, PAY-04, FLT-12
+Prompt:
+"Implement task 1 from my Member 4 plan: add the Payment, Refund and
+FlightBooking Mongoose schemas with the exact TEAM_PLAN names, statuses and
+fields. Use explicit ObjectId schema types with refs, never persist card data,
+add ObjectId guard tests, stay within my module folders and AI_PROMPTS.txt,
+build and run tests, then commit without pushing."
+How the output was used:
+Added the three schemas and schema tests for ObjectId path types, allowed
+statuses and absence of card fields. Backend build and unit tests were run.
+================================================
+
+================================================
+### Member 4 — 2026-11-19 12:24 — PAY-01, PAY-02, PAY-03, PAY-04, FLT-09
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: PAY-01, PAY-02, PAY-03, PAY-04, FLT-09
+Prompt:
+"Implement task 2 in the payments module from TEAM_PLAN.md: PaymentsService
+(createPayment, cancelPayment, createRefund, calculateRefundPercent) and
+POST /api/payments with optional testPaymentMethod. Enforce ownership, valid
+pending holds, accepted policies, server-computed prices, one platform currency,
+and hotel 501 until that booking module exists. Add DTO validation, Swagger
+annotations and unit tests. Do not edit outside my modules and AI_PROMPTS.txt,
+read backend/.env, or push."
+How the output was used:
+Added the authenticated create-payment endpoint, Stripe PaymentIntent/refund
+service operations, server-side flight booking checks, currency conversion to
+Stripe minor units, FLT-09 tier calculation, and service tests. Build and all
+unit tests passed.
+================================================
+
+================================================
+### Member 4 — 2026-11-19 12:42 — PAY-01, PAY-03, FLT-23
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: PAY-01, PAY-03, FLT-23
+Prompt:
+"Implement Member 4 task 3 from TEAM_PLAN.md on a branch from latest develop:
+Stripe-signed POST /api/payments/webhook using rawBody, failed payment retry,
+GET payment, and GET refund. Enforce ownership and use ParseObjectIdPipe. Do not
+fake missing booking or notification services, touch files outside my modules
+and AI_PROMPTS.txt, read backend/.env, or push. Add unit tests, build, test, and
+commit only my files."
+How the output was used:
+Added webhook signature verification and PaymentIntent succeeded/failed/canceled
+state handling, retry and private payment/refund lookup routes. The verified
+success callback to FlightBookingsService remains marked for task 6 because that
+service is not yet implemented. Build and all unit tests passed.
+================================================
+
+================================================
+### Member 4 — 2026-11-19 13:18 — PAY-02, PAY-04
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: PAY-02, PAY-04
+Prompt:
+"Implement task 4 from TEAM_PLAN.md: GET/POST booking policies and accept-policies
+for flights, require ownership and save an acceptance timestamp plus policy
+snapshot, return 501 for hotel policies until Member 6's module exists. Also fix
+Stripe PaymentIntent creation to use automatic_payment_methods with
+allow_redirects 'never' and add a test. Stay within Member 4 modules and
+AI_PROMPTS.txt, do not read backend/.env or push."
+How the output was used:
+Added the flight booking policies controller/service and acceptance DTO, with
+ownership, pending-hold checks and atomic acceptance persistence. Added the
+Stripe configuration regression assertion. Backend build and all unit tests
+passed.
+================================================
+
+================================================
+### Member 4 — 2026-11-19 13:43 — FLT-12, FLT-19, FLT-21
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: FLT-12, FLT-19, FLT-21
+Prompt:
+"Implement task 5 from TEAM_PLAN.md: POST /api/flight-bookings booking summary
+with passenger ages measured at the outbound departure date, at least one adult,
+infant limits, fares, baggage validation and fees. It must not persist or hold
+seats. Use the existing FlightsService and AirlinesService, add DTO validation,
+Swagger docs and tests, build and test, and commit only my modules plus
+AI_PROMPTS.txt."
+How the output was used:
+Added the guarded booking summary endpoint and calculation/validation service,
+using the existing flight and airline services. Round-trip baggage follows the
+Section 10 per-segment default. Tests cover passenger age bands, infant limits,
+baggage limits, summary totals and the no-write behavior. Build and unit tests
+passed.
+================================================
+
+================================================
+### Member 4 — 2026-11-19 15:17 — FLT-22, FLT-23, PAY-01, GEN-11
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: FLT-22, FLT-23, PAY-01, GEN-11
+Prompt:
+"Implement task 6 from TEAM_PLAN.md: atomic 10-minute flight seat holds,
+round-trip rollback, expiry cron with inventory release and PaymentIntent
+cancellation, and confirmation only through the verified Stripe webhook with
+booking reference and held-to-booked counters. Use forwardRef for the
+Payments/FlightBookings cycle, preserve ObjectId conventions, leave a TODO for
+Member 6 notifications, add tests, build/test and commit only my modules plus
+AI_PROMPTS.txt."
+How the output was used:
+Added POST /api/flight-bookings/hold, atomic seat counter transitions, expiry
+cron and verified-payment confirmation callback. Notifications remain a marked
+Member 6 TODO. Build and all unit tests passed.
+================================================
+
+================================================
+### Member 4 — 2026-11-19 16:13 — FLT-22, FLT-23
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: FLT-22, FLT-23
+Prompt:
+"Fix the task 6 duplicate bookingReference bug on the same feature branch:
+leave the reference undefined on pending bookings, retain a sparse unique index,
+unset the reference when reverting confirmation, release seats if booking insert
+fails, and test two pending holds from different users. Build and run tests;
+commit and push this branch only."
+How the output was used:
+Removed the null default from bookingReference and verified its sparse unique
+index. Confirmation rollback now unsets it. Added tests for insert-failure seat
+release and two distinct pending holds. Build and all unit tests passed.
+================================================
+================================================
+### Member 4 — 2026-11-19 16:54 — FLT-23, FLT-25, FLT-26, PAY-01
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: FLT-23, FLT-25, FLT-26, PAY-01
+Prompt:
+"Implement task 7: my bookings list and detail, refund preview and cancellation,
+and confirmed-booking e-ticket PDF. Keep all ownership checks, release booked
+seats atomically on cancellation, create Stripe refunds according to accepted
+cancellation policy, and include DTO validation, Swagger and tests. Also map
+Stripe credential/service errors to clear 502/503 responses instead of bare
+500s. Do not implement airport-local times until Member 5 provides timezone
+support."
+How the output was used:
+Added paginated booking groups and owner-only booking details, refund preview,
+cancellation with booked-seat release, and a PDF e-ticket. PDF segment times are
+explicitly UTC pending Member 5 airport timezone support. Stripe authentication,
+connection and rate-limit errors now return a clear 503; other Stripe API errors
+return 502, while card declines return 400. Build and all unit tests passed.
+================================================
+================================================
+### Member 4 — 2026-11-19 18:01 — FLT-29, FLT-06, FLT-05, ACC-12, GEN-11
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: FLT-29, FLT-06 (booking support), FLT-05 (booking lookup), ACC-12, GEN-11
+Prompt:
+"Implement task 8 from TEAM_PLAN.md: FlightBookingsService.cancelAllForFlight,
+findConfirmedUserIdsForFlight, hasBookings, and hasUpcomingConfirmed; add the
+airline moderator's own-flight paginated bookings endpoint and CSV passenger
+export; and mark confirmed bookings completed every minute only after their
+last segment arrival. Use existing moderator guards, enforce provider ownership,
+return only confirmed/cancelled rows with cabin inventory, refund provider
+cancellations at 100%, release affected seats and pending holds, and leave clear
+Member 6 notification TODOs. Add unit tests, build/test, and commit only my
+modules and AI_PROMPTS.txt."
+How the output was used:
+Added the four shared service methods, provider-cancellation handling with full
+refunds and inventory release, guarded moderator bookings/CSV endpoints, and a
+GEN-11 completion cron based on the last segment arrival. Member 6 notification
+hooks remain marked TODO. Added coverage for ownership, listing, cancellation,
+CSV escaping, shared lookups, and completion timing. Build and unit tests passed.
+================================================
+### Member 5 — 2026-11-19 19:23 — GEN-12, FLT-02
+Student: Member 5
+Tool: ChatGPT / Codex
+Related Requirements: GEN-12, FLT-02
+Prompt:
+"Implement Task 1 from TEAM_PLAN.md in the reference-data module: official-data
+schemas, idempotent seed from docs/requirements/reference-data CSVs, the exact
+ReferenceDataService methods, and public paginated lookup endpoints for airports,
+countries, cities, and currencies. Preserve source identifiers and use ObjectId
+references between related records. Add Swagger DTOs and unit tests; do not run
+the seed or modify files outside reference-data and AI_PROMPTS.txt."
+How the output was used:
+Added Country, City, Airport, Currency and Attraction schemas; an upsert-only
+seed script; service lookups and public paginated endpoints. Source identifier
+values are retained, related records use ObjectId references, and CSVs remain in
+the official docs directory. Build passed and all 26 test suites (158 tests)
+passed. The shared database seed was not run.
+================================================
+================================================
+### Member 5 — 2026-11-19 19:45 — HTL-01, HTL-03, HTL-04, HTL-09, HTL-10
+Student: Member 5
+Tool: ChatGPT / Codex
+Related Requirements: HTL-01, HTL-03, HTL-04, HTL-09, HTL-10
+Prompt:
+"Implement Member 5 Task 2 from TEAM_PLAN.md: Hotel and Room schemas with their
+ObjectId references, required fields and validation; register/export both models;
+add HotelsService.findById, findRoomsByIds, setActive, updateRating, and
+markRoomsReserved. Include unit tests, build and test the backend, and change only
+the hotels module and AI_PROMPTS.txt."
+How the output was used:
+Added the Hotel and Room schemas with per-hotel room-name uniqueness, hotel photo
+and cancellation-tier constraints, standard time fields, ratings fields, and
+validated non-overlapping room availability ranges. Registered both models and
+added the five shared HotelsService methods. Build passed and all 28 test suites
+(168 tests) passed.
+================================================
+================================================
+================================================
+### Member 5 — 2026-11-19 20:09 — HTL-01, HTL-02, HTL-09, HTL-10
+Student: Member 5
+Tool: ChatGPT / Codex
+Related Requirements: HTL-01, HTL-02, HTL-09, HTL-10
+Prompt:
+"Implement Member 5 Task 3 from TEAM_PLAN.md: admin hotel creation, public hotel
+details, own-hotel moderator profile edits, and moderator hotel policy updates.
+Validate city and country against seeded reference data, enforce role and owner
+checks, add DTO validation, Swagger docs and tests. Leave review and room
+availability integration as TODOs if Member 6's models/services are absent.
+Change only the hotels module and AI_PROMPTS.txt."
+How the output was used:
+Added guarded hotel create, edit and policy routes; public profile lookup;
+reference-data checks for consistent city/country ObjectId links; cancellation
+tier and local-time validation; and Member 6 dependency TODOs for reviews and
+date-specific available rooms. Build passed and all 29 test suites (177 tests)
+passed.
+================================================
+### Member 5 — 2026-11-19 20:35 — HTL-03, HTL-04, HTL-05, HTL-06
+Student: Member 5
+Tool: ChatGPT / Codex
+Related Requirements: HTL-03, HTL-04, HTL-05, HTL-06
+Prompt:
+"Implement Member 5 Task 4: hotel moderator endpoints to add, edit, and delete
+rooms and to add, replace, and remove availability and blocked date ranges.
+Enforce room validation, per-hotel unique names, ownership, non-overlapping
+availability ranges, and never-reserved deletion. Do not fake Member 6
+reservation checks if RoomNight is absent. Add Swagger DTOs and unit tests,
+build/test, and edit only hotels plus AI_PROMPTS.txt."
+How the output was used:
+Added guarded room CRUD and availability range routes with strict UTC
+date-only inputs, range validation, unique-name conflict handling, and
+everReserved deletion protection. Confirmed/pending reservation overlap checks
+remain TODOs because Member 6's RoomNight service is not in develop. Build
+passed and all 30 test suites (187 tests) passed.
+================================================
+### Member 5 — 2026-11-19 21:00 — HTL-01, GEN-08
+Student: Member 5
+Tool: ChatGPT / Codex
+Related Requirements: HTL-01, GEN-08
+Prompt:
+"Implement Member 5 Task 5: hotel moderator photo upload/removal endpoints using
+Member 2's UploadsService. Enforce JPG/PNG and 5 MB through the shared service,
+max 5 photos per hotel, ownership, Swagger docs and cleanup on database failure.
+Add unit tests, build/test, and edit only hotels plus AI_PROMPTS.txt."
+How the output was used:
+Added guarded multipart photo upload and owner-only removal. Uploads use the
+shared UploadsService, enforce the five-photo limit atomically, and clean up the
+uploaded file if the database write fails. Build passed and all 30 test suites
+(191 tests) passed.
+================================================
+### Member 5 — 2026-11-19 21:25 — HTL-11, HTL-12, HTL-15
+Student: Member 5
+Tool: ChatGPT / Codex
+Related Requirements: HTL-11, HTL-12, HTL-15
+Prompt:
+"Implement Member 5 Task 6: public hotel search by city or country, with date and guest/room filters, availability ranges, blocked dates, price/rating filters, sorting and pagination; add the available-room listing for a hotel stay with total stay prices. Follow the Member 5 scope, add DTO validation, Swagger docs and unit tests, build/test, edit only hotels plus AI_PROMPTS.txt, and leave explicit TODOs for Member 6 reservation checks."
+How the output was used:
+Added validated search and available-room query endpoints, availability and occupancy matching, inclusive price bounds, rating filtering, sorting and pagination. Build passed and all 31 test suites (197 tests) passed. RoomNight reservation exclusion remains marked for Member 6 integration.
+================================================
+### Member 5 — 2026-11-19 21:40 — HTL-08
+Student: Member 5
+Tool: ChatGPT / Codex
+Related Requirement: HTL-08
+Prompt:
+"Implement Member 5 Task 7: GET /api/hotels/:id/availability for an owner hotel moderator. Accept an inclusive from/to date range and return each room's status for every date as Available, Booked (with reservation reference), or Blocked. Follow the Member 5 file-scope rules, add DTO validation, Swagger docs and unit tests, build/test, and leave the Booked part marked TODO if Member 6's RoomNight support is missing."
+How the output was used:
+Added an owner-only calendar endpoint with inclusive UTC dates and Available/Blocked statuses from room activation, availability and blocked ranges. Booked status and reservation references remain a TODO because Member 6's RoomNight support is not in develop. Build passed and all 32 test suites (201 tests) passed.
+================================================
+### Member 6 — 2026-11-19 22:10 Africa/Cairo — GEN-01
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirement: GEN-01
+Prompt:
+"Implement Member 6 task 1: the Notification schema, exported notify/notifyMany
+service, and authenticated paginated notification list/read endpoints. Enforce
+ownership, use shared pagination, add DTO and Swagger documentation, ObjectId
+schema guard tests, and focused service tests."
+How the output was used:
+Added the Notification model and module exports, shared notification creation
+methods, GET /api/notifications with unread count and newest-first pagination,
+and mark-one/mark-all read routes. Build and the full unit test suite passed.
+================================================
+### Member 6 — 2026-11-19 22:20 Africa/Cairo — HTL-16, HTL-18, HTL-23
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirements: HTL-16, HTL-18, HTL-23
+Prompt:
+"Implement Member 6 task 2 from the latest develop: add HotelBooking, RoomNight,
+and Review schemas with exact lifecycle values, ObjectId refs, sparse booking
+reference behavior, unique room/date and review/booking indexes; register and
+export the models; add HotelBookingsService's hasUpcomingConfirmed,
+findRoomNights, and hasActiveReservationOverlap helpers with guard tests."
+How the output was used:
+Added the three timestamped models and registered them in their owner modules.
+Exported HotelBookingsService and implemented its confirmed-booking and active
+room-night lookup helpers. Build and the full unit test suite passed.
+================================================
+### Member 6 — 2026-11-19 22:34 Africa/Cairo — HTL-16, HTL-17, HTL-18
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirements: HTL-16, HTL-17, HTL-18
+Prompt:
+"Implement Member 6 task 3: a validated POST /api/hotel-bookings multi-room
+hold; hold all room-nights with the booking in one MongoDB transaction and rely
+on the unique room/date index for concurrent conflicts; include policy callback
+methods, payment-success confirmation, expiry cleanup and tests. Allow adults=0
+per room, require at least one adult across the whole reservation, and test a
+second room occupied only by children. Do not change other members' modules."
+How the output was used:
+Added the user-only hold endpoint, DTOs and ten-minute transaction-backed holds,
+policy callbacks, payment-success confirmation and notification, and expiry
+cleanup with payment cancellation. Room occupancy, date availability and adult
+rules are enforced; a child-only second room is covered by a test. Build, all
+unit tests and formatting checks passed. Member 4's payment dispatch and Member
+5's RoomNight availability exclusions remain external integrations.
+================================================
+### Member 6 — 2026-11-19 22:45 Africa/Cairo — HTL-20
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirement: HTL-20
+Prompt:
+"Implement Member 6 task 4: owner-only paginated hotel reservation list with
+upcoming/past/cancelled filters and full reservation details, including hotel,
+rooms, dates, guests, total, status and payment/refund status. Use shared
+pagination and guards, add Swagger documentation and focused tests, and edit
+only Member 6 module folders plus AI_PROMPTS.txt."
+How the output was used:
+Added GET /api/hotel-bookings with group filters and GET /api/hotel-bookings/:id
+with private-resource ownership checks, hotel/room summaries and payment/refund
+status. Both use the shared Mongoose models and the list uses the shared
+10-item paginator. Build, all unit tests and formatting checks passed.
+================================================
+### Member 6 — 2026-11-19 22:55 Africa/Cairo — HTL-21
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirement: HTL-21
+Prompt:
+"Implement Member 6 task 5: owner-only GET refund preview and POST whole-booking
+cancel for confirmed hotel reservations, before the check-in date. Use the
+accepted hotel cancellation tiers on the full total, PaymentsService.createRefund,
+release all room-nights transactionally, update the refund reference, notify the
+user, and add DTOs, Swagger docs and focused tests."
+How the output was used:
+Added refund preview and cancellation routes with ownership checks and the
+whole-calendar-day rule. Cancellation updates status and deletes every room-night
+in one MongoDB transaction; eligible refunds use PaymentsService and notify the
+user. Build, all unit tests and formatting checks passed.
+================================================
+### Member 6 — 2026-11-19 23:12 Africa/Cairo — HTL-22
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirement: HTL-22
+Prompt:
+"Implement Member 6 task 6: GET /api/hotels/:id/reservations for the owning
+hotel moderator only. Support status/date filtering and shared pagination; show
+guest, dates and status; enforce role and provider ownership in both controller
+and service; use UsersService for guest display names, add Swagger docs/tests,
+and edit only Member 6 folders plus AI_PROMPTS.txt."
+How the output was used:
+Added the hotel moderator reservations route with status and inclusive check-in
+date filters, owner-scoped query and pagination. Guest names use UsersService's
+public profile so deactivated users display as Deleted user. Build and all unit
+tests passed.
+================================================
+### Member 6 — 2026-11-19 23:35 Africa/Cairo — HTL-23, HTL-24, GEN-11
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirements: HTL-23, HTL-24, GEN-11
+Prompt:
+"Implement Member 6 task 7: a minutely cron that completes confirmed hotel
+reservations after check-out; POST a single review only for the owner's completed
+reservation; author-owned review edits/deletes; and public newest-first paginated
+hotel reviews with visible-review rating totals and deleted-user names. Recalculate
+ratings via HotelsService.updateRating, add validated DTOs, guards, Swagger and
+focused tests, and edit only Member 6 folders plus AI_PROMPTS.txt."
+How the output was used:
+Added the completion cron, review creation/edit/delete and public list routes.
+Reviews are unique per reservation, owner-scoped, and only visible reviews
+contribute to hotel ratings. Deactivated authors display as Deleted user. Build
+and all unit tests passed.
+================================================
+### Member 6 — 2026-11-19 23:45 Africa/Cairo — ACC-17
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirement: ACC-17
+Prompt:
+"Implement Member 6 task 8: admin-only GET /api/admin/bookings with a read-only
+combined list of flight and hotel reservations, reference, user, provider, travel
+dates, amount and status. Support type, status, inclusive date-range filters and
+shared pagination. Add Swagger docs and focused tests; edit only Member 6 folders
+plus AI_PROMPTS.txt."
+How the output was used:
+Added the admin-protected combined bookings endpoint, batched lookups for user
+and provider names, UTC travel-date filters, newest-first merged pagination and
+Swagger documentation. Focused tests and the backend build passed.
+================================================
+### Member 7 � 2026-11-20 01:30 Africa/Cairo � ITN-01, ITN-03
+Student: Member 7
+Tool: ChatGPT / Codex
+Related Requirement: ITN-01, ITN-03
+Prompt:
+"Implement task 1 for Member 7 in the itineraries module: create the itinerary
+schema with exact ObjectId references, owner-only create/list/get/edit/delete
+endpoints, seeded country validation, private-by-default behavior, confirmation
+for deletion, Swagger DTO validation, and focused unit tests. Only edit the
+itineraries folder and AI_PROMPTS.txt. Build and test; stop after pushing the
+requirement branch."
+How the output was used:
+Added the itinerary model, guarded endpoints, country resolution through
+ReferenceDataService, paginated owner list, and focused schema/service tests.
+The backend build and full unit test suite passed. GitHub was unreachable from
+this machine during the required develop pull; the local tracking branch was
+already up to date.
+================================================
+### Member 7 � 2026-11-20 01:57 Africa/Cairo � ITN-05, ITN-07, ITN-08, ITN-09
+Student: Member 7
+Tool: ChatGPT / Codex
+Related Requirement: ITN-05, ITN-07, ITN-08, ITN-09
+Prompt:
+"Implement Member 7 task 2: add, edit, confirm-delete, and reorder itinerary days;
+validate seeded cities and the 60-day limit; compute day numbers and UTC calendar
+dates from array order; return consecutive city groups with day counts and
+currency-separated subtotals. Keep all edits in the itineraries module and this
+AI log, then build, test, commit, push, and open a PR."
+How the output was used:
+Added guarded day endpoints and owner-checked service operations. Day sequence and
+calendar dates are computed in API responses; day removal drops linked transport
+costs, and city groups calculate subtotals without mixing currencies. Build and
+all 246 unit tests passed.
+================================================
+### Member 7 � 2026-11-20 02:14 Africa/Cairo � ITN-10, ITN-12
+Student: Member 7
+Tool: ChatGPT / Codex
+Related Requirement: ITN-10, ITN-12
+Prompt:
+"Implement Member 7 task 3: add/edit/delete activities on itinerary days and attach
+or remove activity images through the existing UploadsService. Enforce supported
+currency for optional activity cost and the five-image limit; keep edits in the
+itineraries folder plus AI_PROMPTS.txt. Build, test, commit, push, and prepare a
+PR. Carry forward the city-group budget subtotal for the budget tasks."
+How the output was used:
+Added owner-checked activity CRUD and image routes. Images use UploadsService;
+failed database saves remove the just-uploaded file. The group subtotal already
+aggregates currencies separately; it will be revisited with the task 4/5 budget
+endpoints to verify budget and conversion behavior. Build and all 251 tests passed.
+================================================
+### Member 7 � 2026-11-20 02:26 Africa/Cairo � ITN-14, ITN-16
+Student: Member 7
+Tool: ChatGPT / Codex
+Related Requirement: ITN-14, ITN-16
+Prompt:
+"Implement Member 7 task 4: add/edit/delete per-day budget entries with the
+specified categories, non-negative amounts, and supported currencies; add/edit/
+delete transport costs with seeded from/to cities and a valid itinerary day. Keep
+changes in the itineraries module and AI_PROMPTS.txt. Verify city-group subtotals
+include budget, activity, and transport amounts by currency, then build, test,
+commit, push, and prepare a PR."
+How the output was used:
+Added owner-checked budget and transport-cost routes and service methods with
+ReferenceDataService validation. City-group subtotals now recompute from budget
+entries, activity costs, and transport by currency after each change. Build and
+all 255 tests passed.
+================================================
+### Member 7 � 2026-11-20 02:43 Africa/Cairo � ITN-14, ITN-18
+Student: Member 7
+Tool: ChatGPT / Codex
+Related Requirement: ITN-14, ITN-18
+Prompt:
+"Implement Member 7 task 5: add GET /api/itineraries/:id/budget-summary with
+category/day/city-group totals, activity costs under Activities, and intercity
+transport included. Convert every amount through ExchangeRatesService.convert
+into the signed-in viewer�s preferred currency or ?currency=; return the rate date.
+Allow owners or public itinerary readers, respecting hidden and deactivated-owner
+visibility. Keep edits in itineraries and AI_PROMPTS.txt, then build, test, commit,
+and push."
+How the output was used:
+Added an optionally authenticated summary endpoint with owner/private checks,
+public visibility checks, currency selection, and conversion of all budget,
+activity, and intercity transport amounts by ExchangeRatesService. City-group
+subtotals are returned in the target currency. Build and all 259 tests passed.
+================================================
+### Member 7 � 2026-11-20 03:05 Africa/Cairo � ITN-20, ITN-21
+Student: Member 7
+Tool: ChatGPT / Codex
+Related Requirement: ITN-20, ITN-21; budget rounding follow-up ITN-18
+Prompt:
+"Implement Member 7 task 6: public/private visibility, public itinerary search
+(keyword title/country/city, duration, country/city filters), public read-only
+details with author, and private cloning with attribution and independent data.
+Also round all converted budget-summary amounts to 2 decimals. Only edit the
+itineraries module plus AI_PROMPTS.txt; build, test, commit, and push."
+How the output was used:
+Added visibility editing, public search/detail, and owner clone routes. Search and
+public details exclude hidden itineraries and deactivated owners. Clones receive
+new embedded IDs, private visibility, and source attribution; shared image files
+remain while any cloned activity references them. Budget-summary totals now round
+to two decimals. Build and all 265 tests passed.
+================================================
+### Member 7 � 2026-11-20 03:17 Africa/Cairo � ITN-25, ITN-26
+Student: Member 7
+Tool: ChatGPT / Codex
+Related Requirement: ITN-25, ITN-26
+Prompt:
+"Implement Member 7 task 7: expose hotel search for an itinerary city group by
+reusing the existing HotelsService.search, deriving check-in/check-out from the
+group dates and accepting guests/rooms. Check FlightsService.search first; if it
+is missing, leave ITN-26 as a clearly marked TODO without copying flight logic.
+Only edit itineraries and AI_PROMPTS.txt, then build, test, commit, and push."
+How the output was used:
+Added the guarded hotel-search endpoint and query DTO. It passes the populated
+city identifier and derived group dates to HotelsService.search. FlightsService.search
+is absent from develop, so a marked ITN-26 TODO remains with no fake endpoint.
+Build and all 267 tests passed.
+================================================
+
+### Member 3 - 2026-11-20 - FLT-03, FLT-11, FLT-12, FLT-15, FLT-17, GEN-06
+Student: Member 3
+Tool: ChatGPT / Codex
+Related Requirement: FLT-03, FLT-11, FLT-12, FLT-15, FLT-17, GEN-06
+Prompt:
+"Implement Task 7 for the airlines and flights modules. Use ReferenceDataService
+for airports, convert airport-local flight times to UTC, validate flight creation
+and duplicate numbers, return local and UTC times, and add paginated one-way and
+round-trip search with cabin, price, seat, active-airline, and sorting filters.
+Export FlightsService.search(dto), including toAirportIds: string[]. Only edit
+airlines, flights, and AI_PROMPTS.txt; build, test, commit, and push."
+How the output was used:
+Added the scheduled-flight create/details/search endpoints and the exported search
+service method. Airport IANA zones are used for UTC persistence and local response
+times; search filters scheduled flights by active airline, seat availability, cabin,
+price, date, route, sorting, and fixed page size 10.
+================================================
+
+### Member 3 � 2026-11-20 � FLT-11 single-destination query fix
+Student: Member 3
+Tool: ChatGPT / Codex
+Related Requirement: FLT-11, FLT-12
+Prompt:
+"Fix GET /api/flights/search when one toAirportIds query value arrives as a scalar.
+Normalize it to string[], validate each value with IsMongoId, add one-way and
+round-trip regression tests, start the server once, then commit and push."
+How the output was used:
+Search DTO transformation now handles scalar, comma-delimited, and repeated query
+values consistently. Regression tests cover one-way and round-trip single-destination
+requests; build, focused tests, and server startup passed.
+================================================
+### Member 2 — 2026-11-20 — ITN-18, GEN-09, GEN-10, BLG-12, ACC-15
+Date: 2026-11-20
+Student: Member 2
+Tool: Codex
+Related Requirements: ITN-18, GEN-09, GEN-10, BLG-12, ACC-15
+Prompt:
+"Integrate Member 2 modules with the services now merged in develop: validate
+exchange currencies through ReferenceDataService; validate review and public
+itinerary report targets; moderate reviews and itineraries with rating
+recalculation for review changes; list public, non-hidden author itineraries;
+and implement provider deactivate/reactivate through AirlinesService and
+HotelsService with moderator notifications and audit logs. Stay in Member 2
+folders plus AI_PROMPTS.txt, add/update unit tests, run build and tests, commit
+and push one integration branch. Do not read .env or add packages. Skip server
+startup because Atlas connectivity is unavailable."
+How the output was used:
+Replaced the remaining integration stubs with the owning modules' services or
+exported models. Provider-wide booking-recipient lookup is not exposed by
+Members 4/6, so provider status changes notify moderators only; asked those
+members to expose a recipient method if passenger notifications are required.
+Build passed; 49 unit test suites and 275 tests passed. Swagger and server
+startup remain for Member 1 because Atlas connectivity is blocked here.
+================================================
+### Member 3 � 2026-11-20 � FLT-05, FLT-06
+Student: Member 3
+Tool: ChatGPT / Codex
+Related Requirement: FLT-05, FLT-06
+Prompt:
+"Implement Task 8: edit scheduled flight times with airport locking when bookings
+exist, notify confirmed passengers through NotificationsService, and cancel flights
+through FlightBookingsService.cancelAllForFlight. Add focused tests, build, test,
+start the server once, commit, and push."
+How the output was used:
+Flight edits now resolve the actual FlightBookingsService provider for booking locks
+and confirmed-passenger lookups. Time changes notify passengers, airport changes are
+rejected after bookings, and cancellation delegates booking cleanup after setting
+cancelled status.
+================================================
+### Member 3 � 2026-11-20 � FLT-06 confirmation correction
+Student: Member 3
+Tool: ChatGPT / Codex
+Related Requirement: FLT-06, GEN-14
+Prompt:
+"After pulling Member 1's merge, fix POST /api/flights/:id/cancel so the shared
+ConfirmActionDto requires confirm=true. Add a regression test for confirm=false,
+then build, test, commit, and push."
+How the output was used:
+The flight cancellation controller now validates the shared confirmation DTO, so
+confirm=false or a missing confirmation returns 400 before cancellation. Tests cover
+both rejected false and accepted true values.
+================================================
+### Member 6 — 20/11/2026 — integration fix
+Student: Member 6
+Tool: ChatGPT / Codex
+Related Requirements: HTL-23, HTL-24, HTL-16, HTL-18
+Prompt:
+"Break the circular dependencies introduced when HotelsModule imports
+HotelBookingsModule and ReviewsModule. Use forwardRef on Member 6 module imports
+and inject HotelsService with forwardRef in HotelBookingsService and ReviewsService.
+Run the backend build, test suite and development server startup; then commit and
+push the fix."
+How the output was used:
+Added forwardRef to the circular module imports and HotelsService injections.
+Build, tests and startup verification are recorded with this integration fix.
+================================================
+### Member 7 — 2026-11-20 — ITN-26 itinerary flight search
+Student: Member 7
+Tool: ChatGPT / Codex
+Related Requirement: ITN-26
+Prompt:
+"Read docs/TEAM_PLAN.md (Sections 0, 3, 4, Definition of done) and
+ docs/INTEGRATION_PROMPTS.md, then follow the COMMON PART and Member 7 section.
+ Implement GET /api/itineraries/:id/flights using the merged FlightsService.search
+ and ReferenceDataService.findAirportsByCity, with owner-only access, one-way or
+ round-trip search, itinerary-derived default dates, and passenger counts. Replace
+ remaining TODOs in itineraries. Stay in itineraries + AI_PROMPTS.txt, don't read
+ backend/.env or add packages, skip server startup, run build and tests, commit and
+ push the feature branch, and provide a Swagger checklist."
+How the output was used:
+Added an owner-only flight-search endpoint that searches from the selected origin
+to the first itinerary day's city through shared reference data and flight services.
+Round-trip return defaults to the last itinerary day's calendar date; one-way
+search omits the return date. Added DTO validation and regression coverage.
+================================================
+================================================
+### Member 4 — 2026-11-20 16:06 — PAY-01, PAY-02, PAY-03, FLT-23, FLT-26, GEN-01
+Student: Member 4
+Tool: ChatGPT / Codex
+Related Requirements: PAY-01, PAY-02, PAY-03, FLT-23, FLT-26, GEN-01
+Prompt:
+"Integrate Member 4's modules per docs/INTEGRATION_PROMPTS.md: dispatch flight
+and hotel policies, payment amount validation, retries and verified webhook
+success to the owning booking service; use real HotelBookingsService and
+NotificationsService exports; notify flight confirmation/cancellation and
+refund creation/refunded/failed outcomes; remove direct FlightBooking reads
+from PaymentsService. Replace available airport timezone TODOs using
+ReferenceDataService. Add integration unit tests, build/test, start the server
+once, commit and push the integration branch."
+How the output was used:
+Hotel payments, retries, policies and verified success events now dispatch to
+HotelBookingsService; the flight payment amount callback was added to
+FlightBookingsService. NotificationsService handles flight booking transitions
+and refund outcomes, including signed Stripe refund status updates. E-tickets
+now resolve each airport timezone. Build passed and all 52 suites / 291 tests
+passed. One sanitized server startup attempt emitted a diagnostic but did not
+reach the Nest success message; no .env values were displayed.
+================================================
+### Member 5 — 20/11/2026 — integration
+Student: Member 5
+Tool: ChatGPT / Codex
+Related Requirements: HTL-02, HTL-05, HTL-06, HTL-08, HTL-11, HTL-12, HTL-15
+Prompt summary:
+"Integrate Member 6's HotelBookingsService and ReviewsService into Member 5's hotels module. Replace RoomNight TODOs for hotel search, free rooms, availability calendar, booking overlaps for blocking/deactivation/deletion/availability removal, and hotel detail reviews/rating. Use forwardRef for the circular module and service dependencies."
+How the output was used:
+Connected active RoomNight lookups to search, free-room results and the calendar; the calendar now reports Booked with its booking reference when confirmed. Added overlap rejection for blocking, deactivation, deletion and removed availability dates. Hotel details now include paginated visible reviews and their rating aggregate from ReviewsService. Build passed; all 52 test suites (289 tests) passed. Nest application successfully started on port 4001 because port 4000 was occupied by an existing process.
+================================================
+### Member 1 — 2026-11-18 23:07 — GEN-07, ACC-06, ACC-13
+Date: 2026-11-18
+Student: Abdelrahman Hussien (Member 1)
+Tool: Claude Code (Claude Opus 5.5)
+Related Requirement: GEN-07, ACC-06, ACC-13
+Prompt:
+"Change every @Prop({ type: Types.ObjectId }) in my schemas to
+MongooseSchema.Types.ObjectId, check that id queries in my modules still work,
+add schema guard tests, fix the reference rule in TEAM_PLAN.md 3.7, and add a
+unique header line to the AI_PROMPTS.txt format so merges stop gluing entries."
+How the output was used:
+Session.userId, User.providerId and AuditLog.actorId now use
+MongooseSchema.Types.ObjectId (they had silently become Mixed); indexes kept.
+Verified all id filters in auth/users/admin-accounts/audit-logs already pass
+ObjectIds. Added schema guard tests, corrected TEAM_PLAN.md 3.7, and added the
+### header rule to this file's format instructions.
+================================================
+### Member 1 — 2026-11-20 — ACC-09, ACC-12, ACC-13, ACC-15, ACC-16, GEN-01
+Student: Member 1
+Tool: Claude (Claude Code)
+Related Requirements: ACC-09, ACC-12, ACC-13, ACC-15, ACC-16, GEN-01
+Prompt:
+"Follow docs/INTEGRATION_PROMPTS.md (COMMON PART + Member 1 section). Replace my
+remaining stubs with the real services now in develop: AirlinesService/HotelsService
+findById for moderator creation, FlightBookingsService/HotelBookingsService
+hasUpcomingConfirmed for account deactivation, NotificationsService for suspension
+and reactivation, ReferenceDataService.isSupportedCurrency for preferredCurrency.
+Avoid module cycles, add unit tests, build, test, start the server and test the
+endpoints with real requests."
+How the output was used:
+Replaced the direct collection reads with the owning services. Booking services are
+looked up lazily through ModuleRef because both booking modules import UsersModule.
+Suspension/reactivation now send in-app notifications (a failed notification does
+not undo the change). Unsupported currencies return 400. Also merged my earlier
+ObjectId schema fix (User.providerId, Session.userId, AuditLog.actorId) that had
+never been pushed. Unit tests added; build, tests, startup and API checks passed.
+================================================

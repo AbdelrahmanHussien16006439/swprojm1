@@ -1,0 +1,330 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBadRequestResponse,
+  ApiBody,
+  ApiCookieAuth,
+  ApiCreatedResponse,
+  ApiConflictResponse,
+  ApiConsumes,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiPayloadTooLargeResponse,
+  ApiQuery,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { Role } from '../../common/enums/role.enum';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
+import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
+import { CreateHotelDto } from './dto/create-hotel.dto';
+import { UpdateHotelDto } from './dto/update-hotel.dto';
+import { UpdateHotelPoliciesDto } from './dto/update-hotel-policies.dto';
+import { CreateRoomDto } from './dto/create-room.dto';
+import { UpdateRoomDto } from './dto/update-room.dto';
+import { RoomDateRangeDto, UpdateRoomAvailabilityDto } from './dto/room-date-range.dto';
+import { HotelAvailabilityQueryDto } from './dto/hotel-availability-query.dto';
+import { HotelAvailabilityCalendarQueryDto } from './dto/hotel-availability-calendar-query.dto';
+import { ListHotelReviewsQueryDto } from '../reviews/dto/list-hotel-reviews-query.dto';
+import { SearchHotelsDto } from './dto/search-hotels.dto';
+import { HotelsService } from './hotels.service';
+
+@ApiTags('hotels')
+@Controller('hotels')
+export class HotelsController {
+  constructor(private readonly hotelsService: HotelsService) {}
+
+  @Get('search')
+  @ApiOperation({ summary: 'Search available hotels by city or country (HTL-11, HTL-12)' })
+  @ApiQuery({ name: 'cityId', required: false, example: 'cairo' })
+  @ApiQuery({ name: 'countryId', required: false, example: 'EG' })
+  @ApiQuery({ name: 'checkIn', required: true, example: '2026-12-10' })
+  @ApiQuery({ name: 'checkOut', required: true, example: '2026-12-15' })
+  @ApiQuery({ name: 'guests', required: true, example: 2 })
+  @ApiQuery({ name: 'rooms', required: false, example: 1 })
+  @ApiQuery({ name: 'minPrice', required: false, example: 50 })
+  @ApiQuery({ name: 'maxPrice', required: false, example: 300 })
+  @ApiQuery({ name: 'minRating', required: false, example: 4 })
+  @ApiQuery({ name: 'sortBy', required: false, enum: ['price', 'rating'] })
+  @ApiQuery({ name: 'order', required: false, enum: ['asc', 'desc'] })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiOkResponse({ description: 'Paginated matching hotels with cheapest qualifying room price.' })
+  @ApiBadRequestResponse({ description: 'Invalid location, dates, guest count, price or rating filters.' })
+  search(@Query() query: SearchHotelsDto) {
+    return this.hotelsService.search(query);
+  }
+
+  @Get(':id/rooms/available')
+  @ApiOperation({
+    summary: 'List rooms available for the requested stay (HTL-15)',
+    description: 'Rooms with active reservations are excluded using Member 6 RoomNight data.',
+  })
+  @ApiQuery({ name: 'checkIn', required: true, example: '2026-12-10' })
+  @ApiQuery({ name: 'checkOut', required: true, example: '2026-12-15' })
+  @ApiOkResponse({ description: 'Available rooms with nightly price and total stay price.' })
+  @ApiBadRequestResponse({ description: 'Invalid stay dates.' })
+  @ApiNotFoundResponse({ description: 'Hotel not found.' })
+  getFreeRooms(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @Query() query: HotelAvailabilityQueryDto,
+  ) {
+    return this.hotelsService.getFreeRooms(hotelId, query.checkIn, query.checkOut);
+  }
+
+  @Get(':id/availability')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({
+    summary: 'View the room availability calendar for my hotel (HTL-08)',
+    description: 'Returns inclusive UTC calendar dates, including active booking references.',
+  })
+  @ApiQuery({ name: 'from', required: true, example: '2026-12-10' })
+  @ApiQuery({ name: 'to', required: true, example: '2026-12-15' })
+  @ApiOkResponse({ description: 'Room statuses for each date in the requested range.' })
+  @ApiBadRequestResponse({ description: 'Invalid dates or to is before from.' })
+  @ApiUnauthorizedResponse({ description: 'Login as a hotel moderator.' })
+  @ApiForbiddenResponse({ description: 'Hotel moderator role required.' })
+  @ApiNotFoundResponse({ description: 'Hotel not found or not owned by this moderator.' })
+  getAvailabilityCalendar(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @Query() query: HotelAvailabilityCalendarQueryDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.getAvailabilityCalendar(hotelId, query.from, query.to, user);
+  }
+
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Create a hotel profile (HTL-01)' })
+  @ApiCreatedResponse({ description: 'Hotel created.' })
+  @ApiBadRequestResponse({ description: 'Invalid hotel fields or mismatched city and country.' })
+  @ApiUnauthorizedResponse({ description: 'Login as an administrator.' })
+  @ApiForbiddenResponse({ description: 'Administrator role required.' })
+  create(@Body() dto: CreateHotelDto) {
+    return this.hotelsService.create(dto);
+  }
+
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Get a public hotel profile (HTL-02)',
+    description: 'Includes the visible, paginated hotel reviews and rating aggregate.',
+  })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiOkResponse({ description: 'Hotel profile, policy, photos, amenities and rating.' })
+  @ApiNotFoundResponse({ description: 'Hotel not found.' })
+  get(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Query() query: ListHotelReviewsQueryDto,
+  ) {
+    return this.hotelsService.findHotelDetails(id, query);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Edit my hotel profile and standard times (HTL-01, HTL-09)' })
+  @ApiOkResponse({ description: 'Hotel profile updated.' })
+  @ApiBadRequestResponse({ description: 'Invalid hotel fields or mismatched city and country.' })
+  @ApiUnauthorizedResponse({ description: 'Login required.' })
+  @ApiForbiddenResponse({ description: 'Hotel moderator role required.' })
+  @ApiNotFoundResponse({ description: 'Hotel not found.' })
+  update(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Body() dto: UpdateHotelDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.update(id, dto, user);
+  }
+
+  @Put(':id/policies')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Set hotel check-in/out times and cancellation tiers (HTL-09, HTL-10)' })
+  @ApiOkResponse({ description: 'Hotel policies updated.' })
+  @ApiBadRequestResponse({ description: 'Invalid times or cancellation tiers.' })
+  @ApiUnauthorizedResponse({ description: 'Login required.' })
+  @ApiForbiddenResponse({ description: 'Hotel moderator role required.' })
+  @ApiNotFoundResponse({ description: 'Hotel not found.' })
+  updatePolicies(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Body() dto: UpdateHotelPoliciesDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.updatePolicies(id, dto, user);
+  }
+
+  @Post(':id/rooms')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Add a room to my hotel (HTL-03)' })
+  @ApiCreatedResponse({ description: 'Room created.' })
+  @ApiBadRequestResponse({ description: 'Invalid room fields.' })
+  @ApiConflictResponse({ description: 'Room name already exists in this hotel.' })
+  @ApiUnauthorizedResponse({ description: 'Login required.' })
+  @ApiForbiddenResponse({ description: 'Hotel moderator role required.' })
+  @ApiNotFoundResponse({ description: 'Hotel not found or not owned by user.' })
+  createRoom(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @Body() dto: CreateRoomDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.createRoom(hotelId, dto, user);
+  }
+
+  @Patch(':id/rooms/:roomId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Edit or deactivate a room in my hotel (HTL-05, HTL-06)' })
+  @ApiOkResponse({ description: 'Room updated.' })
+  @ApiBadRequestResponse({ description: 'Invalid room fields.' })
+  @ApiConflictResponse({ description: 'Room name already exists in this hotel.' })
+  @ApiUnauthorizedResponse({ description: 'Login required.' })
+  @ApiForbiddenResponse({ description: 'Hotel moderator role required.' })
+  @ApiNotFoundResponse({ description: 'Hotel or room not found or not owned by user.' })
+  updateRoom(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @Param('roomId', ParseObjectIdPipe) roomId: string,
+    @Body() dto: UpdateRoomDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.updateRoom(hotelId, roomId, dto, user);
+  }
+
+  @Delete(':id/rooms/:roomId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Delete a room that has never been reserved (HTL-06)' })
+  @ApiConflictResponse({ description: 'Room has already been reserved.' })
+  @ApiNotFoundResponse({ description: 'Hotel or room not found or not owned by user.' })
+  deleteRoom(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @Param('roomId', ParseObjectIdPipe) roomId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.deleteRoom(hotelId, roomId, user);
+  }
+
+  @Post(':id/rooms/:roomId/availability')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Add an available date range to a room (HTL-04)' })
+  @ApiCreatedResponse({ description: 'Availability range added.' })
+  @ApiBadRequestResponse({ description: 'Invalid or overlapping availability range.' })
+  @ApiUnauthorizedResponse({ description: 'Login required.' })
+  @ApiForbiddenResponse({ description: 'Hotel moderator role required.' })
+  @ApiNotFoundResponse({ description: 'Hotel or room not found or not owned by user.' })
+  addAvailability(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @Param('roomId', ParseObjectIdPipe) roomId: string,
+    @Body() dto: RoomDateRangeDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.addAvailability(hotelId, roomId, dto, user);
+  }
+
+  @Patch(':id/rooms/:roomId/availability')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({
+    summary: 'Edit bookable and blocked date ranges (HTL-05, HTL-06)',
+    description: 'Provided arrays replace their existing ranges; omit an array to leave it unchanged.',
+  })
+  @ApiOkResponse({ description: 'Room availability ranges updated.' })
+  @ApiBadRequestResponse({ description: 'Invalid or overlapping availability ranges.' })
+  @ApiUnauthorizedResponse({ description: 'Login required.' })
+  @ApiForbiddenResponse({ description: 'Hotel moderator role required.' })
+  @ApiNotFoundResponse({ description: 'Hotel or room not found or not owned by user.' })
+  updateAvailability(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @Param('roomId', ParseObjectIdPipe) roomId: string,
+    @Body() dto: UpdateRoomAvailabilityDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.updateAvailability(hotelId, roomId, dto, user);
+  }
+
+  @Post(':id/photos')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+    }),
+  )
+  @ApiOperation({ summary: 'Add a photo to my hotel (HTL-01, GEN-08)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: { file: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiOkResponse({ description: 'Hotel photo uploaded.' })
+  @ApiBadRequestResponse({ description: 'Missing or invalid JPG/PNG image.' })
+  @ApiPayloadTooLargeResponse({ description: 'Image exceeds 5 MB.' })
+  @ApiConflictResponse({ description: 'Hotel already has 5 photos.' })
+  @ApiUnauthorizedResponse({ description: 'Login required.' })
+  @ApiForbiddenResponse({ description: 'Hotel moderator role required.' })
+  @ApiNotFoundResponse({ description: 'Hotel not found or not owned by user.' })
+  uploadPhoto(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.addPhoto(hotelId, file, user);
+  }
+
+  @Delete(':id/photos/:photoId')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.HOTEL_MODERATOR)
+  @ApiCookieAuth('access_token')
+  @ApiOperation({ summary: 'Remove a photo from my hotel (HTL-01, GEN-08)' })
+  @ApiOkResponse({ description: 'Hotel photo removed.' })
+  @ApiBadRequestResponse({ description: 'Photo id is invalid.' })
+  @ApiUnauthorizedResponse({ description: 'Login required.' })
+  @ApiForbiddenResponse({ description: 'Hotel moderator role required.' })
+  @ApiNotFoundResponse({ description: 'Hotel, photo, or ownership not found.' })
+  deletePhoto(
+    @Param('id', ParseObjectIdPipe) hotelId: string,
+    @Param('photoId') photoId: string,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.hotelsService.removePhoto(hotelId, photoId, user);
+  }
+}

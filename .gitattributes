@@ -1,0 +1,13 @@
+# Store all text files with LF line endings in the repo, whatever each
+# member's editor or core.autocrlf setting is (Windows checkouts still get CRLF).
+* text=auto
+
+# Everyone appends to the bottom of the AI log, so keep both sides' lines on merge
+# instead of reporting a conflict.
+AI_PROMPTS.txt merge=union
+
+# Never touch binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
