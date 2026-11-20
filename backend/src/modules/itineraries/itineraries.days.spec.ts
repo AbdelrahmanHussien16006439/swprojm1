@@ -53,7 +53,13 @@ describe('ItinerariesService days (ITN-05, ITN-07, ITN-08, ITN-09)', () => {
         _id: id === 'cairo' ? cityA : cityB,
       })),
     };
-    service = new ItinerariesService(model, referenceData as ReferenceDataService);
+    service = new ItinerariesService(
+      model,
+      referenceData as ReferenceDataService,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
   });
 
   it('adds at the requested position and derives sequential day numbers, dates, and groups', async () => {

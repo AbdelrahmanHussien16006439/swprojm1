@@ -2,10 +2,14 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ConfirmActionDto } from '../../common/dto/confirm-action.dto';
+import { Role } from '../../common/enums/role.enum';
+import { UserStatus } from '../../common/enums/user-status.enum';
 import { paginate } from '../../common/utils/pagination';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
+import { ExchangeRatesService } from '../exchange-rates/exchange-rates.service';
 import { ReferenceDataService } from '../reference-data/reference-data.service';
 import { UploadsService } from '../uploads/uploads.service';
+import { UsersService } from '../users/users.service';
 import { CreateItineraryActivityDto } from './dto/create-itinerary-activity.dto';
 import { CreateItineraryBudgetDto } from './dto/create-itinerary-budget.dto';
 import { CreateItineraryDayDto } from './dto/create-itinerary-day.dto';
@@ -16,6 +20,7 @@ import { UpdateItineraryActivityDto } from './dto/update-itinerary-activity.dto'
 import { UpdateItineraryBudgetDto } from './dto/update-itinerary-budget.dto';
 import { UpdateItineraryDayDto } from './dto/update-itinerary-day.dto';
 import { CreateItineraryTransportCostDto } from './dto/create-itinerary-transport-cost.dto';
+import { BudgetSummaryQueryDto } from './dto/budget-summary-query.dto';
 import { UpdateItineraryTransportCostDto } from './dto/update-itinerary-transport-cost.dto';
 import { UpdateItineraryDto } from './dto/update-itinerary.dto';
 import {
@@ -25,12 +30,34 @@ import {
 } from './itineraries.constants';
 import { Itinerary } from './schemas/itinerary.schema';
 
+const SUMMARY_CATEGORIES = [
+  'food',
+  'accommodation',
+  'in-city transport',
+  'activities',
+  'intercity transport',
+] as const;
+
+type CurrencyTotals = Record<string, number>;
+
+interface RawDaySummary {
+  dayId: string;
+  dayNumber: number;
+  date: Date;
+  cityKey: string;
+  cityId: unknown;
+  byCategory: Record<string, CurrencyTotals>;
+  total: CurrencyTotals;
+}
+
 @Injectable()
 export class ItinerariesService {
   constructor(
     @InjectModel(Itinerary.name) private readonly itineraryModel: Model<Itinerary>,
     private readonly referenceDataService: ReferenceDataService,
     private readonly uploadsService: UploadsService,
+    private readonly exchangeRatesService: ExchangeRatesService,
+    private readonly usersService: UsersService,
   ) {}
 
   async create(dto: CreateItineraryDto, user: JwtUser) {
@@ -341,6 +368,155 @@ export class ItinerariesService {
     return this.findOwned(itinerary._id.toString(), user);
   }
 
+  async getBudgetSummary(
+    id: string,
+    query: BudgetSummaryQueryDto,
+    user?: JwtUser,
+  ) {
+    const itinerary = await this.itineraryModel
+      .findById(id)
+      .populate('days.cityId')
+      .exec();
+    if (!itinerary) throw new NotFoundException('Itinerary not found');
+
+    const ownerId = itinerary.ownerId.toString();
+    const isOwner = user?.sub === ownerId;
+    const isAdmin = user?.role === Role.ADMIN;
+    const owner = await this.usersService.findById(ownerId);
+    const mayReadHidden = isOwner || (isAdmin && itinerary.isHidden);
+    const isPubliclyVisible =
+      itinerary.isPublic &&
+      !itinerary.isHidden &&
+      Boolean(owner && owner.status !== UserStatus.DEACTIVATED);
+    if (!mayReadHidden && !isPubliclyVisible) {
+      throw new NotFoundException('Itinerary not found');
+    }
+
+    const viewer = user ? await this.usersService.findById(user.sub) : null;
+    const targetCurrency = (
+      query.currency ?? viewer?.preferredCurrency ?? owner?.preferredCurrency
+    )?.toUpperCase();
+    if (!targetCurrency || !(await this.referenceDataService.isSupportedCurrency(targetCurrency))) {
+      throw new BadRequestException('currency is not supported');
+    }
+
+    const rawDays = this.buildRawBudgetSummary(itinerary);
+    const rawTotal: CurrencyTotals = {};
+    const rawCategories = this.emptyCategoryTotals();
+    const rawGroups: Array<{
+      cityKey: string;
+      cityId: unknown;
+      fromDay: number;
+      toDay: number;
+      dayCount: number;
+      byCategory: Record<string, CurrencyTotals>;
+      total: CurrencyTotals;
+    }> = [];
+
+    for (const day of rawDays) {
+      this.mergeCategoryTotals(rawCategories, day.byCategory);
+      this.mergeCurrencyTotals(rawTotal, day.total);
+      let group = rawGroups[rawGroups.length - 1];
+      if (!group || group.cityKey !== day.cityKey) {
+        group = {
+          cityKey: day.cityKey,
+          cityId: day.cityId,
+          fromDay: day.dayNumber,
+          toDay: day.dayNumber,
+          dayCount: 0,
+          byCategory: this.emptyCategoryTotals(),
+          total: {},
+        };
+        rawGroups.push(group);
+      }
+      group.toDay = day.dayNumber;
+      group.dayCount += 1;
+      this.mergeCategoryTotals(group.byCategory, day.byCategory);
+      this.mergeCurrencyTotals(group.total, day.total);
+    }
+
+    const identityConversion = await this.exchangeRatesService.convert(
+      0,
+      targetCurrency,
+      targetCurrency,
+    );
+    const rateDate = identityConversion.rateDate;
+    const rates = new Map<string, number>([[targetCurrency, 1]]);
+    const conversions = new Map<
+      string,
+      Promise<{ amount: number; rate: number; rateDate: Date }>
+    >();
+    const convertTotals = async (totals: CurrencyTotals) => {
+      const convertedValues = await Promise.all(
+        Object.entries(totals).map(([currency, amount]) => {
+          const key = `${currency}:${amount}`;
+          let conversion = conversions.get(key);
+          if (!conversion) {
+            conversion = this.exchangeRatesService.convert(
+              amount,
+              currency,
+              targetCurrency,
+            );
+            conversions.set(key, conversion);
+          }
+          return conversion.then((value) => {
+            rates.set(currency, value.rate);
+            return value.amount;
+          });
+        }),
+      );
+      return convertedValues.reduce((sum, amount) => sum + amount, 0);
+    };
+    const convertCategories = async (categories: Record<string, CurrencyTotals>) =>
+      Promise.all(
+        SUMMARY_CATEGORIES.map(async (category) => ({
+          category,
+          amount: await convertTotals(categories[category] ?? {}),
+        })),
+      );
+
+    const [total, byCategory, byDay, byGroup] = await Promise.all([
+      convertTotals(rawTotal),
+      convertCategories(rawCategories),
+      Promise.all(
+        rawDays.map(async (day) => ({
+          dayId: day.dayId,
+          dayNumber: day.dayNumber,
+          date: day.date,
+          cityId: day.cityId,
+          total: await convertTotals(day.total),
+          byCategory: await convertCategories(day.byCategory),
+        })),
+      ),
+      Promise.all(
+        rawGroups.map(async (group) => ({
+          cityId: group.cityId,
+          fromDay: group.fromDay,
+          toDay: group.toDay,
+          dayCount: group.dayCount,
+          budgetSubtotal: await convertTotals(group.total),
+          byCategory: await convertCategories(group.byCategory),
+        })),
+      ),
+    ]);
+
+    return {
+      itineraryId: itinerary._id.toString(),
+      currency: targetCurrency,
+      rateDate,
+      total,
+      byCategory,
+      byDay,
+      byGroup,
+      rates: [...rates].map(([from, rate]) => ({
+        from,
+        to: targetCurrency,
+        rate,
+        rateDate,
+      })),
+    };
+  }
+
   async update(id: string, dto: UpdateItineraryDto, user: JwtUser) {
     const updates: Record<string, unknown> = {};
     if (dto.title !== undefined) updates.title = dto.title.trim();
@@ -506,6 +682,66 @@ export class ItinerariesService {
       const existing = totals.find((total) => total.currency === currency);
       if (existing) existing.amount += item.amount;
       else totals.push({ currency, amount: item.amount });
+    }
+  }
+
+  private buildRawBudgetSummary(itinerary: any): RawDaySummary[] {
+    const transportCosts = itinerary.transportCosts ?? [];
+    return itinerary.days.map((day: any, index: number) => {
+      const byCategory = this.emptyCategoryTotals();
+      for (const entry of day.budgetEntries ?? []) {
+        this.addMoney(byCategory[entry.category], entry.currency, entry.amount);
+      }
+      for (const activity of day.activities ?? []) {
+        if (activity.cost != null && activity.currency) {
+          this.addMoney(byCategory.activities, activity.currency, activity.cost);
+        }
+      }
+      for (const cost of transportCosts) {
+        if (cost.dayId.toString() === day._id.toString()) {
+          this.addMoney(byCategory['intercity transport'], cost.currency, cost.amount);
+        }
+      }
+      const total: CurrencyTotals = {};
+      for (const category of SUMMARY_CATEGORIES) {
+        this.mergeCurrencyTotals(total, byCategory[category]);
+      }
+      const city = day.cityId;
+      return {
+        dayId: day._id.toString(),
+        dayNumber: index + 1,
+        date: new Date(
+          itinerary.startDate.getTime() + index * MILLISECONDS_PER_CALENDAR_DAY,
+        ),
+        cityKey: String(city?._id ?? city),
+        cityId: city,
+        byCategory,
+        total,
+      };
+    });
+  }
+
+  private emptyCategoryTotals(): Record<string, CurrencyTotals> {
+    return Object.fromEntries(SUMMARY_CATEGORIES.map((category) => [category, {}]));
+  }
+
+  private addMoney(totals: CurrencyTotals, currency: string, amount: number) {
+    const code = currency.toUpperCase();
+    totals[code] = (totals[code] ?? 0) + amount;
+  }
+
+  private mergeCurrencyTotals(target: CurrencyTotals, source: CurrencyTotals) {
+    for (const [currency, amount] of Object.entries(source)) {
+      target[currency] = (target[currency] ?? 0) + amount;
+    }
+  }
+
+  private mergeCategoryTotals(
+    target: Record<string, CurrencyTotals>,
+    source: Record<string, CurrencyTotals>,
+  ) {
+    for (const category of SUMMARY_CATEGORIES) {
+      this.mergeCurrencyTotals(target[category], source[category] ?? {});
     }
   }
 

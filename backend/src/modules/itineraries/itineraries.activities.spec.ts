@@ -64,6 +64,8 @@ describe('ItinerariesService activities (ITN-10, ITN-12)', () => {
       model,
       referenceData as ReferenceDataService,
       uploads as UploadsService,
+      {} as any,
+      {} as any,
     );
   });
 

@@ -21,7 +21,13 @@ describe('ItinerariesService basics (ITN-01, ITN-03)', () => {
     referenceData = {
       findCountry: jest.fn().mockResolvedValue({ _id: countryId }),
     };
-    service = new ItinerariesService(model, referenceData as ReferenceDataService);
+    service = new ItinerariesService(
+      model,
+      referenceData as ReferenceDataService,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
   });
 
   it('validates seeded countries, stores UTC calendar date, and creates a private itinerary', async () => {
