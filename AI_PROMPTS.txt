@@ -938,3 +938,22 @@ The flight cancellation controller now validates the shared confirmation DTO, so
 confirm=false or a missing confirmation returns 400 before cancellation. Tests cover
 both rejected false and accepted true values.
 ================================================
+### Member 7 — 2026-11-20 — ITN-26 itinerary flight search
+Student: Member 7
+Tool: ChatGPT / Codex
+Related Requirement: ITN-26
+Prompt:
+"Read docs/TEAM_PLAN.md (Sections 0, 3, 4, Definition of done) and
+ docs/INTEGRATION_PROMPTS.md, then follow the COMMON PART and Member 7 section.
+ Implement GET /api/itineraries/:id/flights using the merged FlightsService.search
+ and ReferenceDataService.findAirportsByCity, with owner-only access, one-way or
+ round-trip search, itinerary-derived default dates, and passenger counts. Replace
+ remaining TODOs in itineraries. Stay in itineraries + AI_PROMPTS.txt, don't read
+ backend/.env or add packages, skip server startup, run build and tests, commit and
+ push the feature branch, and provide a Swagger checklist."
+How the output was used:
+Added an owner-only flight-search endpoint that searches from the selected origin
+to the first itinerary day's city through shared reference data and flight services.
+Round-trip return defaults to the last itinerary day's calendar date; one-way
+search omits the return date. Added DTO validation and regression coverage.
+================================================
