@@ -1,4 +1,6 @@
-import { Controller, Get, Inject, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
 import {
   ApiBadRequestResponse,
   ApiNotFoundResponse,
@@ -11,9 +13,9 @@ import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
 import { UserStatus } from '../../common/enums/user-status.enum';
 import { UsersService } from '../users/users.service';
+import { Itinerary } from '../itineraries/schemas/itinerary.schema';
+import { paginate } from '../../common/utils/pagination';
 import { BlogService } from './blog.service';
-import { PUBLIC_ITINERARY_READER } from './public-itinerary-reader';
-import type { PublicItineraryReader } from './public-itinerary-reader';
 
 @ApiTags('authors')
 @Controller('authors')
@@ -21,20 +23,20 @@ export class AuthorsController {
   constructor(
     private readonly usersService: UsersService,
     private readonly blogService: BlogService,
-    @Inject(PUBLIC_ITINERARY_READER)
-    private readonly itineraryReader: PublicItineraryReader,
+    @InjectModel(Itinerary.name)
+    private readonly itineraryModel: Model<Itinerary>,
   ) {}
 
   @Get(':id')
   @ApiOperation({
     summary: 'Get a public author profile (BLG-12)',
     description:
-      'Posts use public visibility rules and pagination. itineraries is null until M7 provides its public author query.',
+      'Returns the author’s published posts and public, non-hidden itineraries.',
   })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiOkResponse({
     description:
-      'Public profile, paginated published posts, and pending itinerary integration (null)',
+      'Public profile, paginated published posts and public itineraries',
   })
   @ApiBadRequestResponse({ description: 'Invalid author id or page' })
   @ApiNotFoundResponse({ description: 'Author not found' })
@@ -47,10 +49,9 @@ export class AuthorsController {
       id,
       query.page ?? 1,
     );
-    const itineraries =
-      author.status === UserStatus.DEACTIVATED
-        ? null
-        : await this.itineraryReader.listPublicByAuthor(id, query.page ?? 1);
+    const itineraries = author.status === UserStatus.DEACTIVATED
+      ? null
+      : await this.listPublicItineraries(id, query.page ?? 1);
 
     return {
       author: {
@@ -60,6 +61,28 @@ export class AuthorsController {
       },
       posts,
       itineraries,
+    };
+  }
+
+  private async listPublicItineraries(authorId: string, page: number) {
+    const result = await paginate(
+      this.itineraryModel,
+      {
+        ownerId: new Types.ObjectId(authorId),
+        isPublic: true,
+        isHidden: false,
+      },
+      page,
+      { sort: { updatedAt: -1, _id: -1 } },
+    );
+    return {
+      ...result,
+      data: result.data.map((itinerary) => ({
+        id: itinerary._id.toString(),
+        title: itinerary.title,
+        startDate: itinerary.startDate,
+        days: itinerary.days.length,
+      })),
     };
   }
 }

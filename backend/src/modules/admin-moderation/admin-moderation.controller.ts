@@ -70,7 +70,7 @@ export class AdminModerationController {
 
   @Patch('content/:type/:id/hide')
   @ApiParam({ name: 'type', enum: ModeratedContentType })
-  @ApiOperation({ summary: 'Hide or restore a post or comment (GEN-10)' })
+  @ApiOperation({ summary: 'Hide or restore content (GEN-10)' })
   @ApiOkResponse({ description: 'Visibility changed and action audited' })
   @ApiBadRequestResponse({ description: 'Invalid content type or id' })
   @ApiNotFoundResponse({ description: 'Content not found' })
@@ -92,7 +92,7 @@ export class AdminModerationController {
   @Delete('content/:type/:id')
   @ApiParam({ name: 'type', enum: ModeratedContentType })
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete a post or comment (GEN-10)' })
+  @ApiOperation({ summary: 'Delete content (GEN-10)' })
   @ApiOkResponse({ description: 'Content deleted and action audited' })
   @ApiBadRequestResponse({ description: 'Invalid content type or id' })
   @ApiNotFoundResponse({ description: 'Content not found' })

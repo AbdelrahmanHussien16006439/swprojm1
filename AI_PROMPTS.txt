@@ -909,4 +909,25 @@ How the output was used:
 Search DTO transformation now handles scalar, comma-delimited, and repeated query
 values consistently. Regression tests cover one-way and round-trip single-destination
 requests; build, focused tests, and server startup passed.
+================================================Date: 2026-11-20
+Student: Member 2
+Tool: Codex
+Related Requirements: ITN-18, GEN-09, GEN-10, BLG-12, ACC-15
+Prompt:
+"Integrate Member 2 modules with the services now merged in develop: validate
+exchange currencies through ReferenceDataService; validate review and public
+itinerary report targets; moderate reviews and itineraries with rating
+recalculation for review changes; list public, non-hidden author itineraries;
+and implement provider deactivate/reactivate through AirlinesService and
+HotelsService with moderator notifications and audit logs. Stay in Member 2
+folders plus AI_PROMPTS.txt, add/update unit tests, run build and tests, commit
+and push one integration branch. Do not read .env or add packages. Skip server
+startup because Atlas connectivity is unavailable."
+How the output was used:
+Replaced the remaining integration stubs with the owning modules' services or
+exported models. Provider-wide booking-recipient lookup is not exposed by
+Members 4/6, so provider status changes notify moderators only; asked those
+members to expose a recipient method if passenger notifications are required.
+Build passed; 49 unit test suites and 275 tests passed. Swagger and server
+startup remain for Member 1 because Atlas connectivity is blocked here.
 ================================================
