@@ -931,3 +931,31 @@ members to expose a recipient method if passenger notifications are required.
 Build passed; 49 unit test suites and 275 tests passed. Swagger and server
 startup remain for Member 1 because Atlas connectivity is blocked here.
 ================================================
+### Member 3 — 2026-11-20 — FLT-05, FLT-06
+Student: Member 3
+Tool: ChatGPT / Codex
+Related Requirement: FLT-05, FLT-06
+Prompt:
+"Implement Task 8: edit scheduled flight times with airport locking when bookings
+exist, notify confirmed passengers through NotificationsService, and cancel flights
+through FlightBookingsService.cancelAllForFlight. Add focused tests, build, test,
+start the server once, commit, and push."
+How the output was used:
+Flight edits now resolve the actual FlightBookingsService provider for booking locks
+and confirmed-passenger lookups. Time changes notify passengers, airport changes are
+rejected after bookings, and cancellation delegates booking cleanup after setting
+cancelled status.
+================================================
+### Member 3 — 2026-11-20 — FLT-06 confirmation correction
+Student: Member 3
+Tool: ChatGPT / Codex
+Related Requirement: FLT-06, GEN-14
+Prompt:
+"After pulling Member 1's merge, fix POST /api/flights/:id/cancel so the shared
+ConfirmActionDto requires confirm=true. Add a regression test for confirm=false,
+then build, test, commit, and push."
+How the output was used:
+The flight cancellation controller now validates the shared confirmation DTO, so
+confirm=false or a missing confirmation returns 400 before cancellation. Tests cover
+both rejected false and accepted true values.
+================================================

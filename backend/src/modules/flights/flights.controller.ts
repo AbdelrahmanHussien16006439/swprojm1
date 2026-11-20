@@ -19,6 +19,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ConfirmActionDto } from '../../common/dto/confirm-action.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -75,7 +76,11 @@ export class FlightsController {
   @Roles(Role.AIRLINE_MODERATOR)
   @ApiCookieAuth('access_token')
   @ApiOperation({ summary: 'Cancel a scheduled flight (FLT-06)' })
-  cancel(@Param('id', ParseObjectIdPipe) id: string, @CurrentUser() user: JwtUser) {
+  cancel(
+    @Param('id', ParseObjectIdPipe) id: string,
+    @Body() _dto: ConfirmActionDto,
+    @CurrentUser() user: JwtUser,
+  ) {
     return this.flightsService.cancel(id, user);
   }
 
