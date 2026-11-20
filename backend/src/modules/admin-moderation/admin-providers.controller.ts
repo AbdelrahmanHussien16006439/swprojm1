@@ -13,7 +13,6 @@ import {
   ApiForbiddenResponse,
   ApiOperation,
   ApiParam,
-  ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -42,14 +41,9 @@ export class AdminProvidersController {
   @ApiParam({ name: 'type', enum: ProviderType })
   @ApiOperation({
     summary: 'Deactivate a provider (ACC-15)',
-    description:
-      'Currently returns 501 because provider, booking-recipient, and notification services are not integrated. The attempt is audited as not applied.',
+    description: 'Deactivates the provider, notifies its moderator, and records an audit log.',
   })
   @ApiBadRequestResponse({ description: 'Invalid provider type or id' })
-  @ApiResponse({
-    status: 501,
-    description: 'ACC-15 dependencies are not available in this checkout',
-  })
   deactivate(
     @Param('type', new ParseEnumPipe(ProviderType)) type: ProviderType,
     @Param('id', ParseObjectIdPipe) id: string,
@@ -63,14 +57,9 @@ export class AdminProvidersController {
   @ApiParam({ name: 'type', enum: ProviderType })
   @ApiOperation({
     summary: 'Reactivate a provider (ACC-15)',
-    description:
-      'Currently returns 501 because provider, booking-recipient, and notification services are not integrated. The attempt is audited as not applied.',
+    description: 'Reactivates the provider, notifies its moderator, and records an audit log.',
   })
   @ApiBadRequestResponse({ description: 'Invalid provider type or id' })
-  @ApiResponse({
-    status: 501,
-    description: 'ACC-15 dependencies are not available in this checkout',
-  })
   reactivate(
     @Param('type', new ParseEnumPipe(ProviderType)) type: ProviderType,
     @Param('id', ParseObjectIdPipe) id: string,

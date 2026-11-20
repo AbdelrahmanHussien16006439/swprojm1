@@ -1,10 +1,8 @@
 import {
   BadRequestException,
-  Inject,
   Injectable,
   Logger,
   OnModuleInit,
-  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -15,10 +13,7 @@ import {
   ExchangeRate,
   ExchangeRateDocument,
 } from './schemas/exchange-rate.schema';
-import {
-  SUPPORTED_CURRENCY_VALIDATOR,
-} from './currency-validator';
-import type { SupportedCurrencyValidator } from './currency-validator';
+import { ReferenceDataService } from '../reference-data/reference-data.service';
 
 interface FxRatesApiResponse {
   success: boolean;
@@ -40,9 +35,7 @@ export class ExchangeRatesService implements OnModuleInit {
     @InjectModel(ExchangeRate.name)
     private readonly exchangeRateModel: Model<ExchangeRate>,
     private readonly configService: ConfigService,
-    @Optional()
-    @Inject(SUPPORTED_CURRENCY_VALIDATOR)
-    private readonly currencyValidator?: SupportedCurrencyValidator,
+    private readonly referenceDataService: ReferenceDataService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -204,9 +197,9 @@ export class ExchangeRatesService implements OnModuleInit {
   ): Promise<void> {
     const rates = Object.fromEntries(latest.rates);
     for (const currency of currencies) {
-      const supported = this.currencyValidator
-        ? await this.currencyValidator.isSupportedCurrency(currency)
-        : currency === latest.base || Object.hasOwn(rates, currency);
+      const supported = await this.referenceDataService.isSupportedCurrency(
+        currency,
+      );
       if (!supported) {
         throw new BadRequestException(`Unsupported currency: ${currency}`);
       }

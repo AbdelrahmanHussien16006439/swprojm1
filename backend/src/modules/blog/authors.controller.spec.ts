@@ -2,11 +2,8 @@ import { NotFoundException } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { UserStatus } from '../../common/enums/user-status.enum';
 import { ParseObjectIdPipe } from '../../common/pipes/parse-object-id.pipe';
+import { Types } from 'mongoose';
 import { AuthorsController } from './authors.controller';
-import {
-  PendingPublicItineraryReader,
-  PUBLIC_ITINERARY_READER,
-} from './public-itinerary-reader';
 
 describe('AuthorsController (BLG-12)', () => {
   const authorId = '665f1e77d8e043d0b1c0a111';
@@ -32,21 +29,34 @@ describe('AuthorsController (BLG-12)', () => {
       }),
       ...overrides.blogService,
     };
-    const itineraryReader = {
-      listPublicByAuthor: jest.fn().mockResolvedValue(null),
-      ...overrides.itineraryReader,
+    const itineraries = overrides.itineraries ?? [
+      {
+        _id: new Types.ObjectId('665f1e77d8e043d0b1c0a333'),
+        title: 'Public itinerary',
+        startDate: new Date('2026-12-01T00:00:00Z'),
+        days: [{}, {}],
+      },
+    ];
+    const query = {
+      sort: jest.fn().mockReturnThis(),
+      skip: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      exec: jest.fn().mockResolvedValue(itineraries),
+    };
+    const itineraryModel = {
+      find: jest.fn().mockReturnValue(query),
+      countDocuments: jest.fn().mockReturnValue({ exec: jest.fn().mockResolvedValue(itineraries.length) }),
     };
     const controller = new AuthorsController(
       usersService as any,
       blogService as any,
-      itineraryReader as any,
+      itineraryModel as any,
     );
-    return { controller, usersService, blogService, itineraryReader };
+    return { controller, usersService, blogService, itineraryModel, query };
   }
 
-  it('is public and returns the profile with paginated public posts and the pending itinerary value', async () => {
-    const { controller, usersService, blogService, itineraryReader } =
-      makeController();
+  it('returns the profile with paginated public posts and visible public itineraries', async () => {
+    const { controller, usersService, blogService, itineraryModel } = makeController();
 
     const result = await controller.getAuthorProfile(authorId, { page: 2 });
 
@@ -58,10 +68,11 @@ describe('AuthorsController (BLG-12)', () => {
       authorId,
       2,
     );
-    expect(itineraryReader.listPublicByAuthor).toHaveBeenCalledWith(
-      authorId,
-      2,
-    );
+    expect(itineraryModel.find).toHaveBeenCalledWith({
+      ownerId: new Types.ObjectId(authorId),
+      isPublic: true,
+      isHidden: false,
+    });
     expect(result).toEqual({
       author: {
         id: authorId,
@@ -75,12 +86,23 @@ describe('AuthorsController (BLG-12)', () => {
         total: 0,
         totalPages: 0,
       },
-      itineraries: null,
+      itineraries: {
+        data: [{
+          id: '665f1e77d8e043d0b1c0a333',
+          title: 'Public itinerary',
+          startDate: new Date('2026-12-01T00:00:00Z'),
+          days: 2,
+        }],
+        page: 2,
+        limit: 10,
+        total: 1,
+        totalPages: 1,
+      },
     });
   });
 
   it('returns 404 when UsersService cannot find the author', async () => {
-    const { controller, blogService, itineraryReader } = makeController({
+    const { controller, blogService, itineraryModel } = makeController({
       usersService: {
         findPublicProfile: jest
           .fn()
@@ -92,11 +114,11 @@ describe('AuthorsController (BLG-12)', () => {
       controller.getAuthorProfile(authorId, { page: 1 }),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(blogService.listPublicPostsByAuthor).not.toHaveBeenCalled();
-    expect(itineraryReader.listPublicByAuthor).not.toHaveBeenCalled();
+    expect(itineraryModel.find).not.toHaveBeenCalled();
   });
 
   it('does not query itineraries for a deactivated author', async () => {
-    const { controller, itineraryReader } = makeController({
+    const { controller, itineraryModel } = makeController({
       usersService: {
         findPublicProfile: jest.fn().mockResolvedValue({
           ...profile,
@@ -110,7 +132,7 @@ describe('AuthorsController (BLG-12)', () => {
 
     expect(result.author.name).toBe('Deleted user');
     expect(result.itineraries).toBeNull();
-    expect(itineraryReader.listPublicByAuthor).not.toHaveBeenCalled();
+    expect(itineraryModel.find).not.toHaveBeenCalled();
   });
 
   it('validates author IDs as Mongo ObjectIds', () => {
@@ -119,10 +141,4 @@ describe('AuthorsController (BLG-12)', () => {
     );
   });
 
-  it('registers a dependency stub that returns null instead of invented itinerary data', async () => {
-    expect(PUBLIC_ITINERARY_READER).toBeDefined();
-    await expect(
-      new PendingPublicItineraryReader().listPublicByAuthor(authorId, 1),
-    ).resolves.toBeNull();
-  });
 });

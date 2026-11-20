@@ -9,6 +9,8 @@ import { Comment } from '../blog/schemas/comment.schema';
 import { Post, PostStatus } from '../blog/schemas/post.schema';
 import { User } from '../users/schemas/user.schema';
 import { UserStatus } from '../../common/enums/user-status.enum';
+import { Review } from '../reviews/schemas/review.schema';
+import { Itinerary } from '../itineraries/schemas/itinerary.schema';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { CreateReportDto } from './dto/create-report.dto';
 import { Report, ReportTargetType } from './schemas/report.schema';
@@ -20,6 +22,9 @@ export class ReportsService {
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
     @InjectModel(Comment.name) private readonly commentModel: Model<Comment>,
     @InjectModel(User.name) private readonly userModel: Model<User>,
+    @InjectModel(Review.name) private readonly reviewModel: Model<Review>,
+    @InjectModel(Itinerary.name)
+    private readonly itineraryModel: Model<Itinerary>,
   ) {}
 
   async createReport(user: JwtUser, dto: CreateReportDto) {
@@ -79,11 +84,20 @@ export class ReportsService {
         await this.assertPublicPost(comment.postId);
         return;
       }
-      case ReportTargetType.REVIEW:
-      case ReportTargetType.ITINERARY:
-        // Their modules have no schemas/services in this checkout. The DTO still
-        // validates ObjectId syntax; existence checks can be added when merged.
+      case ReportTargetType.REVIEW: {
+        const review = await this.reviewModel
+          .exists({ _id: targetId, isHidden: false })
+          .exec();
+        if (!review) throw new NotFoundException('Report target not found');
         return;
+      }
+      case ReportTargetType.ITINERARY: {
+        const itinerary = await this.itineraryModel
+          .exists({ _id: targetId, isPublic: true, isHidden: false })
+          .exec();
+        if (!itinerary) throw new NotFoundException('Report target not found');
+        return;
+      }
       default:
         throw new NotFoundException('Report target not found');
     }

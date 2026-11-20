@@ -1,4 +1,4 @@
-import { NotFoundException, NotImplementedException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { Model, Types } from 'mongoose';
 import {
   AdminModerationService,
@@ -47,13 +47,26 @@ function createService(targetType = ReportTargetType.POST) {
     deletePostForModeration: jest.fn().mockResolvedValue(undefined),
     deleteCommentForModeration: jest.fn().mockResolvedValue(undefined),
   };
+  const review = { _id: new Types.ObjectId(), hotelId: new Types.ObjectId() };
+  const reviewModel: any = {
+    findByIdAndUpdate: jest.fn().mockReturnValue(execResult(review)),
+    findByIdAndDelete: jest.fn().mockReturnValue(execResult(review)),
+  };
+  const itineraryModel: any = {
+    findByIdAndUpdate: jest.fn().mockReturnValue(execResult({ _id: id })),
+    findByIdAndDelete: jest.fn().mockReturnValue(execResult({ _id: id })),
+  };
+  const reviews: any = { recalculateHotelRating: jest.fn().mockResolvedValue(undefined) };
   const audit: any = { log: jest.fn().mockResolvedValue(undefined) };
   const service = new AdminModerationService(
     reportModel as Model<Report>,
+    reviewModel,
+    itineraryModel,
     blog as BlogService,
+    reviews,
     audit as AuditLogsService,
   );
-  return { service, report, reportModel, blog, audit };
+  return { service, report, reportModel, blog, review, reviewModel, itineraryModel, reviews, audit };
 }
 
 describe('AdminModerationService', () => {
@@ -231,17 +244,37 @@ describe('AdminModerationService', () => {
     expect(audit.log).not.toHaveBeenCalled();
   });
 
-  it('leaves review and itinerary reports pending until owner integrations exist', async () => {
-    const { service, report, audit } = createService(ReportTargetType.REVIEW);
+  it('hides and deletes reviews and recalculates their hotel rating', async () => {
+    const { service, review, reviewModel, reviews, audit } = createService();
 
-    await expect(
-      service.resolveReport(
-        id.toString(),
-        adminId,
-        ReportResolutionAction.DELETE,
-      ),
-    ).rejects.toBeInstanceOf(NotImplementedException);
-    expect(report.save).not.toHaveBeenCalled();
-    expect(audit.log).not.toHaveBeenCalled();
+    await service.setContentHidden(ModeratedContentType.REVIEW, id.toString(), adminId, true);
+    expect(reviewModel.findByIdAndUpdate).toHaveBeenCalledWith(
+      id,
+      { $set: { isHidden: true } },
+      { new: true },
+    );
+    expect(reviews.recalculateHotelRating).toHaveBeenCalledWith(review.hotelId.toString());
+
+    await service.deleteContent(ModeratedContentType.REVIEW, id.toString(), adminId);
+    expect(reviewModel.findByIdAndDelete).toHaveBeenCalledWith(id);
+    expect(reviews.recalculateHotelRating).toHaveBeenCalledTimes(2);
+    expect(audit.log).toHaveBeenCalledWith(adminId, 'CONTENT_DELETED', 'review', id.toString(), { cascadeCleanup: false });
+  });
+
+  it('hides and deletes public itineraries through the shared model', async () => {
+    const { service, itineraryModel, audit } = createService();
+    await service.setContentHidden(ModeratedContentType.ITINERARY, id.toString(), adminId, false);
+    expect(itineraryModel.findByIdAndUpdate).toHaveBeenCalledWith(id, { $set: { isHidden: false } }, { new: true });
+    await service.deleteContent(ModeratedContentType.ITINERARY, id.toString(), adminId);
+    expect(itineraryModel.findByIdAndDelete).toHaveBeenCalledWith(id);
+    expect(audit.log).toHaveBeenCalledWith(adminId, 'CONTENT_DELETED', 'itinerary', id.toString(), { cascadeCleanup: false });
+  });
+
+  it('resolves a review report and recalculates rating after deletion', async () => {
+    const { service, report, review, reviews, audit } = createService(ReportTargetType.REVIEW);
+    await service.resolveReport(id.toString(), adminId, ReportResolutionAction.DELETE);
+    expect(reviews.recalculateHotelRating).toHaveBeenCalledWith(review.hotelId.toString());
+    expect(report.status).toBe(ReportStatus.DELETED);
+    expect(audit.log).toHaveBeenCalledWith(adminId, 'REPORT_DELETE', 'review', report.targetId.toString(), expect.any(Object));
   });
 });

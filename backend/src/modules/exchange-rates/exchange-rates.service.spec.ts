@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { Model } from 'mongoose';
 import { ExchangeRate } from './schemas/exchange-rate.schema';
 import { ExchangeRatesService } from './exchange-rates.service';
+import { ReferenceDataService } from '../reference-data/reference-data.service';
 
 function makeCachedRate(date = new Date()): ExchangeRate {
   return {
@@ -24,7 +25,7 @@ function createService(options?: {
   latest?: ExchangeRate | null;
   today?: ExchangeRate | null;
   apiKey?: string;
-  validator?: { isSupportedCurrency: jest.Mock };
+  referenceData?: { isSupportedCurrency: jest.Mock };
 }) {
   const latest = options && 'latest' in options ? options.latest : makeCachedRate();
   const today = options && 'today' in options ? options.today : latest;
@@ -43,8 +44,15 @@ function createService(options?: {
   const config = {
     get: jest.fn().mockReturnValue(options?.apiKey ?? 'test-api-key'),
   } as unknown as ConfigService;
-  const service = new ExchangeRatesService(model, config, options?.validator);
-  return { service, findOne, findOneAndUpdate, config };
+  const referenceData = options?.referenceData ?? {
+    isSupportedCurrency: jest.fn().mockResolvedValue(true),
+  };
+  const service = new ExchangeRatesService(
+    model,
+    config,
+    referenceData as unknown as ReferenceDataService,
+  );
+  return { service, findOne, findOneAndUpdate, config, referenceData };
 }
 
 describe('ExchangeRatesService', () => {
@@ -60,8 +68,10 @@ describe('ExchangeRatesService', () => {
     });
   });
 
-  it('returns HTTP 400 for a currency absent from the cache when no reference validator is wired', async () => {
-    const { service } = createService();
+  it('returns HTTP 400 when reference data does not support a currency', async () => {
+    const { service } = createService({
+      referenceData: { isSupportedCurrency: jest.fn().mockResolvedValue(false) },
+    });
 
     await expect(service.convert(1, 'USD', 'ZZZ')).rejects.toBeInstanceOf(
       BadRequestException,
@@ -76,16 +86,16 @@ describe('ExchangeRatesService', () => {
     );
   });
 
-  it('uses Member 5 currency validation when the integration is wired', async () => {
-    const validator = {
+  it('validates both conversion currencies with ReferenceDataService', async () => {
+    const referenceData = {
       isSupportedCurrency: jest.fn().mockResolvedValue(false),
     };
-    const { service } = createService({ validator });
+    const { service } = createService({ referenceData });
 
     await expect(service.convert(1, 'USD', 'EUR')).rejects.toBeInstanceOf(
       BadRequestException,
     );
-    expect(validator.isSupportedCurrency).toHaveBeenCalledWith('USD');
+    expect(referenceData.isSupportedCurrency).toHaveBeenCalledWith('USD');
   });
 
   it('skips startup fetching when today already has cached rates', async () => {
