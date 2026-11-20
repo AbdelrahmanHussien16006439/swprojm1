@@ -71,8 +71,8 @@ export class ItinerariesController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Edit itinerary title, countries, or start date (ITN-01)' })
-  @ApiOkResponse({ description: 'Itinerary updated' })
+  @ApiOperation({ summary: 'Edit itinerary details or visibility (ITN-01, ITN-20)' })
+  @ApiOkResponse({ description: 'Itinerary updated; private itineraries disappear from public search immediately' })
   @ApiBadRequestResponse({ description: 'Invalid fields or unknown country' })
   @ApiNotFoundResponse({ description: 'Itinerary not found' })
   update(
@@ -81,6 +81,14 @@ export class ItinerariesController {
     @CurrentUser() user: JwtUser,
   ) {
     return this.itinerariesService.update(id, dto, user);
+  }
+
+  @Post(':id/clone')
+  @ApiOperation({ summary: 'Clone a public itinerary privately with attribution (ITN-21)' })
+  @ApiCreatedResponse({ description: 'Private independent copy created' })
+  @ApiNotFoundResponse({ description: 'Source itinerary is not public or visible' })
+  clone(@Param('id', ParseObjectIdPipe) id: string, @CurrentUser() user: JwtUser) {
+    return this.itinerariesService.clonePublic(id, user);
   }
 
   @Delete(':id')

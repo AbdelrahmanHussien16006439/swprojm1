@@ -845,3 +845,20 @@ public visibility checks, currency selection, and conversion of all budget,
 activity, and intercity transport amounts by ExchangeRatesService. City-group
 subtotals are returned in the target currency. Build and all 259 tests passed.
 ================================================
+### Member 7 — 2026-11-20 03:05 Africa/Cairo — ITN-20, ITN-21
+Student: Member 7
+Tool: ChatGPT / Codex
+Related Requirement: ITN-20, ITN-21; budget rounding follow-up ITN-18
+Prompt:
+"Implement Member 7 task 6: public/private visibility, public itinerary search
+(keyword title/country/city, duration, country/city filters), public read-only
+details with author, and private cloning with attribution and independent data.
+Also round all converted budget-summary amounts to 2 decimals. Only edit the
+itineraries module plus AI_PROMPTS.txt; build, test, commit, and push."
+How the output was used:
+Added visibility editing, public search/detail, and owner clone routes. Search and
+public details exclude hidden itineraries and deactivated owners. Clones receive
+new embedded IDs, private visibility, and source attribution; shared image files
+remain while any cloned activity references them. Budget-summary totals now round
+to two decimals. Build and all 265 tests passed.
+================================================
