@@ -1,5 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Model, Types } from 'mongoose';
+import { ModuleRef } from '@nestjs/core';
 import { Role } from '../../common/enums/role.enum';
 import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 import { AirlinesService } from '../airlines/airlines.service';
@@ -43,6 +44,71 @@ function setup(overrides: Record<string, jest.Mock> = {}) {
 }
 
 describe('FlightsService', () => {
+  it('locks airport changes when bookings exist and notifies confirmed passengers after time changes', async () => {
+    const departureAirportId = new Types.ObjectId();
+    const arrivalAirportId = new Types.ObjectId();
+    const departureTime = new Date('2027-03-10T08:00:00.000Z');
+    const arrivalTime = new Date('2027-03-10T12:00:00.000Z');
+    const updatedFlight = { ...flight, airlineId, departureAirportId, arrivalAirportId, departureTime: new Date('2027-03-10T09:00:00.000Z'), arrivalTime } as Flight;
+    const model = {
+      findById: jest.fn().mockReturnValue(exec({ ...flight, airlineId, status: FlightStatus.SCHEDULED, departureAirportId, arrivalAirportId, departureTime, arrivalTime, cabins: [] })),
+      findOne: jest.fn().mockReturnValue(exec(null)),
+      findOneAndUpdate: jest.fn().mockReturnValue(exec(updatedFlight)),
+    } as unknown as Model<Flight>;
+    const referenceDataService = {
+      findAirport: jest.fn()
+        .mockResolvedValueOnce({ _id: departureAirportId, timezone: 'Africa/Cairo' })
+        .mockResolvedValueOnce({ _id: arrivalAirportId, timezone: 'Asia/Dubai' }),
+    };
+    const flightBookingsService = {
+      hasBookings: jest.fn().mockResolvedValue(false),
+      findConfirmedUserIdsForFlight: jest.fn().mockResolvedValue(['user-1']),
+    };
+    const notificationsService = { notifyMany: jest.fn().mockResolvedValue([]) };
+    const moduleRef = { get: jest.fn().mockReturnValue(flightBookingsService) } as unknown as ModuleRef;
+    const airlinesService = { findById: jest.fn().mockResolvedValue({ _id: airlineId }) } as unknown as AirlinesService;
+    const service = new FlightsService(model, airlinesService, referenceDataService as never, moduleRef, notificationsService as never);
+
+    await service.update(flightId.toString(), { departureTime: '2027-03-10T12:00:00' }, moderator);
+
+    expect(flightBookingsService.findConfirmedUserIdsForFlight).toHaveBeenCalledWith(flightId.toString());
+    expect(notificationsService.notifyMany).toHaveBeenCalledWith(
+      ['user-1'],
+      'FLIGHT_SCHEDULE_CHANGED',
+      expect.stringContaining('schedule changed'),
+      `/flights/${flightId.toString()}`,
+    );
+  });
+
+  it('rejects airport changes when any booking exists', async () => {
+    const departureAirportId = new Types.ObjectId();
+    const arrivalAirportId = new Types.ObjectId();
+    const model = {
+      findById: jest.fn().mockReturnValue(exec({ ...flight, airlineId, status: FlightStatus.SCHEDULED, departureAirportId, arrivalAirportId, departureTime: new Date('2027-03-10T08:00:00.000Z'), arrivalTime: new Date('2027-03-10T12:00:00.000Z'), cabins: [] })),
+    } as unknown as Model<Flight>;
+    const flightBookingsService = { hasBookings: jest.fn().mockResolvedValue(true) };
+    const moduleRef = { get: jest.fn().mockReturnValue(flightBookingsService) } as unknown as ModuleRef;
+    const airlinesService = { findById: jest.fn().mockResolvedValue({ _id: airlineId }) } as unknown as AirlinesService;
+    const service = new FlightsService(model, airlinesService, undefined, moduleRef);
+
+    await expect(service.update(flightId.toString(), { arrivalAirportId: new Types.ObjectId().toString() }, moderator)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('cancels all bookings after changing the flight status', async () => {
+    const model = {
+      findById: jest.fn().mockReturnValue(exec({ ...flight, airlineId, status: FlightStatus.SCHEDULED, cabins: [] })),
+      findOneAndUpdate: jest.fn().mockReturnValue(exec({ ...flight, status: FlightStatus.CANCELLED })),
+    } as unknown as Model<Flight>;
+    const flightBookingsService = { cancelAllForFlight: jest.fn().mockResolvedValue(undefined) };
+    const moduleRef = { get: jest.fn().mockReturnValue(flightBookingsService) } as unknown as ModuleRef;
+    const airlinesService = { findById: jest.fn().mockResolvedValue({ _id: airlineId }) } as unknown as AirlinesService;
+    const service = new FlightsService(model, airlinesService, undefined, moduleRef);
+
+    await service.cancel(flightId.toString(), moderator);
+
+    expect(flightBookingsService.cancelAllForFlight).toHaveBeenCalledWith(flightId.toString());
+  });
+
   it('finds a flight by id', async () => {
     const model = {
       findById: jest.fn().mockReturnValue(exec(flight)),
