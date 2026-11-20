@@ -96,6 +96,19 @@ npm run start:dev
 
 To switch user, log out and log in with the other account.
 
+## Testing payments (Stripe test mode)
+
+Payments use Stripe **test mode** only; no real money is involved.
+
+1. Install the [Stripe CLI](https://docs.stripe.com/stripe-cli).
+2. Forward webhooks to the API (keep this window open while testing):
+   ```bash
+   stripe listen --api-key <STRIPE_SECRET_KEY> --events payment_intent.succeeded,payment_intent.payment_failed,payment_intent.canceled,charge.refunded,refund.created,refund.updated --forward-to localhost:4000/api/payments/webhook
+   ```
+   Put the `whsec_...` it prints into `STRIPE_WEBHOOK_SECRET` and restart the API.
+3. In Swagger: hold a flight (`POST /api/flight-bookings/hold`) or hotel (`POST /api/hotel-bookings`) → `POST /api/bookings/{type}/{id}/accept-policies` with `{"accepted": true}` → `POST /api/payments` with `{"bookingType": "flight" | "hotel", "bookingId": "...", "testPaymentMethod": "pm_card_visa"}`.
+4. A few seconds later the webhook confirms the booking (status `confirmed` + booking reference + notification). Use `pm_card_chargeDeclined` to test a failed payment and `POST /api/payments/{id}/retry`.
+
 ## Scripts (run inside `backend/`)
 
 | Command              | What it does                         |
@@ -106,12 +119,14 @@ To switch user, log out and log in with the other account.
 | `npm run lint`       | ESLint (auto-fix)                    |
 | `npm run format`     | Prettier                             |
 | `npm run seed:admin` | Seed the administrator (ACC-18)      |
+| `npm run seed:reference` | Seed countries, cities, airports, currencies and attractions from `docs/requirements/reference-data/` (team leader runs it once on the shared database) |
 
 ## Common problems
 
 | Error | Cause / fix |
 | ----- | ----------- |
 | `querySrv ECONNREFUSED` / `querySrv ETIMEOUT` | Your DNS server refuses Atlas SRV lookups. Pull the latest `develop` (it uses public DNS servers for the lookup). You can keep the normal `mongodb+srv://` string. |
+| Server hangs while connecting / SRV or TXT lookups blocked | Some networks block DNS SRV/TXT records. Use the non-SRV string instead: `mongodb://USER:PASSWORD@ac-ig9t9k3-shard-00-00.i7gpxlm.mongodb.net:27017,ac-ig9t9k3-shard-00-01.i7gpxlm.mongodb.net:27017,ac-ig9t9k3-shard-00-02.i7gpxlm.mongodb.net:27017/travel-platform?tls=true&authSource=admin&retryWrites=true&w=majority&appName=travel-platform` |
 | `bad auth : authentication failed` | Wrong username or password in `MONGODB_URI`. Ask the team leader for the correct string. Special characters in the password must be URL-encoded. |
 | `Server selection timed out` / `ENOTFOUND` | Your IP is not on the Atlas network access list, or you are offline. Ask the team leader to add your IP. |
 | `Cannot find module '.../dist/main'` | Stale build output. Delete `backend/dist` and any `*.tsbuildinfo` file in `backend/`, then run `npm run start:dev` again. |
