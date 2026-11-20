@@ -974,6 +974,7 @@ push the fix."
 How the output was used:
 Added forwardRef to the circular module imports and HotelsService injections.
 Build, tests and startup verification are recorded with this integration fix.
+================================================
 ### Member 7 — 2026-11-20 — ITN-26 itinerary flight search
 Student: Member 7
 Tool: ChatGPT / Codex
