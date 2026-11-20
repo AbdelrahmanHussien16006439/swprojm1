@@ -31,6 +31,8 @@ export const ItineraryActivitySchema = SchemaFactory.createForClass(ItineraryAct
 
 @Schema()
 export class ItineraryBudgetEntry {
+  _id: Types.ObjectId;
+
   @Prop({ required: true, enum: ['food', 'accommodation', 'in-city transport', 'activities'] })
   category: string;
 
@@ -67,6 +69,8 @@ export const ItineraryDaySchema = SchemaFactory.createForClass(ItineraryDay);
 
 @Schema()
 export class ItineraryTransportCost {
+  _id: Types.ObjectId;
+
   @Prop({ required: true, trim: true })
   mode: string;
 

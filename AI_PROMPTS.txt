@@ -810,3 +810,20 @@ failed database saves remove the just-uploaded file. The group subtotal already
 aggregates currencies separately; it will be revisited with the task 4/5 budget
 endpoints to verify budget and conversion behavior. Build and all 251 tests passed.
 ================================================
+### Member 7 — 2026-11-20 02:26 Africa/Cairo — ITN-14, ITN-16
+Student: Member 7
+Tool: ChatGPT / Codex
+Related Requirement: ITN-14, ITN-16
+Prompt:
+"Implement Member 7 task 4: add/edit/delete per-day budget entries with the
+specified categories, non-negative amounts, and supported currencies; add/edit/
+delete transport costs with seeded from/to cities and a valid itinerary day. Keep
+changes in the itineraries module and AI_PROMPTS.txt. Verify city-group subtotals
+include budget, activity, and transport amounts by currency, then build, test,
+commit, push, and prepare a PR."
+How the output was used:
+Added owner-checked budget and transport-cost routes and service methods with
+ReferenceDataService validation. City-group subtotals now recompute from budget
+entries, activity costs, and transport by currency after each change. Build and
+all 255 tests passed.
+================================================
