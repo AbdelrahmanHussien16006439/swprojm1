@@ -2,7 +2,6 @@
 
 import { useId, useRef, useState } from "react";
 import Image from "next/image";
-import { api } from "@/lib/api/client";
 import { Button, FormErrors } from "@/components/ui";
 import { cn } from "@/lib/cn";
 
@@ -14,6 +13,8 @@ export interface UploadedImage {
 interface ImageUploaderProps {
   value?: UploadedImage[];
   onChange: (images: UploadedImage[]) => void;
+  onUpload: (file: File) => Promise<UploadedImage>;
+  onRemove?: (image: UploadedImage) => Promise<void>;
   maxCount?: number;
   disabled?: boolean;
   className?: string;
@@ -22,8 +23,12 @@ interface ImageUploaderProps {
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png"]);
 
-/** Uploads images immediately and returns the backend's image records to the parent form. */
-export function ImageUploader({ value = [], onChange, maxCount = 5, disabled = false, className }: ImageUploaderProps) {
+/**
+ * Example for a post: onUpload={(file) => { const formData = new FormData();
+ * formData.append("file", file); return api.upload(`/posts/${postId}/images`, formData); }}.
+ * The caller owns the endpoint because each item type has a different upload route.
+ */
+export function ImageUploader({ value = [], onChange, onUpload, onRemove, maxCount = 5, disabled = false, className }: ImageUploaderProps) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -52,9 +57,7 @@ export function ImageUploader({ value = [], onChange, maxCount = 5, disabled = f
     try {
       const uploaded: UploadedImage[] = [];
       for (const file of selected) {
-        const formData = new FormData();
-        formData.append("file", file);
-        uploaded.push(await api.upload<UploadedImage>("/uploads", formData));
+        uploaded.push(await onUpload(file));
       }
       onChange([...value, ...uploaded]);
     } catch (uploadError) {
@@ -62,6 +65,19 @@ export function ImageUploader({ value = [], onChange, maxCount = 5, disabled = f
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  const removeImage = async (image: UploadedImage) => {
+    setBusy(true);
+    setError(null);
+    try {
+      if (onRemove) await onRemove(image);
+      onChange(value.filter((item) => item.id !== image.id));
+    } catch (removeError) {
+      setError(removeError);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -98,7 +114,7 @@ export function ImageUploader({ value = [], onChange, maxCount = 5, disabled = f
               <button
                 type="button"
                 className="absolute right-2 top-2 rounded-full bg-surface/95 px-3 py-1 text-xs font-semibold text-danger shadow-sm transition hover:bg-danger-soft"
-                onClick={() => onChange(value.filter((item) => item.id !== image.id))}
+                onClick={() => void removeImage(image)}
                 disabled={disabled || busy}
                 aria-label="Remove uploaded image"
               >

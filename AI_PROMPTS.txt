@@ -1103,3 +1103,17 @@ theme/UI kit, client-side upload checks, previews, removal, responsive layouts, 
 backend error handling. The components are ready for blog, itinerary, review, and
 provider pages to consume.
 ================================================
+### Member 2 — 2026-11-24 — GEN-08
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: GEN-08
+Prompt:
+"Fix ImageUploader so callers provide onUpload(file) and optional onRemove(image),
+allowing posts, hotels, airlines, and activities to use their own multipart upload
+and delete endpoints. Keep the JPG/PNG, 5 MB, max-count, preview, counter, and
+backend-error behavior, and run the frontend build and lint."
+How the output was used:
+Refactored ImageUploader to delegate upload and deletion to the owning page. A
+preview is removed only after its delete callback succeeds, and callback errors are
+shown through the shared error UI.
+================================================
