@@ -1,8 +1,9 @@
-// PLACEHOLDER — OWNER: Member 2 (TEAM_PLAN M2.3, M2.8). Replace this file with the real page.
-import { ComingSoon } from "@/components/layout/ComingSoon";
+import { PageHeader } from "@/components/ui";
+import { ContentActions } from "../ModerationActions";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Content moderation" };
 
-export default function AdminContentPage() {
-  return <ComingSoon title="Content moderation" owner="Member 2" requirements="GEN-10" />;
+export default function ContentPage() {
+  return <div><PageHeader eyebrow="🧹 Moderation" title="Content" description="Hide, restore or permanently delete a post, comment, review or itinerary by ID." /><ContentActions /></div>;
 }

@@ -1,8 +1,9 @@
-// PLACEHOLDER — OWNER: Member 2 (TEAM_PLAN M2.3, M2.8). Replace this file with the real page.
-import { ComingSoon } from "@/components/layout/ComingSoon";
+import { PageHeader } from "@/components/ui";
+import { ProviderActions } from "../ModerationActions";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Providers" };
 
-export default function AdminProvidersPage() {
-  return <ComingSoon title="Providers" owner="Member 2" requirements="ACC-15" />;
+export default function ProvidersPage() {
+  return <div><PageHeader eyebrow="🔌 Providers" title="Airlines & hotels" description="Deactivate or reactivate a provider by type and ID. The backend result will be shown after each action." /><ProviderActions /></div>;
 }
