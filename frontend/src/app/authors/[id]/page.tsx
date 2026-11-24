@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { EmptyState, PageHeader, Pagination } from "@/components/ui";
+import { EmptyState, PageHeader } from "@/components/ui";
 import { PostCard } from "@/components/blog/PostCard";
 import type { BlogPostSummary } from "@/components/blog/types";
 import { serverApi } from "@/lib/api/server";
@@ -72,7 +72,11 @@ export default async function AuthorPage({ params }: { params: Promise<{ id: str
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {profile.posts.data.map((post) => <PostCard key={post.id} post={post} />)}
             </div>
-            <Pagination page={profile.posts.page} totalPages={profile.posts.totalPages} basePath={`/authors/${id}`} searchParams={{}} />
+            {profile.posts.totalPages > 1 && (
+              <Link href={`/blog?q=${encodeURIComponent(profile.author.name)}`} className="inline-flex font-semibold text-primary hover:underline">
+                See all {profile.posts.total} stories by {profile.author.name} →
+              </Link>
+            )}
           </>
         )}
       </section>
@@ -91,7 +95,7 @@ export default async function AuthorPage({ params }: { params: Promise<{ id: str
                 </Link>
               ))}
             </div>
-            <Pagination page={profile.itineraries.page} totalPages={profile.itineraries.totalPages} basePath={`/authors/${id}`} searchParams={{}} />
+            {profile.itineraries.totalPages > 1 && <p className="text-sm text-muted">Showing the latest 10 itineraries</p>}
           </>
         )}
       </section>
