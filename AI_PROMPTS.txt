@@ -1179,3 +1179,19 @@ Added PostEditor, MyPostsList, authenticated new/edit/mine routes, post-specific
 image operations, draft/published status, tag validation, ownership checks, empty
 states, pagination, and delete confirmation.
 ================================================
+### Member 2 — 2026-11-24 — BLG-12
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirements: BLG-12
+Prompt:
+"Implement task 5 from TEAM_PLAN M2.8: the ISR public author page /authors/[id]
+with the author's name and join date, published posts using PostCard, public
+itineraries linking to /explore/[id], empty states, metadata, generateStaticParams,
+and notFound for unknown or deactivated authors. Only show BlogActions to user
+role accounts. Run frontend build/lint and log the prompt."
+How the output was used:
+Added the ISR author page with published-post and public-itinerary sections,
+pagination and empty states, populated itinerary country names in the author API,
+and restricted blog author actions to registered users.
+================================================
+================================================

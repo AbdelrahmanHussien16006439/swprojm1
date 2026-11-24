@@ -73,13 +73,16 @@ export class AuthorsController {
         isHidden: false,
       },
       page,
-      { sort: { updatedAt: -1, _id: -1 } },
+      { sort: { updatedAt: -1, _id: -1 }, populate: 'countryIds' },
     );
     return {
       ...result,
       data: result.data.map((itinerary) => ({
         id: itinerary._id.toString(),
         title: itinerary.title,
+        countries: (itinerary.countryIds as unknown as Array<{ name?: string }>).map(
+          (country) => country.name ?? String(country),
+        ),
         startDate: itinerary.startDate,
         days: itinerary.days.length,
       })),
