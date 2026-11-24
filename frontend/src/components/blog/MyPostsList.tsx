@@ -44,7 +44,7 @@ export function MyPostsList({ initialPosts }: { initialPosts: Paginated<MyPost> 
         <Card key={post.id}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <Link href={`/blog/${post.id}`} className="text-lg font-bold hover:text-primary">{post.title}</Link>
+              <Link href={post.status === "draft" ? `/blog/${post.id}/edit` : `/blog/${post.id}`} className="text-lg font-bold hover:text-primary">{post.title}</Link>
               <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted">
                 <StatusBadge status={post.status} />
                 <span>{formatDate(post.date)}</span>

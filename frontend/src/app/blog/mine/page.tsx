@@ -1,5 +1,5 @@
 import { MyPostsList, type MyPost } from "@/components/blog/MyPostsList";
-import { EmptyState, PageHeader, Pagination } from "@/components/ui";
+import { ButtonLink, EmptyState, PageHeader, Pagination } from "@/components/ui";
 import { serverApi } from "@/lib/api/server";
 import { requireRole } from "@/lib/auth/server";
 import type { Paginated } from "@/types/api";
@@ -17,7 +17,7 @@ export default async function BlogMinePage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-8">
-      <PageHeader title="My posts" description="Manage your drafts and published travel stories." eyebrow="📝 Your writing" />
+      <PageHeader title="My posts" description="Manage your drafts and published travel stories." eyebrow="📝 Your writing" actions={<ButtonLink href="/blog/new">+ New post</ButtonLink>} />
       {posts.data.length === 0 ? <EmptyState title="You have no posts yet" message="Start writing your first travel story." emoji="📝" /> : <MyPostsList initialPosts={posts} />}
       <Pagination page={posts.page} totalPages={posts.totalPages} basePath="/blog/mine" searchParams={{}} />
     </div>

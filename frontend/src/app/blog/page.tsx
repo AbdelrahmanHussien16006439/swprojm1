@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button, EmptyState, ErrorState, Input, PageHeader, Pagination } from "@/components/ui";
 import { PostCard } from "@/components/blog/PostCard";
+import { BlogActions } from "@/components/blog/BlogActions";
 import type { BlogPostSummary } from "@/components/blog/types";
 import { ApiError, serverApi } from "@/lib/api/server";
 import type { Paginated } from "@/types/api";
@@ -34,7 +35,7 @@ export default async function BlogPage({ searchParams }: { searchParams: Promise
   } catch (error) {
     return (
       <div>
-        <PageHeader title="Travel blog" description="Stories and tips from fellow travellers." eyebrow="📝 Community" />
+        <PageHeader title="Travel blog" description="Stories and tips from fellow travellers." eyebrow="📝 Community" actions={<BlogActions />} />
         <ErrorState message={error instanceof ApiError ? error.messages.join(" ") : "We could not load the blog right now."} />
       </div>
     );
@@ -43,7 +44,7 @@ export default async function BlogPage({ searchParams }: { searchParams: Promise
   const filters = { q: q || undefined, tag: tag || undefined };
   return (
     <div>
-      <PageHeader title="Travel blog" description="Stories and tips from fellow travellers." eyebrow="📝 Community" />
+      <PageHeader title="Travel blog" description="Stories and tips from fellow travellers." eyebrow="📝 Community" actions={<BlogActions />} />
       <form method="get" className="mb-8 grid gap-3 rounded-3xl border border-border bg-surface p-4 shadow-sm sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <label className="space-y-1 text-sm font-semibold">
           <span>Search stories</span>
