@@ -1,8 +1,15 @@
-// PLACEHOLDER — OWNER: Member 1 (TEAM_PLAN M2.3, M2.8). Replace this file with the real page.
-import { ComingSoon } from "@/components/layout/ComingSoon";
+import { Suspense } from "react";
+import { LoadingState } from "@/components/ui";
+import { RegisterForm } from "./RegisterForm";
 
-export const metadata = { title: "Sign up" };
+export const metadata = { title: "Sign up", description: "Create a free TravelMate account." };
 
 export default function RegisterPage() {
-  return <ComingSoon title="Sign up" owner="Member 1" requirements="ACC-01" />;
+  return (
+    <div className="mx-auto max-w-md">
+      <Suspense fallback={<LoadingState />}>
+        <RegisterForm />
+      </Suspense>
+    </div>
+  );
 }
