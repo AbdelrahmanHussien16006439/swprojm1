@@ -3,7 +3,7 @@
 Software Project I — Winter 2026 (German International University).
 A web platform that combines flight booking, hotel booking, itinerary planning & budgeting, and a travel blog/community.
 
-**Current phase: Milestone 2 — Next.js frontend + integration**, due 11/12/2026. Milestone 1 (NestJS + MongoDB Atlas + Swagger backend) was submitted on 20/11/2026.
+**Current phase: Milestone 1 — backend only** (NestJS + MongoDB Atlas + Swagger), due 20/11/2026.
 
 - Team plan (conventions, ownership, every endpoint and rule): [`docs/TEAM_PLAN.md`](docs/TEAM_PLAN.md)
 - PR self-check prompts (run yours before opening a PR): [`docs/PR_CHECK_PROMPTS.md`](docs/PR_CHECK_PROMPTS.md)
@@ -85,28 +85,6 @@ npm run start:dev
 
 - API: http://localhost:4000/api
 - Swagger UI: **http://localhost:4000/api/docs**
-
-## Run the frontend (Milestone 2)
-
-The frontend lives in `frontend/` (Next.js 16 App Router, TypeScript, Tailwind CSS). Keep the backend running in another terminal.
-
-```bash
-cd frontend
-npm install
-cp .env.example .env.local      # Windows cmd: copy .env.example .env.local
-npm run dev
-```
-
-Open **http://localhost:3000**. The Next.js server forwards `/api/*` and `/uploads/*` to the backend (`BACKEND_URL` in `frontend/.env.local`), so the browser only talks to port 3000 and the login cookies work without CORS.
-
-| Variable (frontend/.env.local) | What it is |
-| ------------------------------ | ---------- |
-| `BACKEND_URL` | Where the NestJS backend runs (default `http://localhost:4000`) |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe **publishable** test key (`pk_test_...`) for the checkout form. Never the secret key |
-
-Frontend scripts (inside `frontend/`): `npm run dev` (development), `npm run build` (production build + type check), `npm run lint`.
-
-How the frontend is organised (folders per member, shared helpers, rendering strategy per page): [`docs/TEAM_PLAN.md`](docs/TEAM_PLAN.md) PART B.
 
 ## Testing in Swagger
 
