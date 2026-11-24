@@ -1116,6 +1116,7 @@ How the output was used:
 Refactored ImageUploader to delegate upload and deletion to the owning page. A
 preview is removed only after its delete callback succeeds, and callback errors are
 shown through the shared error UI.
+================================================
 ### Member 1 — 2026-11-24 — frontend: modern theme, auth pages, profile, admin accounts (ACC-01, ACC-07a, ACC-08, ACC-09, ACC-11, ACC-12, ACC-13, ACC-14, ACC-15, ACC-16, GEN-15, GEN-17)
 Student: Member 1
 Tool: Claude (Claude Code)
