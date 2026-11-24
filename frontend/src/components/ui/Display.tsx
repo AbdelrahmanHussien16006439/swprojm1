@@ -2,22 +2,36 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
 
-export function Card({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <div className={cn("rounded-lg border border-border bg-surface p-4 shadow-sm sm:p-6", className)}>{children}</div>;
+/** White rounded card. Add `interactive` for clickable cards (lifts on hover). */
+export function Card({ className, interactive, children }: { className?: string; interactive?: boolean; children: React.ReactNode }) {
+  return (
+    <div
+      className={cn(
+        "rounded-3xl border border-border bg-surface p-5 shadow-[0_8px_30px_-12px_rgba(124,58,237,0.18)] sm:p-7",
+        interactive && "transition duration-200 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_16px_40px_-12px_rgba(255,79,163,0.30)]",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
 }
 
-type Tone = "gray" | "green" | "yellow" | "red" | "blue";
+type Tone = "gray" | "green" | "yellow" | "red" | "blue" | "violet" | "pink" | "lime";
 
 const tones: Record<Tone, string> = {
-  gray: "bg-background text-muted border-border",
-  green: "bg-success-soft text-success border-success/30",
-  yellow: "bg-warning-soft text-warning border-warning/30",
-  red: "bg-danger-soft text-danger border-danger/30",
-  blue: "bg-info-soft text-info border-info/30",
+  gray: "bg-background text-muted",
+  green: "bg-success-soft text-success",
+  yellow: "bg-warning-soft text-warning",
+  red: "bg-danger-soft text-danger",
+  blue: "bg-info-soft text-info",
+  violet: "bg-primary-soft text-primary",
+  pink: "bg-accent-soft text-accent",
+  lime: "bg-lime text-foreground",
 };
 
 export function Badge({ tone = "gray", children }: { tone?: Tone; children: React.ReactNode }) {
-  return <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium", tones[tone])}>{children}</span>;
+  return <span className={cn("inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold", tones[tone])}>{children}</span>;
 }
 
 /** Same colour for the same status everywhere (GEN-11 lifecycle, flight status, report status...). */
@@ -64,24 +78,27 @@ export function StatusBadge({ status }: { status: string }) {
 interface PageHeaderProps {
   title: string;
   description?: string;
+  /** Small emoji or label above the title, e.g. "✈️ Flights". */
+  eyebrow?: string;
   /** Shows "← Back" so users can always go back (GEN-14). */
   backHref?: string;
   backLabel?: string;
   actions?: React.ReactNode;
 }
 
-export function PageHeader({ title, description, backHref, backLabel = "Back", actions }: PageHeaderProps) {
+export function PageHeader({ title, description, eyebrow, backHref, backLabel = "Back", actions }: PageHeaderProps) {
   return (
-    <div className="mb-6 space-y-2">
+    <div className="mb-8 space-y-3">
       {backHref && (
-        <Link href={backHref} className="text-sm text-primary hover:underline">
+        <Link href={backHref} className="inline-flex items-center gap-1 rounded-full bg-surface px-3 py-1 text-sm font-medium text-muted shadow-sm hover:text-primary">
           ← {backLabel}
         </Link>
       )}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">{title}</h1>
-          {description && <p className="mt-1 text-sm text-muted">{description}</p>}
+          {eyebrow && <p className="mb-1 text-sm font-semibold text-primary">{eyebrow}</p>}
+          <h1 className="text-3xl font-bold sm:text-4xl">{title}</h1>
+          {description && <p className="mt-2 max-w-2xl text-muted">{description}</p>}
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
       </div>
@@ -90,23 +107,27 @@ export function PageHeader({ title, description, backHref, backLabel = "Back", a
 }
 
 /** Friendly message for empty lists and searches with no results (GEN-04). */
-export function EmptyState({ title, message, action }: { title: string; message?: string; action?: React.ReactNode }) {
+export function EmptyState({ title, message, emoji = "🧳", action }: { title: string; message?: string; emoji?: string; action?: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-dashed border-border bg-surface px-6 py-12 text-center">
-      <p className="text-base font-medium">{title}</p>
-      {message && <p className="mt-1 text-sm text-muted">{message}</p>}
-      {action && <div className="mt-4 flex justify-center">{action}</div>}
+    <div className="rounded-3xl border-2 border-dashed border-border bg-surface/70 px-6 py-14 text-center">
+      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-soft text-3xl" aria-hidden="true">
+        {emoji}
+      </div>
+      <p className="font-display text-lg font-bold">{title}</p>
+      {message && <p className="mx-auto mt-1 max-w-md text-sm text-muted">{message}</p>}
+      {action && <div className="mt-5 flex justify-center">{action}</div>}
     </div>
   );
 }
 
 /** Error block with an optional retry button (GEN-16). */
-export function ErrorState({ title = "Something went wrong", message, action }: { title?: string; message?: string; action?: React.ReactNode }) {
+export function ErrorState({ title = "Oops, something broke", message, action }: { title?: string; message?: string; action?: React.ReactNode }) {
   return (
-    <div role="alert" className="rounded-lg border border-danger/30 bg-danger-soft px-6 py-10 text-center">
-      <p className="text-base font-medium text-danger">{title}</p>
-      {message && <p className="mt-1 text-sm text-danger">{message}</p>}
-      {action && <div className="mt-4 flex justify-center">{action}</div>}
+    <div role="alert" className="rounded-3xl border border-danger/20 bg-danger-soft px-6 py-12 text-center">
+      <div className="mb-3 text-4xl" aria-hidden="true">😵‍💫</div>
+      <p className="font-display text-lg font-bold text-danger">{title}</p>
+      {message && <p className="mx-auto mt-1 max-w-md text-sm text-danger/80">{message}</p>}
+      {action && <div className="mt-5 flex justify-center">{action}</div>}
     </div>
   );
 }
@@ -114,8 +135,8 @@ export function ErrorState({ title = "Something went wrong", message, action }: 
 /** Scrolls sideways on phones instead of breaking the layout. Use normal <thead>/<tbody>/<tr>/<th>/<td> inside. */
 export function Table({ children }: { children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-surface">
-      <table className="w-full text-left text-sm [&_td]:px-4 [&_td]:py-3 [&_th]:bg-background [&_th]:px-4 [&_th]:py-3 [&_th]:font-medium [&_th]:text-muted [&_tr]:border-b [&_tr]:border-border [&_tbody_tr:last-child]:border-0">
+    <div className="overflow-x-auto rounded-3xl border border-border bg-surface shadow-sm">
+      <table className="w-full text-left text-sm [&_td]:px-5 [&_td]:py-4 [&_th]:bg-primary-soft/50 [&_th]:px-5 [&_th]:py-3 [&_th]:text-xs [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted [&_tbody_tr]:transition [&_tbody_tr:hover]:bg-background [&_tr]:border-b [&_tr]:border-border [&_tbody_tr:last-child]:border-0">
         {children}
       </table>
     </div>

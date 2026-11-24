@@ -30,16 +30,16 @@ export function Sidebar({ title, links, exact = [] }: { title: string; links: Si
     exact.includes(href) || href === links[0]?.href ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <aside className="md:w-56 md:shrink-0">
-      <p className="mb-2 hidden px-3 text-xs font-semibold uppercase tracking-wide text-muted md:block">{title}</p>
+    <aside className="md:sticky md:top-24 md:w-60 md:shrink-0 md:self-start md:rounded-3xl md:border md:border-border md:bg-surface md:p-3 md:shadow-sm">
+      <p className="mb-3 hidden px-4 font-display text-sm font-bold text-primary md:block">{title}</p>
       <nav className="flex gap-1 overflow-x-auto pb-2 md:flex-col md:pb-0" aria-label={title}>
         {links.map((l) => (
           <Link
             key={l.href}
             href={l.href}
             className={cn(
-              "whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium",
-              isActive(l.href) ? "bg-primary-soft text-primary" : "text-muted hover:bg-background hover:text-foreground",
+              "whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-semibold transition",
+              isActive(l.href) ? "bg-foreground text-white shadow" : "text-muted hover:bg-primary-soft hover:text-primary",
             )}
           >
             {l.label}

@@ -46,12 +46,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           <div
             key={t.id}
             className={cn(
-              "rounded-md border px-4 py-3 text-sm shadow-md",
-              t.kind === "success" && "border-success/30 bg-success-soft text-success",
-              t.kind === "error" && "border-danger/30 bg-danger-soft text-danger",
-              t.kind === "info" && "border-info/30 bg-info-soft text-info",
+              "rounded-2xl border px-4 py-3 text-sm font-semibold shadow-xl backdrop-blur",
+              t.kind === "success" && "border-success/20 bg-success-soft/95 text-success",
+              t.kind === "error" && "border-danger/20 bg-danger-soft/95 text-danger",
+              t.kind === "info" && "border-primary/20 bg-primary-soft/95 text-primary",
             )}
           >
+            {t.kind === "success" ? "✅ " : t.kind === "error" ? "⚠️ " : "💬 "}
             {t.message}
           </div>
         ))}

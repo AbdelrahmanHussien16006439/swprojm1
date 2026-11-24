@@ -23,15 +23,15 @@ export function Modal({ open, title, onClose, children, footer }: ModalProps) {
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/30 p-4 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="w-full max-w-md rounded-lg bg-surface p-6 shadow-lg"
+        className="w-full max-w-md rounded-3xl bg-surface p-6 shadow-2xl sm:p-8"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold">{title}</h2>
+        <h2 className="text-xl font-bold">{title}</h2>
         <div className="mt-3 text-sm">{children}</div>
         {footer && <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">{footer}</div>}
       </div>

@@ -118,7 +118,9 @@ Formatting: import { formatMoney, formatDate, formatDateTime } from '@/lib/forma
 UI kit (components/ui, Tailwind): Button, Input, Textarea, Select, Checkbox, FormField (label + field-level error), FormErrors (list of backend messages), Card, Badge (booking/flight statuses), Modal, ConfirmDialog (GEN-03), Pagination (page size 10, GEN-05), EmptyState (GEN-04), ErrorState, LoadingState / Spinner, Tabs, Table, PageHeader (title + back link, GEN-14), Toast via useToast(), StatusBadge (status → colour), statusLabel.
   Import from "@/components/ui" (works in Server and Client Components). Client-only parts have their own files: import { Modal, ConfirmDialog } from "@/components/ui/Modal"; import { useToast } from "@/components/ui/Toast".
   Field errors: <FormField label="Email" htmlFor="email" error={fieldError(error, "email")}> picks the backend message for that field; <FormErrors error={error} /> shows all of them.
-  Colours: only the theme names in src/app/globals.css (bg-primary, text-muted, border-border, bg-surface, text-danger, bg-success-soft ...).
+  Look & feel (modern, playful): soft lilac background, violet → pink → orange brand gradient, pill buttons, rounded-3xl cards, emojis as small icons.
+  Colours: only the theme names in src/app/globals.css (bg-primary, bg-accent, bg-lime, text-muted, border-border, bg-surface, text-danger, bg-success-soft ...). Brand gradient: bg-brand / text-brand. Headings: font-display (Space Grotesk, automatic on h1–h3).
+  Handy options: Button variant="primary|secondary|dark|ghost|danger" size="sm|md|lg"; <Card interactive> for clickable cards; Badge tone="violet|pink|lime|green|yellow|red|blue|gray"; PageHeader eyebrow="✈️ Flights"; EmptyState emoji="🔍".
 Layout: DashboardShell + SidebarLink from "@/components/layout/Sidebar" (the admin and moderator layouts already use it), ComingSoon (placeholder pages).
 Layout (components/layout): Navbar (role-aware links, NotificationBell slot), Footer, Sidebar.
 Every route segment gets loading.tsx and error.tsx (GEN-16).

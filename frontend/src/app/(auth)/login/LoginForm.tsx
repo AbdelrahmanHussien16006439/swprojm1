@@ -41,8 +41,10 @@ export function LoginForm() {
 
   return (
     <Card>
-      <h1 className="text-2xl font-semibold">Log in</h1>
-      {next && <p className="mt-1 text-sm text-muted">Log in to continue.</p>}
+      <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-2xl shadow-md" aria-hidden="true">👋</div>
+      <h1 className="text-3xl font-bold">Welcome back</h1>
+      <p className="mt-1 text-sm text-muted">Log in to pick up where you left off.</p>
+      {next && <p className="mt-3 rounded-2xl bg-primary-soft px-4 py-2 text-sm font-medium text-primary">🔒 Log in first to continue.</p>}
       <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
         <FormErrors error={error} />
         <FormField label="Email" htmlFor="email" required>
@@ -51,14 +53,14 @@ export function LoginForm() {
         <FormField label="Password" htmlFor="password" required>
           <Input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </FormField>
-        <Button type="submit" className="w-full" loading={busy}>
+        <Button type="submit" size="lg" className="w-full" loading={busy}>
           Log in
         </Button>
       </form>
       <p className="mt-4 text-center text-sm text-muted">
         No account yet?{" "}
-        <Link href={next ? `/register?next=${encodeURIComponent(next)}` : "/register"} className="text-primary hover:underline">
-          Sign up
+        <Link href={next ? `/register?next=${encodeURIComponent(next)}` : "/register"} className="font-semibold text-primary hover:underline">
+          Join free ✨
         </Link>
       </p>
     </Card>

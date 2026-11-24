@@ -4,25 +4,26 @@ import { cn } from "@/lib/cn";
 import { errorMessages } from "@/lib/api/errors";
 
 const control =
-  "w-full rounded-md border border-border bg-surface px-3 text-sm text-foreground placeholder:text-muted " +
-  "focus:border-primary focus:outline-none disabled:bg-background disabled:text-muted";
+  "w-full rounded-2xl border border-border bg-surface px-4 text-sm text-foreground placeholder:text-muted/70 shadow-sm " +
+  "transition focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15 " +
+  "disabled:bg-background disabled:text-muted";
 
 export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, ...rest }, ref) {
-    return <input ref={ref} className={cn(control, "h-10", className)} {...rest} />;
+    return <input ref={ref} className={cn(control, "h-12", className)} {...rest} />;
   },
 );
 
 export const Textarea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
   function Textarea({ className, rows = 4, ...rest }, ref) {
-    return <textarea ref={ref} rows={rows} className={cn(control, "py-2", className)} {...rest} />;
+    return <textarea ref={ref} rows={rows} className={cn(control, "py-3", className)} {...rest} />;
   },
 );
 
 export const Select = forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(
   function Select({ className, children, ...rest }, ref) {
     return (
-      <select ref={ref} className={cn(control, "h-10", className)} {...rest}>
+      <select ref={ref} className={cn(control, "h-12", className)} {...rest}>
         {children}
       </select>
     );
@@ -36,7 +37,7 @@ interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>
 export function Checkbox({ label, className, id, ...rest }: CheckboxProps) {
   return (
     <label htmlFor={id} className={cn("inline-flex items-center gap-2 text-sm", className)}>
-      <input id={id} type="checkbox" className="h-4 w-4 accent-primary" {...rest} />
+      <input id={id} type="checkbox" className="h-5 w-5 rounded-md accent-primary" {...rest} />
       <span>{label}</span>
     </label>
   );
@@ -57,7 +58,7 @@ interface FormFieldProps {
 export function FormField({ label, htmlFor, error, hint, required, children, className }: FormFieldProps) {
   return (
     <div className={cn("space-y-1", className)}>
-      <label htmlFor={htmlFor} className="block text-sm font-medium">
+      <label htmlFor={htmlFor} className="block text-sm font-semibold">
         {label}
         {required && <span className="text-danger"> *</span>}
       </label>
@@ -76,7 +77,7 @@ export function FormErrors({ error }: { error: unknown }) {
   if (!error) return null;
   const messages = errorMessages(error);
   return (
-    <div role="alert" className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
+    <div role="alert" className="rounded-2xl border border-danger/20 bg-danger-soft px-4 py-3 text-sm font-medium text-danger">
       {messages.length === 1 ? (
         <p>{messages[0]}</p>
       ) : (
