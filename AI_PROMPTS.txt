@@ -1103,6 +1103,21 @@ theme/UI kit, client-side upload checks, previews, removal, responsive layouts, 
 backend error handling. The components are ready for blog, itinerary, review, and
 provider pages to consume.
 ================================================
+### Member 2 — 2026-11-24 — BLG-02, BLG-08, BLG-09
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirements: BLG-02, BLG-08, BLG-09
+Prompt:
+"Implement task 2 from TEAM_PLAN M2.8: the dynamic SSR blog list/search page at
+/blog with keyword and tag filters, pagination, empty/error/loading states, and
+post cards linking to /blog/[id], plus the dynamic SSR /tags/[tag] page. Use
+serverApi, Pagination, EmptyState, and the shared UI kit, keep changes in Member 2
+folders, run build and lint, and log this prompt."
+How the output was used:
+Replaced the blog and tag placeholders with server-rendered pages using the backend
+published-post endpoint. Added reusable blog post cards, filters, pagination links,
+responsive layouts, loading/error states, and empty search results.
+================================================
 ### Member 2 — 2026-11-24 — GEN-08
 Student: Member 2
 Tool: ChatGPT / Codex
