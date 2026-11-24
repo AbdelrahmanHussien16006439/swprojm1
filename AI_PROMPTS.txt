@@ -1066,3 +1066,39 @@ not undo the change). Unsupported currencies return 400. Also merged my earlier
 ObjectId schema fix (User.providerId, Session.userId, AuditLog.actorId) that had
 never been pushed. Unit tests added; build, tests, startup and API checks passed.
 ================================================
+### Member 1 — 2026-11-24 — Milestone 2 plan + frontend skeleton (ACC-04, ACC-10, ACC-19, GEN-03, GEN-04, GEN-14, GEN-15, GEN-16, GEN-17)
+Student: Member 1
+Tool: Claude (Claude Code)
+Related Requirements: ACC-04, ACC-10, ACC-19, GEN-03, GEN-04, GEN-14, GEN-15, GEN-16, GEN-17
+Prompt:
+"Plan Milestone 2 (Next.js frontend) for our 7 members in docs/TEAM_PLAN.md: folder ownership, URL map,
+shared API/auth helpers, rendering strategy per page, shared components and task lists. Then build my
+task 1: the frontend skeleton in frontend/ (Next.js 16 App Router + TypeScript + Tailwind), proxy to the
+backend, API client, auth with route protection and session refresh, UI kit, layout and placeholder
+pages for every member. Build, lint and test it in the browser against the running backend."
+How the output was used:
+Added PART B to TEAM_PLAN.md (and corrected it for Next.js 16: proxy.ts instead of middleware.ts, classic
+caching model with revalidate/dynamic). Created the frontend: rewrites /api and /uploads to the backend so
+httpOnly cookies work, lib/api (client with refresh-on-401, server helper with ISR option), lib/auth
+(AuthProvider, getCurrentUser, requireRole, roleHome, loginUrl), src/proxy.ts (protected routes, ?next=,
+refresh when the access cookie expired), theme + UI kit, Navbar/Footer/Sidebar, error/404/loading/forbidden
+pages, a working login page and 40 placeholder pages. Build and lint pass; tested guest redirect to login,
+login redirect to ?next, role redirects to /forbidden, admin and moderator areas, silent refresh and the
+phone menu in the browser.
+================================================
+### Member 1 — 2026-11-24 — frontend: modern theme, auth pages, profile, admin accounts (ACC-01, ACC-07a, ACC-08, ACC-09, ACC-11, ACC-12, ACC-13, ACC-14, ACC-15, ACC-16, GEN-15, GEN-17)
+Student: Member 1
+Tool: Claude (Claude Code)
+Related Requirements: ACC-01, ACC-07a, ACC-08, ACC-09, ACC-11, ACC-12, ACC-13, ACC-14, ACC-15, ACC-16, GEN-15, GEN-17
+Prompt:
+"Make the design more modern, Gen Z vibes. Then build my Milestone 2 pages from TEAM_PLAN M2.8: register,
+change password (forced after an admin reset), profile with delete account, admin overview, accounts list
+with search/filters and suspend/reactivate/reset password, and create moderator. Test them in the browser."
+How the output was used:
+New theme in globals.css (lilac background, violet-pink-orange brand gradient, Space Grotesk + Plus Jakarta Sans),
+restyled UI kit, glass navbar and new home hero. Register logs the user in and returns to ?next; change password
+with forced mode; profile (SSR) with currency check and delete-account confirm; admin accounts (SSR, filters in the
+URL, pagination) with suspend/reactivate/reset dialogs; create moderator form. Provider dropdown and currency
+dropdown wait for Members 3/5 (marked ⏳). Tested in the browser: validation, sign-up, currency 400/200, delete
+account, admin list/filters/actions, moderator temp password → forced change → dashboard. Test accounts deleted.
+================================================
