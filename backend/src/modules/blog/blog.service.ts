@@ -222,6 +222,17 @@ export class BlogService {
       throw new NotFoundException('Post not found');
     }
 
+    const likedByMe = viewer
+      ? Boolean(
+          await this.likeModel
+            .exists({
+              postId: post._id,
+              userId: new Types.ObjectId(viewer.sub),
+            })
+            .exec(),
+        )
+      : false;
+
     const commentFilter: FilterQuery<Comment> = isAdmin
       ? { postId: post._id }
       : viewer
@@ -248,6 +259,7 @@ export class BlogService {
       tags: post.tags,
       images: post.images,
       likesCount: post.likesCount,
+      likedByMe,
       commentsCount: post.commentsCount,
       comments: comments.map((comment) => {
         const commentAuthor = comment.authorId as unknown as UserDocument;

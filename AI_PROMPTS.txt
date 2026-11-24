@@ -1148,3 +1148,19 @@ URL, pagination) with suspend/reactivate/reset dialogs; create moderator form. P
 dropdown wait for Members 3/5 (marked ⏳). Tested in the browser: validation, sign-up, currency 400/200, delete
 account, admin list/filters/actions, moderator temp password → forced change → dashboard. Test accounts deleted.
 ================================================
+### Member 2 — 2026-11-24 — BLG-02, BLG-05, BLG-06, BLG-07
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirements: BLG-02, BLG-05, BLG-06, BLG-07
+Prompt:
+"Implement task 3 from TEAM_PLAN M2.8: the ISR post page with metadata, author and
+tag links, images, likes, comments, reporting, login redirects, and own-comment
+edit/delete with confirmation. Use serverApi for the post and shared api/UI/auth
+helpers for client interactions. Unknown or unpublished posts must use notFound().
+Keep the page inside the shared layout, run build and lint, and log this prompt."
+How the output was used:
+Replaced the post placeholder with an ISR server page and reusable detail, like,
+and comment components. Added login-aware like/comment actions, backend error
+display, duplicate-like handling, 500-character comment validation, own-comment
+editing/deletion, report buttons, metadata, and loading/error boundaries.
+================================================
