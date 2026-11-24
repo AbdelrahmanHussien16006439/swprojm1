@@ -1086,3 +1086,20 @@ pages, a working login page and 40 placeholder pages. Build and lint pass; teste
 login redirect to ?next, role redirects to /forbidden, admin and moderator areas, silent refresh and the
 phone menu in the browser.
 ================================================
+### Member 2 — 2026-11-24 — GEN-08, GEN-09
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirements: GEN-08, GEN-09
+Prompt:
+"Implement Milestone 2 task 1 shared frontend components: ImageUploader for JPG/PNG
+uploads up to 5 MB with previews and a maximum count, and ReportButton with a reason
+modal that submits to the reports endpoint and displays the backend's errors,
+including duplicate-report conflicts. Use the Next.js 16 frontend skeleton's shared
+api client and UI kit, no new packages, no hard-coded colours, and only edit my
+owned component folders plus AI_PROMPTS.txt."
+How the output was used:
+Added reusable ImageUploader and ReportButton components with the shared API client,
+theme/UI kit, client-side upload checks, previews, removal, responsive layouts, and
+backend error handling. The components are ready for blog, itinerary, review, and
+provider pages to consume.
+================================================
