@@ -1,0 +1,8 @@
+// PLACEHOLDER — OWNER: Member 6 (TEAM_PLAN M2.3, M2.8). Replace this file with the real page.
+import { ComingSoon } from "@/components/layout/ComingSoon";
+
+export const metadata = { title: "My hotel bookings" };
+
+export default function MyHotelBookingsPage() {
+  return <ComingSoon title="My hotel bookings" owner="Member 6" requirements="HTL-20" />;
+}
