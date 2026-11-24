@@ -255,6 +255,7 @@ export class BlogService {
       title: post.title,
       author: { id: author._id.toString(), name: author.name },
       date: post.publishedAt ?? post.createdAt,
+      status: post.status,
       body: post.body,
       tags: post.tags,
       images: post.images,

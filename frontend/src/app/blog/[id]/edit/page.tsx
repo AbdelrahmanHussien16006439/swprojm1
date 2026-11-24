@@ -1,8 +1,26 @@
-// PLACEHOLDER — OWNER: Member 2 (TEAM_PLAN M2.3, M2.8). Replace this file with the real page.
-import { ComingSoon } from "@/components/layout/ComingSoon";
+import { notFound } from "next/navigation";
+import { PostEditor } from "@/components/blog/PostEditor";
+import type { BlogPost } from "@/components/blog/types";
+import { ApiError, serverApi } from "@/lib/api/server";
+import { requireRole } from "@/lib/auth/server";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "Edit post" };
 
-export default function BlogIdEditPage() {
-  return <ComingSoon title="Edit post" owner="Member 2" requirements="BLG-04, BLG-08" />;
+export default async function BlogIdEditPage({ params }: { params: Promise<{ id: string }> }) {
+  const user = await requireRole("user");
+  const { id } = await params;
+  let post: BlogPost;
+  try {
+    post = await serverApi.get<BlogPost>(`/posts/${id}`);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) notFound();
+    throw error;
+  }
+  if (post.author.id !== user.id) notFound();
+  return (
+    <div>
+      <PostEditor mode="edit" initialPost={post} />
+    </div>
+  );
 }
