@@ -13,7 +13,7 @@ Team member: paste this whole file into your AI chat (and, if possible, attach d
 "I am Member N. We are doing Milestone 2: the Next.js frontend in frontend/, using our finished NestJS backend. Read PART B fully, and PART A Section 7 for the endpoints my pages call. Help me do my task list in M2.8, in order, starting from task 1. For each task: tell me exactly which files to create inside my own folders (M2.3), write the code, and tell me how to test it in the browser with the backend running."
 
 Rules the AI must follow:
-- Only create or edit files inside the member's own frontend folders (M2.3). Never edit another member's pages or components, frontend/package.json, next.config.ts, src/middleware.ts, src/lib/ or src/components/ui/ (those are Member 1's). Need a change there? Write a message for the owner.
+- Only create or edit files inside the member's own frontend folders (M2.3). Never edit another member's pages or components, frontend/package.json, next.config.ts, src/proxy.ts, src/lib/ or src/components/ui/ (those are Member 1's). Need a change there? Write a message for the owner.
 - Use the shared helpers with the exact names in M2.5 (api client, server fetch, auth helpers, UI kit). Do NOT write your own fetch wrapper, auth context, buttons or modals.
 - Do NOT add npm packages. Member 1 installs all packages (M2.2). If you really need one, ask Member 1.
 - The backend already enforces every rule. The frontend shows the rules (hints, limits, disabled buttons) but never replaces backend validation or authorization (official rule). Always show the backend's error messages.
@@ -43,7 +43,9 @@ Date | What
 11/12 | Submit
 
 M2.2 Tech & setup (Member 1 sets this up once)
-- Next.js (latest) App Router + TypeScript + Tailwind CSS + ESLint, in frontend/ with src/ and the "@/..." import alias.
+- Next.js 16 App Router + React 19 + TypeScript + Tailwind CSS 4 + ESLint, in frontend/ with src/ and the "@/..." import alias.
+- ⚠️ Next.js 16 differs from what most AIs learned: middleware.ts is now src/proxy.ts; params and searchParams are Promises (const { id } = await params); cookies() and headers() must be awaited. frontend/AGENTS.md says the same — the docs for this exact version are in frontend/node_modules/next/dist/docs/.
+- Caching: we use the CLASSIC model (cacheComponents is off in next.config.ts). ISR page = export const revalidate = 60 and serverApi.get(..., { auth: false, revalidate: 60 }). SSR page = export const dynamic = "force-dynamic" (or any page that reads cookies). Do NOT use "use cache", cacheLife or cacheTag.
   Created with: npx create-next-app@latest frontend --ts --tailwind --eslint --app --src-dir --import-alias "@/*"
 - Extra packages (Member 1 installs, nobody else): @stripe/stripe-js @stripe/react-stripe-js
 - Port: frontend http://localhost:3000, backend http://localhost:4000 (both run at the same time).
@@ -58,7 +60,7 @@ M2.2 Tech & setup (Member 1 sets this up once)
 
 M2.3 Folder ownership — frontend/src (edit ONLY your own)
 Owner | Folders / files
-Member 1 | app/layout.tsx, app/page.tsx (home), app/error.tsx, app/not-found.tsx, app/loading.tsx, app/(auth)/** (login, register, change-password), app/profile/**, app/forbidden/, app/admin/layout.tsx, app/admin/page.tsx, app/admin/accounts/**, app/admin/moderators/**, middleware.ts, lib/**, components/ui/**, components/layout/**, types/api.ts, next.config.ts, package.json, tailwind/global CSS, frontend/.env.example
+Member 1 | app/layout.tsx, app/page.tsx (home), app/error.tsx, app/not-found.tsx, app/loading.tsx, app/(auth)/** (login, register, change-password), app/profile/**, app/forbidden/, app/admin/layout.tsx, app/admin/page.tsx, app/admin/accounts/**, app/admin/moderators/**, proxy.ts, lib/**, lib/cn.ts, components/ui/**, components/layout/**, types/api.ts, next.config.ts, package.json, tailwind/global CSS, frontend/.env.example
 Member 2 | app/blog/**, app/tags/**, app/authors/**, app/admin/reports/**, app/admin/content/**, app/admin/audit-logs/**, app/admin/providers/**, components/blog/**, components/uploads/**, components/reports/**
 Member 3 | app/flights/** (except the book link target), app/admin/airlines/**, app/moderator/airline/** (except flights/[id]/bookings), components/flights/**
 Member 4 | app/book/flight/**, app/my/flight-bookings/**, app/moderator/airline/flights/[id]/bookings/**, components/payments/**, components/flight-bookings/**
@@ -91,7 +93,7 @@ Role home after login: user → /, admin → /admin, airline_moderator → /mode
 M2.4 Auth & route protection (Member 1 builds it; everyone uses it)
 - Login state lives only in the backend's httpOnly cookies. The frontend never reads tokens and never stores the user in localStorage.
 - Who is logged in: server components call getCurrentUser() (it calls GET /api/auth/me with the request cookies); client components use useAuth().
-- middleware.ts: for protected URLs (/profile, /my, /book, /itineraries, /notifications, /blog/new, /blog/mine, /blog/*/edit, /admin, /moderator) with no session cookie → redirect to /login?next=<url> (ACC-10). If the access cookie expired but the refresh cookie exists, middleware calls POST /api/auth/refresh and passes the new cookies on.
+- proxy.ts (Next.js 16 renamed middleware.ts to proxy.ts): for protected URLs (/profile, /my, /book, /itineraries, /notifications, /blog/new, /blog/mine, /blog/*/edit, /admin, /moderator) with no session cookie → redirect to /login?next=<url> (ACC-10). If the access cookie expired but the refresh cookie exists, proxy.ts calls POST /api/auth/refresh and passes the new cookies on.
 - Role pages: admin/moderator layouts call requireRole(...) → not logged in: /login?next=..., wrong role: /forbidden. This is only for navigation — the backend still checks every request.
 - Restricted actions on public pages (book, like, comment, review, report, clone): if not logged in, send to /login?next=<current page> and come back after login (ACC-10).
 - Client fetch: on 401 the api client calls /api/auth/refresh once and retries; if that fails it sends the user to /login?next=... (ACC-19 session expiry).
@@ -113,8 +115,14 @@ Auth:
 - import { loginUrl, roleHome } from '@/lib/auth/routes' — loginUrl(nextPath) and roleHome(role).
 Formatting: import { formatMoney, formatDate, formatDateTime } from '@/lib/format'
 - formatDateTime(iso, timeZone?) — flight times are shown in the AIRPORT's local time (the backend returns the time zone).
-UI kit (components/ui, Tailwind): Button, Input, Textarea, Select, Checkbox, FormField (label + field-level error), FormErrors (list of backend messages), Card, Badge (booking/flight statuses), Modal, ConfirmDialog (GEN-03), Pagination (page size 10, GEN-05), EmptyState (GEN-04), ErrorState, LoadingState / Spinner, Tabs, Table, PageHeader (title + back link, GEN-14), Toast via useToast().
-Layout (components/layout): Navbar (role-aware links, NotificationBell slot), Footer, AdminSidebar, ModeratorSidebar.
+UI kit (components/ui, Tailwind): Button, Input, Textarea, Select, Checkbox, FormField (label + field-level error), FormErrors (list of backend messages), Card, Badge (booking/flight statuses), Modal, ConfirmDialog (GEN-03), Pagination (page size 10, GEN-05), EmptyState (GEN-04), ErrorState, LoadingState / Spinner, Tabs, Table, PageHeader (title + back link, GEN-14), Toast via useToast(), StatusBadge (status → colour), statusLabel.
+  Import from "@/components/ui" (works in Server and Client Components). Client-only parts have their own files: import { Modal, ConfirmDialog } from "@/components/ui/Modal"; import { useToast } from "@/components/ui/Toast".
+  Field errors: <FormField label="Email" htmlFor="email" error={fieldError(error, "email")}> picks the backend message for that field; <FormErrors error={error} /> shows all of them.
+  Look & feel (modern, playful): soft lilac background, violet → pink → orange brand gradient, pill buttons, rounded-3xl cards, emojis as small icons.
+  Colours: only the theme names in src/app/globals.css (bg-primary, bg-accent, bg-lime, text-muted, border-border, bg-surface, text-danger, bg-success-soft ...). Brand gradient: bg-brand / text-brand. Headings: font-display (Space Grotesk, automatic on h1–h3).
+  Handy options: Button variant="primary|secondary|dark|ghost|danger" size="sm|md|lg"; <Card interactive> for clickable cards; Badge tone="violet|pink|lime|green|yellow|red|blue|gray"; PageHeader eyebrow="✈️ Flights"; EmptyState emoji="🔍".
+Layout: DashboardShell + SidebarLink from "@/components/layout/Sidebar" (the admin and moderator layouts already use it), ComingSoon (placeholder pages).
+Layout (components/layout): Navbar (role-aware links, NotificationBell slot), Footer, Sidebar.
 Every route segment gets loading.tsx and error.tsx (GEN-16).
 
 M2.6 Rendering strategy (official table — be ready to justify it)
@@ -145,7 +153,7 @@ NotificationBell (unread count, GEN-01), ReviewList (HTL-24) | M6 task 1 (compon
 
 M2.8 Task lists (in order). ⏳ = needs another member's shared component.
 Member 1 — skeleton, auth, profile, admin accounts
-1. FIRST (by 25/11) Skeleton: create-next-app in frontend/, install packages (M2.2), proxy rewrites, lib/api (client + server), lib/auth (AuthProvider, getCurrentUser, requireRole, routes), middleware.ts (M2.4), lib/format, types/api.ts, UI kit + theme (GEN-15, GEN-17), layout with Navbar/Footer/sidebars (GEN-14), error/loading/not-found/forbidden pages, placeholder pages for every folder in M2.3, frontend/.env.example, README "Run the frontend" section. Merge, then tell everyone to start.
+1. FIRST (by 25/11) Skeleton: create-next-app in frontend/, install packages (M2.2), proxy rewrites, lib/api (client + server), lib/auth (AuthProvider, getCurrentUser, requireRole, routes), proxy.ts (M2.4), lib/format, types/api.ts, UI kit + theme (GEN-15, GEN-17), layout with Navbar/Footer/sidebars (GEN-14), error/loading/not-found/forbidden pages, placeholder pages for every folder in M2.3, frontend/.env.example, README "Run the frontend" section. Merge, then tell everyone to start.
 2. Login (ACC-04; lockout message ACC-05; suspended message; redirect to ?next= or role home ACC-10), register (ACC-01: terms checkbox, field errors, 409 email taken), logout, change password (ACC-08; forced when mustChangePassword).
 3. Profile (ACC-09, ACC-11): view/edit name, phone, preferred currency (⏳ M5 CurrencySelect); delete my account with ConfirmDialog, show the backend's "upcoming bookings" message (ACC-12).
 4. Admin: /admin home (cards linking to every admin page), accounts list with search/role/status filters + pagination (ACC-14), suspend/reactivate with confirm (ACC-15, ACC-16), reset password (ACC-07a), create moderator with airline/hotel picker (ACC-13; ⏳ M3 GET /api/airlines, M5 GET /api/hotels).
@@ -167,7 +175,7 @@ Member 3 — flights, airline moderator
 3. Flight search /flights (FLT-11, FLT-12, FLT-15: results for outbound + return, filters, sort, pagination, empty state, local times) — Dynamic SSR. "Select" → /book/flight?... (M4).
 4. Flight details /flights/[id] (FLT-17): airline, local times + duration, cabins with price/seats/bags, baggage + cancellation policy, Book button.
 5. /admin/airlines: list + create airline (FLT-01).
-6. /moderator/airline: layout with ModeratorSidebar, dashboard, profile + logo (FLT-01, ⏳ M2 ImageUploader), baggage policy (FLT-08), cancellation tiers editor (FLT-09).
+6. /moderator/airline: add your links to the existing layout.tsx (DashboardShell), dashboard, profile + logo (FLT-01, ⏳ M2 ImageUploader), baggage policy (FLT-08), cancellation tiers editor (FLT-09).
 7. Flights management: my flights list, create flight (FLT-03, airports ⏳ M5), cabins (FLT-04), edit (FLT-05), cancel with confirm (FLT-06). Each flight row links to /moderator/airline/flights/[id]/bookings (M4).
 
 Member 4 — flight booking, payments
