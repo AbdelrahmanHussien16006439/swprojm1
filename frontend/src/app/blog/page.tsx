@@ -1,12 +1,9 @@
 import Link from "next/link";
-import { Button } from "@/components/ui";
-import { EmptyState, ErrorState, PageHeader } from "@/components/ui";
-import { Pagination } from "@/components/ui";
+import { Button, EmptyState, ErrorState, Input, PageHeader, Pagination } from "@/components/ui";
 import { PostCard } from "@/components/blog/PostCard";
 import type { BlogPostSummary } from "@/components/blog/types";
 import { ApiError, serverApi } from "@/lib/api/server";
 import type { Paginated } from "@/types/api";
-import { Input } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -36,16 +33,16 @@ export default async function BlogPage({ searchParams }: { searchParams: Promise
     });
   } catch (error) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+      <div>
         <PageHeader title="Travel blog" description="Stories and tips from fellow travellers." eyebrow="📝 Community" />
         <ErrorState message={error instanceof ApiError ? error.messages.join(" ") : "We could not load the blog right now."} />
-      </main>
+      </div>
     );
   }
 
   const filters = { q: q || undefined, tag: tag || undefined };
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <div>
       <PageHeader title="Travel blog" description="Stories and tips from fellow travellers." eyebrow="📝 Community" />
       <form method="get" className="mb-8 grid gap-3 rounded-3xl border border-border bg-surface p-4 shadow-sm sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <label className="space-y-1 text-sm font-semibold">
@@ -71,6 +68,6 @@ export default async function BlogPage({ searchParams }: { searchParams: Promise
           <Pagination page={posts.page} totalPages={posts.totalPages} basePath="/blog" searchParams={filters} />
         </>
       )}
-    </main>
+    </div>
   );
 }

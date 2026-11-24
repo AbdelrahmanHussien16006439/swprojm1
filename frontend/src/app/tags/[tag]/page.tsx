@@ -38,15 +38,15 @@ export default async function TagsTagPage({ params, searchParams }: { params: Pr
     });
   } catch (error) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+      <div>
         <PageHeader title={`Posts tagged #${tag}`} eyebrow="🏷️ Blog tag" backHref="/blog" />
         <ErrorState message={error instanceof ApiError ? error.messages.join(" ") : "We could not load this tag right now."} />
-      </main>
+      </div>
     );
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+    <div>
       <PageHeader title={`Posts tagged #${tag}`} description="Explore published stories with this tag." eyebrow="🏷️ Blog tag" backHref="/blog" />
       <form method="get" className="mb-8 flex flex-col gap-3 rounded-3xl border border-border bg-surface p-4 sm:flex-row sm:items-end">
         <label className="flex-1 space-y-1 text-sm font-semibold">
@@ -66,6 +66,6 @@ export default async function TagsTagPage({ params, searchParams }: { params: Pr
           <Pagination page={posts.page} totalPages={posts.totalPages} basePath={`/tags/${encodeURIComponent(tag)}`} searchParams={{ q: q || undefined }} />
         </>
       )}
-    </main>
+    </div>
   );
 }
