@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api/client";
 import { Button, Card, FormErrors, Textarea } from "@/components/ui";
@@ -30,6 +30,19 @@ export function CommentsSection({ postId, initialComments }: { postId: string; i
   const [text, setText] = useState("");
   const [formError, setFormError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get<{ comments: BlogComment[] }>(`/posts/${postId}`, { redirectOn401: false })
+      .then((post) => {
+        if (active) setComments(post.comments);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [postId]);
 
   const addComment = async () => {
     if (!user) {

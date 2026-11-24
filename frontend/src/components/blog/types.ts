@@ -30,6 +30,7 @@ export interface BlogPost {
   tags: string[];
   images: BlogImage[];
   likesCount: number;
+  likedByMe: boolean;
   commentsCount: number;
   comments: BlogComment[];
 }

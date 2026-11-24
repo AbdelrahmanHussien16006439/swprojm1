@@ -8,6 +8,11 @@ import { ApiError, serverApi } from "@/lib/api/server";
 
 export const revalidate = 60;
 
+// No posts are pre-rendered at build time; visited posts are generated and revalidated on demand.
+export async function generateStaticParams(): Promise<Array<{ id: string }>> {
+  return [];
+}
+
 async function getPost(id: string): Promise<BlogPost> {
   return serverApi.get<BlogPost>(`/posts/${id}`, { auth: false, revalidate: 60 });
 }
@@ -35,7 +40,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ id: s
     <div className="space-y-10">
       <PostDetail post={post} />
       <div className="flex flex-wrap items-center gap-3 border-y border-border py-5">
-        <LikeButton postId={post.id} initialLikesCount={post.likesCount} />
+        <LikeButton postId={post.id} initialLikesCount={post.likesCount} initialLikedByMe={post.likedByMe} />
         <ReportButton targetType="post" targetId={post.id} />
       </div>
       <CommentsSection postId={post.id} initialComments={post.comments} />

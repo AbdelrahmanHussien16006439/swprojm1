@@ -59,6 +59,7 @@ function makeService(overrides: Record<string, any> = {}) {
   };
   const likeModel: Record<string, any> = {
     create: jest.fn(),
+    exists: jest.fn().mockReturnValue(execResult(false)),
     deleteMany: jest.fn().mockReturnValue(execResult({ deletedCount: 0 })),
     findOneAndDelete: jest
       .fn()
@@ -617,5 +618,49 @@ describe('BlogService post images (BLG-10)', () => {
     await service.deletePost(postId.toString(), userId.toString());
 
     expect(uploadsService.deleteImage).not.toHaveBeenCalled();
+  });
+
+  it('returns whether the logged-in viewer has liked the post', async () => {
+    const author = {
+      _id: otherUserId,
+      name: 'Author',
+      status: UserStatus.ACTIVE,
+    };
+    const post = {
+      _id: postId,
+      authorId: author,
+      title: 'A published post',
+      body: 'Travel story',
+      status: PostStatus.PUBLISHED,
+      isHidden: false,
+      publishedAt: new Date('2026-11-24T00:00:00.000Z'),
+      createdAt: new Date('2026-11-23T00:00:00.000Z'),
+      tags: [],
+      images: [],
+      likesCount: 3,
+      commentsCount: 0,
+    };
+    const commentsQuery = {
+      sort: jest.fn().mockReturnThis(),
+      populate: jest.fn().mockReturnThis(),
+      exec: jest.fn().mockResolvedValue([]),
+    };
+    const { service, likeModel } = makeService({
+      postModel: {
+        findById: jest.fn().mockReturnValue({
+          populate: jest.fn().mockReturnValue(execResult(post)),
+        }),
+      },
+      commentModel: { find: jest.fn().mockReturnValue(commentsQuery) },
+      likeModel: { exists: jest.fn().mockReturnValue(execResult(true)) },
+    });
+
+    const result = await service.getPost(postId.toString(), user);
+
+    expect(result.likedByMe).toBe(true);
+    expect(likeModel.exists).toHaveBeenCalledWith({
+      postId,
+      userId,
+    });
   });
 });
