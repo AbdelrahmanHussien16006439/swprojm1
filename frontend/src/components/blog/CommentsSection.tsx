@@ -11,6 +11,17 @@ import { formatDate } from "@/lib/format";
 import { ReportButton } from "@/components/reports";
 import type { BlogComment } from "./types";
 
+interface CommentMutationResponse {
+  id: string;
+  text: string;
+  author: { id: string; name: string };
+  createdAt: string;
+}
+
+function normalizeComment(comment: CommentMutationResponse): BlogComment {
+  return { id: comment.id, text: comment.text, author: comment.author, date: comment.createdAt };
+}
+
 export function CommentsSection({ postId, initialComments }: { postId: string; initialComments: BlogComment[] }) {
   const { user } = useAuth();
   const router = useRouter();
@@ -32,8 +43,8 @@ export function CommentsSection({ postId, initialComments }: { postId: string; i
     setBusy(true);
     setFormError(null);
     try {
-      const comment = await api.post<BlogComment>(`/posts/${postId}/comments`, { text: text.trim() });
-      setComments((current) => [...current, comment]);
+      const comment = await api.post<CommentMutationResponse>(`/posts/${postId}/comments`, { text: text.trim() });
+      setComments((current) => [...current, normalizeComment(comment)]);
       setText("");
     } catch (error) {
       setFormError(error);
@@ -93,8 +104,8 @@ function CommentItem({ comment, userId, onUpdated, onDeleted }: { comment: BlogC
     setBusy(true);
     setError(null);
     try {
-      const updated = await api.patch<BlogComment>(`/comments/${comment.id}`, { text: text.trim() });
-      onUpdated(updated);
+      const updated = await api.patch<CommentMutationResponse>(`/comments/${comment.id}`, { text: text.trim() });
+      onUpdated(normalizeComment(updated));
       setEditing(false);
     } catch (updateError) {
       setError(updateError);
