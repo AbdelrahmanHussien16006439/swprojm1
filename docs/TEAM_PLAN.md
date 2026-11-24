@@ -1,6 +1,229 @@
 Team Plan — Travel Planning and Booking Platform (Software Project I, Winter 2026)
-⚠️ CURRENT PHASE: MILESTONE 1 ONLY (BACKEND) — deadline 20/11/2026
-We are building only the NestJS backend + MongoDB Atlas + Swagger right now. Do NOT build any frontend / Next.js code yet. Lines marked "Milestone 2 frontend (later)" are for later — ignore them.
+⚠️ CURRENT PHASE: MILESTONE 2 (FRONTEND + INTEGRATION) — deadline 11/12/2026
+Milestone 1 (backend) is DONE and submitted (main, 20/11/2026). Now we build the Next.js frontend on top of it.
+PART B below is the Milestone 2 plan. PART A (further down) is the Milestone 1 backend plan: it is still the reference for every endpoint, rule, model name and owner.
+
+====================================================================
+PART B — MILESTONE 2: NEXT.JS FRONTEND
+====================================================================
+
+M2.0 READ THIS FIRST — instructions for the AI assistant
+Team member: paste this whole file into your AI chat (and, if possible, attach docs/requirements/requirements-mandatory.csv), then write:
+
+"I am Member N. We are doing Milestone 2: the Next.js frontend in frontend/, using our finished NestJS backend. Read PART B fully, and PART A Section 7 for the endpoints my pages call. Help me do my task list in M2.8, in order, starting from task 1. For each task: tell me exactly which files to create inside my own folders (M2.3), write the code, and tell me how to test it in the browser with the backend running."
+
+Rules the AI must follow:
+- Only create or edit files inside the member's own frontend folders (M2.3). Never edit another member's pages or components, frontend/package.json, next.config.ts, src/middleware.ts, src/lib/ or src/components/ui/ (those are Member 1's). Need a change there? Write a message for the owner.
+- Use the shared helpers with the exact names in M2.5 (api client, server fetch, auth helpers, UI kit). Do NOT write your own fetch wrapper, auth context, buttons or modals.
+- Do NOT add npm packages. Member 1 installs all packages (M2.2). If you really need one, ask Member 1.
+- The backend already enforces every rule. The frontend shows the rules (hints, limits, disabled buttons) but never replaces backend validation or authorization (official rule). Always show the backend's error messages.
+- Every page needs: a loading state, an error state, an empty state for lists (GEN-04, GEN-16), confirmation before delete/cancel (GEN-03), and must work at phone width (375 px) and desktop (GEN-16).
+- Use the rendering strategy from M2.6 for each page and add metadata (title/description) to public pages (SEO).
+- Use only the UI kit and theme colours (GEN-15, GEN-17). No random colours, fonts or inline styles.
+- Keep code simple and readable — the student must explain it in the evaluation, including why each page uses its rendering strategy.
+- Small backend changes are allowed only inside the member's OWN backend module (PART A 3.2), with the same backend rules (DTO validation, Swagger, tests, server starts).
+- At the end of each task remind the member to: run `npm run build` in frontend/, commit with the requirement IDs, open a PR into develop, and add an entry to AI_PROMPTS.txt.
+
+M2.1 How we work in Milestone 2
+- Step 1 (Member 1, by 25/11): Member 1 builds and merges the frontend skeleton (M2.8 Member 1 task 1). Nobody else starts coding before it is merged — everything plugs into it. Meanwhile: read PART B, pull develop, check your backend runs.
+- Step 2 (26/11 → 6/12): everyone works on their own task list AT THE SAME TIME. Frontend folders don't overlap, so there are no conflicts.
+- Task 1 of several members is a SHARED component other members need (M2.7). Do it first and merge it fast.
+- A task marked ⏳ needs another member's shared component. git pull origin develop; if it's there, use it; if not, do your next task and come back. Never copy or fake another member's component.
+- Merge each finished task immediately (PR into develop, tested by Member 1).
+- 7/12 → 9/12: integration week — every role's full workflow tested end to end, fixes only.
+- 10/12: Member 1 runs the final check, merges develop → main. Submission 11/12.
+
+Timeline
+Date | What
+24–25/11 | Member 1: frontend skeleton merged. Members 3 and 5: their small backend list endpoints (M2.8)
+26–28/11 | Shared components merged first (M2.7), then pages
+29/11–6/12 | All remaining pages
+7–9/12 | Integration testing of all roles, fixes, README, AI_PROMPTS
+10/12 | Final check, develop → main
+11/12 | Submit
+
+M2.2 Tech & setup (Member 1 sets this up once)
+- Next.js (latest) App Router + TypeScript + Tailwind CSS + ESLint, in frontend/ with src/ and the "@/..." import alias.
+  Created with: npx create-next-app@latest frontend --ts --tailwind --eslint --app --src-dir --import-alias "@/*"
+- Extra packages (Member 1 installs, nobody else): @stripe/stripe-js @stripe/react-stripe-js
+- Port: frontend http://localhost:3000, backend http://localhost:4000 (both run at the same time).
+- Proxy: next.config.ts rewrites /api/:path* → BACKEND_URL/api/:path* and /uploads/:path* → BACKEND_URL/uploads/:path*.
+  The browser only ever talks to localhost:3000, so the httpOnly login cookies just work (same origin). Never call localhost:4000 from browser code.
+- frontend/.env.local (never committed; values from Member 1 privately):
+  BACKEND_URL=http://localhost:4000
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...   (the publishable key only — never the secret key)
+- Run (two terminals): cd backend → npm run start:dev, and cd frontend → npm run dev. Open http://localhost:3000.
+- Payments locally also need the Stripe CLI listener from the README (the webhook confirms bookings).
+- Can't reach Atlas from your network (backend won't start)? Use a phone hotspot, or set BACKEND_URL to the deployed backend once Member 1 shares it (M2.8 Member 1 task 6).
+
+M2.3 Folder ownership — frontend/src (edit ONLY your own)
+Owner | Folders / files
+Member 1 | app/layout.tsx, app/page.tsx (home), app/error.tsx, app/not-found.tsx, app/loading.tsx, app/(auth)/** (login, register, change-password), app/profile/**, app/forbidden/, app/admin/layout.tsx, app/admin/page.tsx, app/admin/accounts/**, app/admin/moderators/**, middleware.ts, lib/**, components/ui/**, components/layout/**, types/api.ts, next.config.ts, package.json, tailwind/global CSS, frontend/.env.example
+Member 2 | app/blog/**, app/tags/**, app/authors/**, app/admin/reports/**, app/admin/content/**, app/admin/audit-logs/**, app/admin/providers/**, components/blog/**, components/uploads/**, components/reports/**
+Member 3 | app/flights/** (except the book link target), app/admin/airlines/**, app/moderator/airline/** (except flights/[id]/bookings), components/flights/**
+Member 4 | app/book/flight/**, app/my/flight-bookings/**, app/moderator/airline/flights/[id]/bookings/**, components/payments/**, components/flight-bookings/**
+Member 5 | app/hotels/**, app/admin/hotels/**, app/moderator/hotel/** (except reservations), components/hotels/**, components/reference/**
+Member 6 | app/book/hotel/**, app/my/hotel-bookings/**, app/moderator/hotel/reservations/**, app/notifications/**, app/admin/bookings/**, components/notifications/**, components/reviews/**, components/hotel-bookings/**
+Member 7 | app/itineraries/**, app/explore/** (public itineraries), components/itineraries/**
+Member 1's skeleton creates every folder above with a placeholder page ("Coming soon — Member N") so the navbar links work. Replace your placeholders.
+
+URL map (so links between members match)
+Page | URL | Owner
+Home | / | M1
+Login / register / change password | /login?next=..., /register, /change-password | M1
+Profile | /profile | M1
+Blog list / post / new / edit / my posts | /blog, /blog/[id], /blog/new, /blog/[id]/edit, /blog/mine | M2
+Tag / author | /tags/[tag], /authors/[id] | M2
+Flight search / details | /flights?from=&to=&departDate=&returnDate=&adults=&children=&infants=&cabinClass= , /flights/[id] | M3
+Book a flight | /book/flight?outbound=<flightId>:<cabinId>&return=<flightId>:<cabinId>&adults=&children=&infants= | M4
+My flight bookings | /my/flight-bookings, /my/flight-bookings/[id] | M4
+Hotel search / details | /hotels?cityId=&checkIn=&checkOut=&guests=&rooms= , /hotels/[id]?checkIn=&checkOut= | M5
+Book a hotel | /book/hotel?hotelId=&checkIn=&checkOut= (+ selected rooms) | M6
+My hotel bookings | /my/hotel-bookings, /my/hotel-bookings/[id] | M6
+Notifications | /notifications | M6
+My itineraries / editor | /itineraries, /itineraries/new, /itineraries/[id] | M7
+Public itineraries | /explore, /explore/[id] | M7
+Admin | /admin (home) + /admin/accounts, /admin/moderators (M1), /admin/reports, /admin/content, /admin/audit-logs, /admin/providers (M2), /admin/airlines (M3), /admin/hotels (M5), /admin/bookings (M6) | see owners
+Airline moderator | /moderator/airline (M3) + /moderator/airline/flights/[id]/bookings (M4) | M3/M4
+Hotel moderator | /moderator/hotel (M5) + /moderator/hotel/reservations (M6) | M5/M6
+Role home after login: user → /, admin → /admin, airline_moderator → /moderator/airline, hotel_moderator → /moderator/hotel. mustChangePassword → /change-password first.
+
+M2.4 Auth & route protection (Member 1 builds it; everyone uses it)
+- Login state lives only in the backend's httpOnly cookies. The frontend never reads tokens and never stores the user in localStorage.
+- Who is logged in: server components call getCurrentUser() (it calls GET /api/auth/me with the request cookies); client components use useAuth().
+- middleware.ts: for protected URLs (/profile, /my, /book, /itineraries, /notifications, /blog/new, /blog/mine, /blog/*/edit, /admin, /moderator) with no session cookie → redirect to /login?next=<url> (ACC-10). If the access cookie expired but the refresh cookie exists, middleware calls POST /api/auth/refresh and passes the new cookies on.
+- Role pages: admin/moderator layouts call requireRole(...) → not logged in: /login?next=..., wrong role: /forbidden. This is only for navigation — the backend still checks every request.
+- Restricted actions on public pages (book, like, comment, review, report, clone): if not logged in, send to /login?next=<current page> and come back after login (ACC-10).
+- Client fetch: on 401 the api client calls /api/auth/refresh once and retries; if that fails it sends the user to /login?next=... (ACC-19 session expiry).
+
+M2.5 Shared code contract (Member 1) — use EXACTLY these names
+API (all paths WITHOUT the /api prefix, e.g. '/flights/search'):
+- Client components: import { api, ApiError } from '@/lib/api/client'
+  api.get<T>(path, { query? }), api.post<T>(path, body?), api.patch<T>(path, body?), api.put<T>(path, body?), api.delete<T>(path, body?), api.upload<T>(path, formData), api.download(path, fileName) (PDF/CSV)
+  Errors throw ApiError { status: number; messages: string[] } (messages = the backend's message array, GEN-02).
+- Server components: import { serverApi } from '@/lib/api/server'
+  serverApi.get<T>(path, { query?, auth?: boolean (default true: forwards the user's cookies), revalidate?: number })
+  ISR/public pages use { auth: false, revalidate: 60 } so the page can be cached.
+- Types: import type { Paginated, CurrentUser, Role } from '@/types/api'
+  Paginated<T> = { data: T[]; page: number; limit: number; total: number; totalPages: number }
+  Each member puts their own response types in their components folder (e.g. components/flights/types.ts).
+Auth:
+- import { getCurrentUser, requireRole } from '@/lib/auth/server' — getCurrentUser(): Promise<CurrentUser | null>; requireRole(...roles) redirects if needed and returns the user.
+- import { useAuth } from '@/lib/auth/AuthProvider' — { user, loading, refresh(), logout() }.
+- import { loginUrl, roleHome } from '@/lib/auth/routes' — loginUrl(nextPath) and roleHome(role).
+Formatting: import { formatMoney, formatDate, formatDateTime } from '@/lib/format'
+- formatDateTime(iso, timeZone?) — flight times are shown in the AIRPORT's local time (the backend returns the time zone).
+UI kit (components/ui, Tailwind): Button, Input, Textarea, Select, Checkbox, FormField (label + field-level error), FormErrors (list of backend messages), Card, Badge (booking/flight statuses), Modal, ConfirmDialog (GEN-03), Pagination (page size 10, GEN-05), EmptyState (GEN-04), ErrorState, LoadingState / Spinner, Tabs, Table, PageHeader (title + back link, GEN-14), Toast via useToast().
+Layout (components/layout): Navbar (role-aware links, NotificationBell slot), Footer, AdminSidebar, ModeratorSidebar.
+Every route segment gets loading.tsx and error.tsx (GEN-16).
+
+M2.6 Rendering strategy (official table — be ready to justify it)
+Page | Strategy | Owner
+Published blog post /blog/[id] | ISR (revalidate 60) + Client Components for likes/comments | M2
+Blog list / search /blog, /tags/[tag] | Dynamic SSR | M2
+Public author page /authors/[id] | ISR | M2
+Blog editor / drafts /blog/new, /blog/[id]/edit, /blog/mine | Dynamic SSR + Client Components | M2
+Public itinerary detail /explore/[id] | ISR + Client Component for the clone button | M7
+Public itinerary search /explore | Dynamic SSR | M7
+Private itinerary detail / editor /itineraries/[id] | Dynamic SSR + Client Components | M7
+Flight / hotel search /flights, /hotels | Dynamic SSR (search params) | M3, M5
+Flight / hotel details /flights/[id], /hotels/[id] | Dynamic SSR (seats/rooms change) | M3, M5
+User booking pages /book/**, /my/** | Dynamic SSR + Client Components (forms, Stripe) | M4, M6
+Admin / moderator dashboards | Dynamic SSR | owners
+Home / login / register | Static shell + Client Component forms | M1
+Rule of thumb: a page is a Server Component; only the interactive part (form, button, Stripe, like) is a Client Component ("use client").
+
+M2.7 Shared components other members need (do these FIRST)
+Component | Owner | Used by
+UI kit, api client, auth, layout (skeleton) | M1 task 1 | everyone
+CountrySelect, CitySelect (filter by country), AirportSelect (search by code/name/city), CurrencySelect | M5 task 1 (components/reference) | M1 profile, M3 search/flight form, M5, M7
+ImageUploader (JPG/PNG ≤ 5 MB check, preview, max count), ReportButton (GEN-09) | M2 task 1 (components/uploads, components/reports) | M3 logo, M5 photos, M7 activity images; M6 reviews, M7 public itineraries
+FlightSearchForm, FlightCard | M3 task 2 (components/flights) | M1 home, M7 plan-travel
+HotelSearchForm, HotelCard | M5 task 2 (components/hotels) | M1 home, M7 plan-travel
+StripeCheckout (Stripe PaymentElement + confirmPayment, then poll booking status), PolicyAcceptance (PAY-02), HoldCountdown | M4 task 1 (components/payments) | M6 hotel booking
+NotificationBell (unread count, GEN-01), ReviewList (HTL-24) | M6 task 1 (components/notifications, components/reviews) | M1 navbar, M5 hotel page
+
+M2.8 Task lists (in order). ⏳ = needs another member's shared component.
+Member 1 — skeleton, auth, profile, admin accounts
+1. FIRST (by 25/11) Skeleton: create-next-app in frontend/, install packages (M2.2), proxy rewrites, lib/api (client + server), lib/auth (AuthProvider, getCurrentUser, requireRole, routes), middleware.ts (M2.4), lib/format, types/api.ts, UI kit + theme (GEN-15, GEN-17), layout with Navbar/Footer/sidebars (GEN-14), error/loading/not-found/forbidden pages, placeholder pages for every folder in M2.3, frontend/.env.example, README "Run the frontend" section. Merge, then tell everyone to start.
+2. Login (ACC-04; lockout message ACC-05; suspended message; redirect to ?next= or role home ACC-10), register (ACC-01: terms checkbox, field errors, 409 email taken), logout, change password (ACC-08; forced when mustChangePassword).
+3. Profile (ACC-09, ACC-11): view/edit name, phone, preferred currency (⏳ M5 CurrencySelect); delete my account with ConfirmDialog, show the backend's "upcoming bookings" message (ACC-12).
+4. Admin: /admin home (cards linking to every admin page), accounts list with search/role/status filters + pagination (ACC-14), suspend/reactivate with confirm (ACC-15, ACC-16), reset password (ACC-07a), create moderator with airline/hotel picker (ACC-13; ⏳ M3 GET /api/airlines, M5 GET /api/hotels).
+5. Home page (GEN-14): flight and hotel search forms (⏳ M3, M5), links to explore itineraries and blog, metadata.
+6. (Optional, bonus — decide by 6/12) Deploy backend + frontend; if we apply, grading uses ONLY the deployed version, so everything must work there.
+7. Integration week: PR reviews, end-to-end test of every role, final README, develop → main.
+
+Member 2 — blog, community, admin moderation
+1. Shared: ImageUploader (components/uploads) and ReportButton (components/reports, GEN-09: reason modal, 409 "already reported" message). Merge fast.
+2. Blog list/search /blog (BLG-02, BLG-09: keyword + tag filter, pagination, empty state) and /tags/[tag] (BLG-08) — Dynamic SSR.
+3. Post page /blog/[id] (BLG-02) — ISR + metadata; LikeButton (BLG-06) and comments add/edit/delete (BLG-05, BLG-07, 500-char limit) as Client Components; logged out → login?next.
+4. Editor /blog/new and /blog/[id]/edit (BLG-01, BLG-04: draft/published, tags max 5 × 30 chars BLG-08, images BLG-10 via ImageUploader), /blog/mine with drafts + counts (BLG-03), delete with confirm.
+5. Author page /authors/[id] (BLG-12) — ISR: name, join date, published posts, public itineraries (links to /explore/[id]).
+6. Admin: /admin/reports (GEN-10: filter, resolve dismiss/hide/delete with confirm), /admin/content (hide/unhide/delete by type + id), /admin/audit-logs (GEN-07 filters), /admin/providers (ACC-15 deactivate/reactivate airline/hotel with confirm).
+
+Member 3 — flights, airline moderator
+1. Backend (in your modules, by 26/11): GET /api/airlines (admin, paginated, ?q) and GET /api/flights/mine (airline moderator: own airline's flights, paginated, ?status). Same backend rules (DTO, Swagger, tests, server starts).
+2. Shared: FlightSearchForm (one-way/round-trip, AirportSelect ⏳ M5, dates, adults/children/infants, cabin) and FlightCard (components/flights).
+3. Flight search /flights (FLT-11, FLT-12, FLT-15: results for outbound + return, filters, sort, pagination, empty state, local times) — Dynamic SSR. "Select" → /book/flight?... (M4).
+4. Flight details /flights/[id] (FLT-17): airline, local times + duration, cabins with price/seats/bags, baggage + cancellation policy, Book button.
+5. /admin/airlines: list + create airline (FLT-01).
+6. /moderator/airline: layout with ModeratorSidebar, dashboard, profile + logo (FLT-01, ⏳ M2 ImageUploader), baggage policy (FLT-08), cancellation tiers editor (FLT-09).
+7. Flights management: my flights list, create flight (FLT-03, airports ⏳ M5), cabins (FLT-04), edit (FLT-05), cancel with confirm (FLT-06). Each flight row links to /moderator/airline/flights/[id]/bookings (M4).
+
+Member 4 — flight booking, payments
+1. Shared: components/payments — StripeCheckout (loads Stripe with NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, POST /api/payments without testPaymentMethod → clientSecret → PaymentElement → stripe.confirmPayment({ redirect: 'if_required' }) → poll the booking until confirmed; retry on failure PAY-01), PolicyAcceptance (PAY-02), HoldCountdown (10-minute hold). Merge fast — Member 6 needs it. Card data goes straight to Stripe, never to our backend.
+2. /book/flight: passenger forms (FLT-19: name, date of birth, passport/ID, extra bags up to the airline max; FLT-12 age bands), summary (FLT-21), hold (FLT-22), policies (PAY-02), pay (PAY-01), success page with booking reference.
+3. /my/flight-bookings: Upcoming / Past / Cancelled tabs (FLT-25); details page with payment + refund status (PAY-03), e-ticket download (FLT-23), refund preview + cancel with confirm (FLT-26).
+4. /moderator/airline/flights/[id]/bookings: bookings + passengers (FLT-29), CSV export button.
+5. Backend fix (your module): e-ticket PDF shows airport IATA codes (CAI → LHR) instead of ids.
+
+Member 5 — hotels, reference data, hotel moderator
+1. Shared: components/reference — CountrySelect, CitySelect, AirportSelect, CurrencySelect (from /api/countries, /cities, /airports, /currencies). Merge fast — Members 1, 3 and 7 need them.
+2. Backend (in your modules, by 26/11): GET /api/hotels (admin, paginated, ?q) and GET /api/hotels/:id/rooms (hotel moderator: all own rooms incl. inactive). Same backend rules.
+3. Shared: HotelSearchForm, HotelCard (components/hotels).
+4. Hotel search /hotels (HTL-11, HTL-12: city or country, dates, guests, rooms, filters, sort, pagination, empty state) — Dynamic SSR.
+5. Hotel details /hotels/[id] (HTL-02, HTL-15): photos, amenities, policies, check-in/out times, available rooms for the chosen dates, reviews (⏳ M6 ReviewList), select rooms → /book/hotel (M6).
+6. /admin/hotels: list + create hotel (HTL-01).
+7. /moderator/hotel: layout, dashboard, profile + photos (HTL-01, ⏳ M2 ImageUploader), policies (HTL-09, HTL-10), rooms list/create/edit/deactivate/delete with confirm (HTL-03, HTL-06), availability ranges + blocked dates (HTL-04, HTL-05), availability calendar (HTL-08, Booked/Blocked/Available with references).
+
+Member 6 — hotel booking, reviews, notifications, admin bookings
+1. Shared: NotificationBell (components/notifications: unread count, dropdown of latest, mark read; GEN-01) and ReviewList (components/reviews: average rating, count, newest first, pagination; HTL-24). Merge fast — Member 1's navbar and Member 5's hotel page need them.
+2. /notifications page: list, mark one / all as read (GEN-01).
+3. /book/hotel: rooms + guests per room (HTL-16, child ages), hold (HTL-18; 409 "no longer available" message), policies + payment (⏳ M4 PolicyAcceptance, StripeCheckout), success page.
+4. /my/hotel-bookings: Upcoming / Past / Cancelled (HTL-20), details with payment/refund status, refund preview + cancel with confirm (HTL-21), write review for completed stays (HTL-23), edit/delete own review.
+5. /moderator/hotel/reservations: reservations with filters (HTL-22).
+6. /admin/bookings: read-only list of all bookings with filters (ACC-17).
+7. Backend tidy-up (your module): remove the outdated "TODO (Member 4)" comment in hotel-bookings.service.ts.
+
+Member 7 — itineraries
+1. /itineraries: my itineraries list (ITN-03), create (ITN-01: title, countries ⏳ M5 CountrySelect, start date), delete with confirm.
+2. Editor /itineraries/[id] (Dynamic SSR + Client Components): edit details, public/private toggle (ITN-20), days with city (⏳ M5 CitySelect) and notes (ITN-05), delete day with confirm (ITN-07), reorder (ITN-08), city groups (ITN-09).
+3. Activities per day: add/edit/delete, time, cost + currency (ITN-10), images (ITN-12, ⏳ M2 ImageUploader).
+4. Budget panel: budget entries (ITN-14), transport costs (ITN-16), summary converted to a chosen currency with the rate date (ITN-18, ⏳ M5 CurrencySelect).
+5. Plan travel: hotels for a city group (ITN-25, ⏳ M5 HotelCard) and flights to the first city (ITN-26, ⏳ M3 FlightCard) with links to the booking pages.
+6. /explore: public search (ITN-20, ITN-21: keyword, days, country/city filters) — Dynamic SSR. /explore/[id]: ISR read-only view + metadata, Clone button (ITN-21, logged out → login?next), ReportButton (⏳ M2).
+
+Everyone (in your own pages): GEN-02 field errors, GEN-03 confirmations, GEN-04 empty states, GEN-05 pagination, GEN-14 clear navigation + back/cancel, GEN-15/16/17 consistent, responsive UI with loading/success/error feedback, ACC-10 redirect after login.
+
+M2.9 Git rules (same as PART A Section 8)
+- One branch per task from the latest develop: feature/FE-<REQ-ID>-<description>, e.g. feature/FE-FLT-11-flight-search. PR into develop (never main).
+- Commits: feat(frontend-flights): flight search page (FLT-11). Requirement IDs in commits and PRs.
+- Never commit .env, .env.local, node_modules, .next. Only Member 1 changes frontend/package.json and package-lock.json.
+- AI_PROMPTS.txt: new entry at the bottom, starting with "### Member N — date time — REQ-IDs" right after a ==== line.
+
+M2.10 Definition of done (every page)
+- cd frontend && npm run build passes (type check + lint) — and the backend still starts if you touched it.
+- Tested in the browser (Chrome) with the backend running, logged in as the right role, at desktop width AND phone width (DevTools, 375 px).
+- Loading, error and empty states; confirmation before destructive actions; backend error messages shown next to the form (GEN-02).
+- Uses the shared helpers and UI kit only; no new packages; only your own folders changed.
+- Rendering strategy from M2.6; metadata on public pages.
+- Requirement IDs in the commit and PR; AI_PROMPTS.txt entry; you can explain the code and the rendering choice.
+
+====================================================================
+PART A — MILESTONE 1: BACKEND (DONE — reference for endpoints, rules and owners)
+====================================================================
+(Written for Milestone 1. The backend is finished: use this part as the reference for endpoints, rules, model names and owners. For Milestone 2 work follow PART B above.)
+In Milestone 1 nobody built frontend code. Lines below marked "Milestone 2 frontend (later)" are now covered by PART B, M2.8.
 
 Sources this plan is based on (all in docs/requirements/):
 
