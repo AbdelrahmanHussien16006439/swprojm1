@@ -1164,3 +1164,18 @@ and comment components. Added login-aware like/comment actions, backend error
 display, duplicate-like handling, 500-character comment validation, own-comment
 editing/deletion, report buttons, metadata, and loading/error boundaries.
 ================================================
+### Member 2 — 2026-11-24 — BLG-01, BLG-03, BLG-04, BLG-08, BLG-10
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirements: BLG-01, BLG-03, BLG-04, BLG-08, BLG-10
+Prompt:
+"Implement task 4 from TEAM_PLAN M2.8: the dynamic SSR new/edit post forms and
+my-posts page. Create posts before enabling the shared ImageUploader, use the
+post-specific image upload/delete endpoints, enforce title/body/status/tag rules,
+show field-level backend errors, protect editing to the author, and add confirmed
+deletion for posts. Run frontend build/lint and log the prompt."
+How the output was used:
+Added PostEditor, MyPostsList, authenticated new/edit/mine routes, post-specific
+image operations, draft/published status, tag validation, ownership checks, empty
+states, pagination, and delete confirmation.
+================================================

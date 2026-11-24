@@ -26,6 +26,7 @@ export interface BlogPost {
   title: string;
   author: { id: string; name: string };
   date: string;
+  status: "draft" | "published";
   body: string;
   tags: string[];
   images: BlogImage[];
