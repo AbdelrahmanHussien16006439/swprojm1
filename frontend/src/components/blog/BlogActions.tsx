@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth/AuthProvider";
 export function BlogActions() {
   const { user, loading } = useAuth();
 
-  if (loading || !user) return null;
+  if (loading || user?.role !== "user") return null;
 
   return (
     <>

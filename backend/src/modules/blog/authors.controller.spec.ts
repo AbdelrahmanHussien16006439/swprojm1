@@ -33,12 +33,14 @@ describe('AuthorsController (BLG-12)', () => {
       {
         _id: new Types.ObjectId('665f1e77d8e043d0b1c0a333'),
         title: 'Public itinerary',
+        countryIds: [],
         startDate: new Date('2026-12-01T00:00:00Z'),
         days: [{}, {}],
       },
     ];
     const query = {
       sort: jest.fn().mockReturnThis(),
+      populate: jest.fn().mockReturnThis(),
       skip: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
       exec: jest.fn().mockResolvedValue(itineraries),
@@ -90,6 +92,7 @@ describe('AuthorsController (BLG-12)', () => {
         data: [{
           id: '665f1e77d8e043d0b1c0a333',
           title: 'Public itinerary',
+          countries: [],
           startDate: new Date('2026-12-01T00:00:00Z'),
           days: 2,
         }],
