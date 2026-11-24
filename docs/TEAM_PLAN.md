@@ -25,6 +25,10 @@ Rules the AI must follow:
 - At the end of each task remind the member to: run `npm run build` in frontend/, commit with the requirement IDs, open a PR into develop, and add an entry to AI_PROMPTS.txt.
 
 M2.1 How we work in Milestone 2
+- DECIDED 24/11 (team leader): like Milestone 1, members work ONE AT A TIME, in this order:
+  Member 1 → 2 → 5 → 3 → 4 → 6 → 7. The order follows the shared components: Member 2's ImageUploader and Member 5's
+  dropdowns are needed by later members. Wait for Member 1's "your turn" message before starting.
+  Parts marked ⏳ that need a LATER member are done at the end, in an integration round (like Milestone 1).
 - Step 1 (Member 1, by 25/11): Member 1 builds and merges the frontend skeleton (M2.8 Member 1 task 1). Nobody else starts coding before it is merged — everything plugs into it. Meanwhile: read PART B, pull develop, check your backend runs.
 - Step 2 (26/11 → 6/12): everyone works on their own task list AT THE SAME TIME. Frontend folders don't overlap, so there are no conflicts.
 - Task 1 of several members is a SHARED component other members need (M2.7). Do it first and merge it fast.
@@ -117,7 +121,7 @@ Formatting: import { formatMoney, formatDate, formatDateTime } from '@/lib/forma
 - formatDateTime(iso, timeZone?) — flight times are shown in the AIRPORT's local time (the backend returns the time zone).
 UI kit (components/ui, Tailwind): Button, Input, Textarea, Select, Checkbox, FormField (label + field-level error), FormErrors (list of backend messages), Card, Badge (booking/flight statuses), Modal, ConfirmDialog (GEN-03), Pagination (page size 10, GEN-05), EmptyState (GEN-04), ErrorState, LoadingState / Spinner, Tabs, Table, PageHeader (title + back link, GEN-14), Toast via useToast(), StatusBadge (status → colour), statusLabel.
   Import from "@/components/ui" (works in Server and Client Components). Client-only parts have their own files: import { Modal, ConfirmDialog } from "@/components/ui/Modal"; import { useToast } from "@/components/ui/Toast".
-  Field errors: <FormField label="Email" htmlFor="email" error={fieldError(error, "email")}> picks the backend message for that field; <FormErrors error={error} /> shows all of them.
+  Field errors: <FormField label="Email" htmlFor="email" error={fieldError(error, "email")}> picks the backend message for that field; <FormErrors error={error} fields={["email"]} /> shows the other messages at the top (fields = the ones already shown under their box).
   Look & feel (modern, playful): soft lilac background, violet → pink → orange brand gradient, pill buttons, rounded-3xl cards, emojis as small icons.
   Colours: only the theme names in src/app/globals.css (bg-primary, bg-accent, bg-lime, text-muted, border-border, bg-surface, text-danger, bg-success-soft ...). Brand gradient: bg-brand / text-brand. Headings: font-display (Space Grotesk, automatic on h1–h3).
   Handy options: Button variant="primary|secondary|dark|ghost|danger" size="sm|md|lg"; <Card interactive> for clickable cards; Badge tone="violet|pink|lime|green|yellow|red|blue|gray"; PageHeader eyebrow="✈️ Flights"; EmptyState emoji="🔍".

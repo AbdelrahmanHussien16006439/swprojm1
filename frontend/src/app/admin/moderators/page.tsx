@@ -1,8 +1,22 @@
-// PLACEHOLDER — OWNER: Member 1 (TEAM_PLAN M2.3, M2.8). Replace this file with the real page.
-import { ComingSoon } from "@/components/layout/ComingSoon";
+// Create a moderator (ACC-13).
+import { Card, PageHeader } from "@/components/ui";
+import { CreateModeratorForm } from "./CreateModeratorForm";
 
-export const metadata = { title: "Create moderator" };
+export const metadata = { title: "New moderator" };
 
-export default function AdminModeratorsPage() {
-  return <ComingSoon title="Create moderator" owner="Member 1" requirements="ACC-13" />;
+export default function ModeratorsPage() {
+  return (
+    <>
+      <PageHeader
+        eyebrow="🧑‍✈️ Moderators"
+        title="New moderator"
+        description="A moderator manages exactly one airline or one hotel. They must change the temporary password at first login."
+        backHref="/admin/accounts"
+        backLabel="Accounts"
+      />
+      <Card className="max-w-2xl">
+        <CreateModeratorForm />
+      </Card>
+    </>
+  );
 }

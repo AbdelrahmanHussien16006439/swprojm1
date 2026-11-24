@@ -72,10 +72,17 @@ export function FormField({ label, htmlFor, error, hint, required, children, cla
   );
 }
 
-/** Shows the backend's error messages above a form (GEN-02). Pass whatever your catch received. */
-export function FormErrors({ error }: { error: unknown }) {
+/**
+ * Shows the backend's error messages above a form (GEN-02). Pass whatever your catch received.
+ * `fields`: the fields that already show their own error under the box (via fieldError), so they
+ * are not repeated here: <FormErrors error={error} fields={["email", "password"]} />
+ */
+export function FormErrors({ error, fields = [] }: { error: unknown; fields?: string[] }) {
   if (!error) return null;
-  const messages = errorMessages(error);
+  const messages = errorMessages(error).filter(
+    (m) => !fields.some((f) => m.toLowerCase().startsWith(f.toLowerCase())),
+  );
+  if (!messages.length) return null;
   return (
     <div role="alert" className="rounded-2xl border border-danger/20 bg-danger-soft px-4 py-3 text-sm font-medium text-danger">
       {messages.length === 1 ? (
