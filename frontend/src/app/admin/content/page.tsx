@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/ui";
-import { ContentActions } from "../ModerationActions";
+import { ContentActions } from "@/components/admin-moderation/ModerationActions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Content moderation" };

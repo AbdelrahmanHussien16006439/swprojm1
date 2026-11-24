@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Audit log" };
 
 interface AuditLogRow {
-  id: string;
+  _id: string;
   actorId: string;
   action: string;
   targetType: string;
@@ -34,7 +34,7 @@ export default async function AuditLogsPage({ searchParams }: { searchParams: Pr
       </form>
       {result.data.length === 0 ? <EmptyState emoji="📜" title="No audit entries found" message={filtered ? "Try different filters." : "Administrative actions will appear here."} /> : (
         <Table><thead><tr><th>Date</th><th>Actor</th><th>Action</th><th>Target</th><th>Details</th></tr></thead><tbody>
-          {result.data.map((entry) => <tr key={entry.id}><td className="whitespace-nowrap text-muted">{formatDate(entry.createdAt)}</td><td className="font-mono text-xs">{entry.actorId}</td><td><span className="font-semibold">{entry.action}</span></td><td className="font-mono text-xs">{entry.targetType} / {entry.targetId}</td><td className="max-w-xs truncate text-xs text-muted">{entry.details ? JSON.stringify(entry.details) : "—"}</td></tr>)}
+          {result.data.map((entry) => <tr key={entry._id}><td className="whitespace-nowrap text-muted">{formatDate(entry.createdAt)}</td><td className="font-mono text-xs">{entry.actorId}</td><td><span className="font-semibold">{entry.action}</span></td><td className="font-mono text-xs">{entry.targetType} / {entry.targetId}</td><td className="max-w-xs truncate text-xs text-muted">{entry.details ? JSON.stringify(entry.details) : "—"}</td></tr>)}
         </tbody></Table>
       )}
       <Pagination page={result.page} totalPages={result.totalPages} basePath="/admin/audit-logs" searchParams={sp} />

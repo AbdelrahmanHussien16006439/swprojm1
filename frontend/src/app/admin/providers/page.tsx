@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/ui";
-import { ProviderActions } from "../ModerationActions";
+import { ProviderActions } from "@/components/admin-moderation/ModerationActions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Providers" };

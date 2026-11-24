@@ -2,13 +2,13 @@ import { serverApi } from "@/lib/api/server";
 import { formatDate } from "@/lib/format";
 import { Button, ButtonLink, EmptyState, PageHeader, Pagination, Select, StatusBadge, Table } from "@/components/ui";
 import type { Paginated } from "@/types/api";
-import { ReportActions } from "../ModerationActions";
+import { ReportActions } from "@/components/admin-moderation/ModerationActions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Reports" };
 
 interface ReportRow {
-  id: string;
+  _id: string;
   targetType: "post" | "comment" | "review" | "itinerary";
   targetId: string;
   reason: string;
@@ -34,7 +34,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       </form>
       {result.data.length === 0 ? <EmptyState emoji="🚩" title="No reports found" message={filtered ? "Try different filters." : "There are no reports to review."} /> : (
         <Table><thead><tr><th>Type</th><th>Target</th><th>Reason</th><th>Status</th><th>Reported</th><th className="text-right">Actions</th></tr></thead><tbody>
-          {result.data.map((report) => <tr key={report.id}><td className="font-semibold capitalize">{report.targetType}</td><td className="max-w-36 truncate font-mono text-xs">{report.targetId}</td><td className="max-w-xs">{report.reason}</td><td><StatusBadge status={report.status} /></td><td className="whitespace-nowrap text-muted">{formatDate(report.createdAt)}</td><td><ReportActions reportId={report.id} targetType={report.targetType} /></td></tr>)}
+          {result.data.map((report) => <tr key={report._id}><td className="font-semibold capitalize">{report.targetType}</td><td className="max-w-36 truncate font-mono text-xs">{report.targetId}</td><td className="max-w-xs">{report.reason}</td><td><StatusBadge status={report.status} /></td><td className="whitespace-nowrap text-muted">{formatDate(report.createdAt)}</td><td>{report.status === "open" ? <ReportActions reportId={report._id} targetType={report.targetType} /> : <span className="text-muted">—</span>}</td></tr>)}
         </tbody></Table>
       )}
       <Pagination page={result.page} totalPages={result.totalPages} basePath="/admin/reports" searchParams={sp} />

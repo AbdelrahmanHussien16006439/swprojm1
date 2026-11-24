@@ -66,8 +66,8 @@ export function ContentActions() {
   const [id, setId] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const hide = () => run(() => api.patch(`/admin/content/${type}/${id.trim()}/hide`, { hidden: true }), "Content hidden");
-  const unhide = () => run(() => api.patch(`/admin/content/${type}/${id.trim()}/hide`, { hidden: false }), "Content restored");
+  const hide = () => run(() => api.patch(`/admin/content/${type}/${id.trim()}/hide`, { hidden: true }), "Content hidden").catch(() => undefined);
+  const unhide = () => run(() => api.patch(`/admin/content/${type}/${id.trim()}/hide`, { hidden: false }), "Content restored").catch(() => undefined);
   const remove = () => run(() => api.delete(`/admin/content/${type}/${id.trim()}`), "Content deleted").then(() => setDialogOpen(false));
   const valid = id.trim().length > 0;
 
