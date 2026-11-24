@@ -1086,6 +1086,37 @@ pages, a working login page and 40 placeholder pages. Build and lint pass; teste
 login redirect to ?next, role redirects to /forbidden, admin and moderator areas, silent refresh and the
 phone menu in the browser.
 ================================================
+### Member 2 — 2026-11-24 — GEN-08, GEN-09
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirements: GEN-08, GEN-09
+Prompt:
+"Implement Milestone 2 task 1 shared frontend components: ImageUploader for JPG/PNG
+uploads up to 5 MB with previews and a maximum count, and ReportButton with a reason
+modal that submits to the reports endpoint and displays the backend's errors,
+including duplicate-report conflicts. Use the Next.js 16 frontend skeleton's shared
+api client and UI kit, no new packages, no hard-coded colours, and only edit my
+owned component folders plus AI_PROMPTS.txt."
+How the output was used:
+Added reusable ImageUploader and ReportButton components with the shared API client,
+theme/UI kit, client-side upload checks, previews, removal, responsive layouts, and
+backend error handling. The components are ready for blog, itinerary, review, and
+provider pages to consume.
+================================================
+### Member 2 — 2026-11-24 — GEN-08
+Student: Member 2
+Tool: ChatGPT / Codex
+Related Requirement: GEN-08
+Prompt:
+"Fix ImageUploader so callers provide onUpload(file) and optional onRemove(image),
+allowing posts, hotels, airlines, and activities to use their own multipart upload
+and delete endpoints. Keep the JPG/PNG, 5 MB, max-count, preview, counter, and
+backend-error behavior, and run the frontend build and lint."
+How the output was used:
+Refactored ImageUploader to delegate upload and deletion to the owning page. A
+preview is removed only after its delete callback succeeds, and callback errors are
+shown through the shared error UI.
+================================================
 ### Member 1 — 2026-11-24 — frontend: modern theme, auth pages, profile, admin accounts (ACC-01, ACC-07a, ACC-08, ACC-09, ACC-11, ACC-12, ACC-13, ACC-14, ACC-15, ACC-16, GEN-15, GEN-17)
 Student: Member 1
 Tool: Claude (Claude Code)
