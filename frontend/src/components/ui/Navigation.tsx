@@ -61,7 +61,7 @@ export function Tabs({ tabs, active }: { tabs: Tab[]; active: string }) {
           href={tab.href}
           className={cn(
             "whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition",
-            tab.href === active ? "bg-foreground text-white shadow" : "text-muted hover:bg-primary-soft hover:text-primary",
+            tab.href === active ? "bg-primary text-white shadow-sm" : "text-muted hover:bg-primary-soft hover:text-primary",
           )}
         >
           {tab.label}

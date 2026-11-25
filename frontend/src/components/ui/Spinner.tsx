@@ -15,7 +15,7 @@ export function LoadingState({ label = "Loading..." }: { label?: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted">
       <span className="relative flex h-10 w-10">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent/40" />
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/30" />
         <span className="relative inline-flex h-10 w-10 rounded-full bg-brand" />
       </span>
       <span className="text-sm font-medium">{label}</span>

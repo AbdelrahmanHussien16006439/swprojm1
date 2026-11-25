@@ -1210,3 +1210,17 @@ Added the admin reports, content moderation, audit-log and provider pages with U
 filters, pagination, confirmation dialogs, backend error display, result toasts and
 refreshes after successful actions.
 ================================================
+### Member 1 — 2026-11-25 — professional redesign + home page search (GEN-14, GEN-15, GEN-16, GEN-17)
+Student: Member 1
+Tool: Claude (Claude Code)
+Related Requirements: GEN-14, GEN-15, GEN-16, GEN-17
+Prompt:
+"Make the frontend look like a professional travel website (inspired by sites like Expedia, but our own
+brand): attention grabbing and very professional. Keep the theme token names so the members' pages follow."
+How the output was used:
+New theme (navy, royal blue, coral, Plus Jakarta Sans), restyled UI kit, white navbar with logo, 4-column
+navy footer. New ISR home page (revalidate 300): full-width hero with a working tabbed search (Stays → /hotels,
+Flights → /flights, Plan a trip → /explore) built from the seeded cities and airports, trust strip, destination
+tiles, trip-planner showcase, latest stories and a closing banner. Tested search validation and URLs, desktop and
+phone widths (no sideways scroll), and that other members' pages picked up the new theme.
+================================================

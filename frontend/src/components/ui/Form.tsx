@@ -4,8 +4,8 @@ import { cn } from "@/lib/cn";
 import { errorMessages } from "@/lib/api/errors";
 
 const control =
-  "w-full rounded-2xl border border-border bg-surface px-4 text-sm text-foreground placeholder:text-muted/70 shadow-sm " +
-  "transition focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15 " +
+  "w-full rounded-xl border border-border bg-surface px-4 text-sm text-foreground placeholder:text-muted/70 " +
+  "transition focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/12 " +
   "disabled:bg-background disabled:text-muted";
 
 export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(

@@ -7,8 +7,8 @@ export function Card({ className, interactive, children }: { className?: string;
   return (
     <div
       className={cn(
-        "rounded-3xl border border-border bg-surface p-5 shadow-[0_8px_30px_-12px_rgba(124,58,237,0.18)] sm:p-7",
-        interactive && "transition duration-200 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_16px_40px_-12px_rgba(255,79,163,0.30)]",
+        "rounded-2xl border border-border bg-surface p-5 shadow-[0_1px_3px_rgba(15,23,42,0.06)] sm:p-7",
+        interactive && "transition duration-200 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_18px_40px_-18px_rgba(15,23,42,0.35)]",
         className,
       )}
     >
@@ -135,7 +135,7 @@ export function ErrorState({ title = "Oops, something broke", message, action }:
 /** Scrolls sideways on phones instead of breaking the layout. Use normal <thead>/<tbody>/<tr>/<th>/<td> inside. */
 export function Table({ children }: { children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-3xl border border-border bg-surface shadow-sm">
+    <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-sm">
       <table className="w-full text-left text-sm [&_td]:px-5 [&_td]:py-4 [&_th]:bg-primary-soft/50 [&_th]:px-5 [&_th]:py-3 [&_th]:text-xs [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted [&_tbody_tr]:transition [&_tbody_tr:hover]:bg-background [&_tr]:border-b [&_tr]:border-border [&_tbody_tr:last-child]:border-0">
         {children}
       </table>

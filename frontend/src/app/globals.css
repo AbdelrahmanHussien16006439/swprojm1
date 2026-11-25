@@ -2,45 +2,46 @@
 
 /*
  * Theme (Member 1) — the ONLY colours, radius and fonts the app uses (GEN-15, GEN-17).
- * Use the Tailwind names: bg-primary, text-muted, border-border, bg-surface, text-danger, font-display ...
- * Brand gradient: use the "bg-brand" / "text-brand" classes below. Never hard-code other colours in pages.
+ * Look: clean, professional travel site — deep navy, royal blue actions, warm coral highlights.
+ * Use the Tailwind names: bg-primary, bg-navy, text-muted, border-border, bg-surface, text-danger ...
+ * Brand gradient: "bg-brand" / "text-brand". Never hard-code other colours in pages.
  */
 @theme inline {
-  --color-background: #faf7ff;
+  --color-background: #f3f5fa;
   --color-surface: #ffffff;
-  --color-foreground: #1a1230;
-  --color-muted: #6e6787;
-  --color-border: #ece6f8;
+  --color-foreground: #0f172a;
+  --color-muted: #5b6478;
+  --color-border: #e2e7f0;
 
-  --color-primary: #7c3aed;
-  --color-primary-hover: #6d28d9;
-  --color-primary-soft: #f3edff;
-  --color-accent: #ff4fa3;
-  --color-accent-soft: #ffe8f4;
-  --color-sunset: #ff8a3d;
-  --color-lime: #c8f560;
+  --color-navy: #0b1736;
+  --color-navy-light: #15275a;
 
-  --color-success: #15a34a;
-  --color-success-soft: #e9fbef;
-  --color-warning: #d97706;
-  --color-warning-soft: #fff6e5;
-  --color-danger: #e11d48;
-  --color-danger-hover: #be123c;
-  --color-danger-soft: #ffeef2;
-  --color-info: #2563eb;
-  --color-info-soft: #eaf1ff;
+  --color-primary: #1f4fd8;
+  --color-primary-hover: #1a3fae;
+  --color-primary-soft: #eaf0ff;
+  --color-accent: #f2643a;
+  --color-accent-soft: #fff0ea;
+  --color-sunset: #f5a524;
+  --color-lime: #ffd76a;
+
+  --color-success: #138a4b;
+  --color-success-soft: #e8f7ef;
+  --color-warning: #b45309;
+  --color-warning-soft: #fff5e0;
+  --color-danger: #d92d3c;
+  --color-danger-hover: #b4232f;
+  --color-danger-soft: #fdecee;
+  --color-info: #1d6fd8;
+  --color-info-soft: #e9f3ff;
 
   --font-sans: var(--font-body);
-  --font-display: var(--font-heading);
+  --font-display: var(--font-body);
 }
 
 body {
+  /* full-width sections (home hero) must never cause sideways scrolling */
+  overflow-x: clip;
   background-color: var(--color-background);
-  /* soft colour blobs behind everything */
-  background-image:
-    radial-gradient(40rem 30rem at 0% -10%, #ede2ff 0%, transparent 60%),
-    radial-gradient(35rem 25rem at 100% 0%, #ffe4f1 0%, transparent 60%);
-  background-attachment: fixed;
   color: var(--color-foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
 }
@@ -49,15 +50,15 @@ h1,
 h2,
 h3 {
   font-family: var(--font-display), var(--font-sans), sans-serif;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
 }
 
-/* Brand gradient (violet → pink → sunset). */
+/* Brand gradient: deep navy → royal blue (heroes, highlights). */
 @utility bg-brand {
-  background-image: linear-gradient(120deg, var(--color-primary) 0%, var(--color-accent) 60%, var(--color-sunset) 100%);
+  background-image: linear-gradient(125deg, var(--color-navy) 0%, var(--color-navy-light) 45%, var(--color-primary) 100%);
 }
 @utility text-brand {
-  background-image: linear-gradient(120deg, var(--color-primary) 0%, var(--color-accent) 60%, var(--color-sunset) 100%);
+  background-image: linear-gradient(120deg, var(--color-primary) 0%, var(--color-accent) 100%);
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
@@ -70,6 +71,6 @@ h3 {
 }
 
 ::selection {
-  background: var(--color-accent-soft);
+  background: var(--color-primary-soft);
   color: var(--color-foreground);
 }
