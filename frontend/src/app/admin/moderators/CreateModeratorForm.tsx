@@ -56,7 +56,7 @@ export function CreateModeratorForm() {
     <form onSubmit={onSubmit} className="space-y-4" noValidate>
       {created && (
         <p className="rounded-2xl bg-success-soft px-4 py-3 text-sm font-medium text-success">
-          ✅ {created.name} ({created.email}) can now log in with the temporary password.{" "}
+          {created.name} ({created.email}) can now log in with the temporary password.{" "}
           <Link href="/admin/accounts" className="underline">See accounts</Link>
         </p>
       )}
@@ -71,8 +71,8 @@ export function CreateModeratorForm() {
       </div>
       <FormField label="Moderates" htmlFor="role" required>
         <Select id="role" value={form.role} onChange={set("role")}>
-          <option value="airline_moderator">✈️ An airline</option>
-          <option value="hotel_moderator">🏨 A hotel</option>
+          <option value="airline_moderator">An airline</option>
+          <option value="hotel_moderator">A hotel</option>
         </Select>
       </FormField>
       <FormField

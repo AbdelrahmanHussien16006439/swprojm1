@@ -3,6 +3,7 @@
 // Small success/error messages after an action (GEN-16): const toast = useToast(); toast.success("Saved");
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
+import { Icon } from "./Icon";
 
 type ToastKind = "success" | "error" | "info";
 interface ToastItem {
@@ -52,8 +53,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               t.kind === "info" && "border-primary/20 bg-primary-soft/95 text-primary",
             )}
           >
-            {t.kind === "success" ? "✅ " : t.kind === "error" ? "⚠️ " : "💬 "}
-            {t.message}
+            <span className="flex items-start gap-2">
+              <Icon name={t.kind === "success" ? "checkCircle" : t.kind === "error" ? "alert" : "info"} className="mt-0.5 h-4 w-4" />
+              {t.message}
+            </span>
           </div>
         ))}
       </div>

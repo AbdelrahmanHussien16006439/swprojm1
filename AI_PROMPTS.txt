@@ -1224,3 +1224,17 @@ Flights → /flights, Plan a trip → /explore) built from the seeded cities and
 tiles, trip-planner showcase, latest stories and a closing banner. Tested search validation and URLs, desktop and
 phone widths (no sideways scroll), and that other members' pages picked up the new theme.
 ================================================
+### Member 1 — 2026-11-25 — real photos and line icons (GEN-15, GEN-17)
+Student: Member 1
+Tool: Claude (Claude Code)
+Related Requirements: GEN-15, GEN-17
+Prompt:
+"I don't like the emoji destination tiles. Put actual pictures and make the icons look more professional,
+not childish."
+How the output was used:
+Home page now uses free Unsplash photos (hero, 8 seeded cities, planner, banner) loaded at the right size from
+Unsplash's CDN (unoptimized next/image, because Next's optimizer timed out fetching full originals). Added a
+line-icon set (components/ui/Icon.tsx) and removed every emoji from the shared UI: navbar, footer, empty/error
+states, toasts, placeholders, auth and admin pages. PageHeader strips emojis and EmptyState maps old emoji props
+to icons, so other members' pages follow. Tested desktop and phone in the browser.
+================================================

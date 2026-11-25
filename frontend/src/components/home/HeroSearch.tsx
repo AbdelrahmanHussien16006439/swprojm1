@@ -230,7 +230,7 @@ export function HeroSearch({ cities, airports }: { cities: CityOption[]; airport
               <Input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="Search trip ideas — e.g. Cairo, Paris, 5 days…" />
             </Field>
             <Button variant="secondary" size="lg" onClick={() => router.push("/itineraries/new")}>
-              ✏️ Start my own plan
+              Start my own plan
             </Button>
           </div>
         )}

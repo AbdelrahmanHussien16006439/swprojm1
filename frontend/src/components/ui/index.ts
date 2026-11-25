@@ -6,3 +6,4 @@ export { Spinner, LoadingState } from "./Spinner";
 export { Input, Textarea, Select, Checkbox, FormField, FormErrors, fieldError } from "./Form";
 export { Card, Badge, StatusBadge, statusTone, statusLabel, PageHeader, EmptyState, ErrorState, Table } from "./Display";
 export { Pagination, Tabs } from "./Navigation";
+export { Icon, stripEmoji, type IconName } from "./Icon";

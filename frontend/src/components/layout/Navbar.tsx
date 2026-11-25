@@ -10,32 +10,33 @@ import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { cn } from "@/lib/cn";
 import type { Role } from "@/types/api";
 import { Logo } from "./Logo";
+import { Icon, type IconName } from "@/components/ui/Icon";
 
 interface NavLink {
   href: string;
   label: string;
-  emoji: string;
+  icon: IconName;
 }
 
 const PUBLIC_LINKS: NavLink[] = [
-  { href: "/hotels", label: "Stays", emoji: "🏨" },
-  { href: "/flights", label: "Flights", emoji: "✈️" },
-  { href: "/explore", label: "Trip ideas", emoji: "🗺️" },
-  { href: "/blog", label: "Stories", emoji: "📝" },
+  { href: "/hotels", label: "Stays", icon: "hotel" },
+  { href: "/flights", label: "Flights", icon: "plane" },
+  { href: "/explore", label: "Trip ideas", icon: "map" },
+  { href: "/blog", label: "Stories", icon: "pen" },
 ];
 
 function roleLinks(role: Role): NavLink[] {
   switch (role) {
     case "user":
       return [
-        { href: "/itineraries", label: "My trips", emoji: "🧭" },
-        { href: "/my/flight-bookings", label: "Bookings", emoji: "🎫" },
+        { href: "/itineraries", label: "My trips", icon: "compass" },
+        { href: "/my/flight-bookings", label: "Bookings", icon: "ticket" },
       ];
     case "admin":
-      return [{ href: "/admin", label: "Admin", emoji: "🛡️" }];
+      return [{ href: "/admin", label: "Admin", icon: "shield" }];
     case "airline_moderator":
     case "hotel_moderator":
-      return [{ href: roleHome(role), label: "Dashboard", emoji: "📊" }];
+      return [{ href: roleHome(role), label: "Dashboard", icon: "chart" }];
   }
 }
 
@@ -134,7 +135,7 @@ export function Navbar() {
                   isActive(l.href) ? "bg-primary-soft text-primary" : "bg-background hover:bg-primary-soft hover:text-primary",
                 )}
               >
-                <span aria-hidden="true">{l.emoji}</span>
+                <Icon name={l.icon} className="h-4 w-4" />
                 {l.label}
               </Link>
             ))}

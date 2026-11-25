@@ -1,6 +1,7 @@
 // Display components (Member 1): Card, Badge, PageHeader, EmptyState, ErrorState, Table.
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { Icon, stripEmoji, type IconName } from "./Icon";
 
 /** White rounded card. Add `interactive` for clickable cards (lifts on hover). */
 export function Card({ className, interactive, children }: { className?: string; interactive?: boolean; children: React.ReactNode }) {
@@ -78,7 +79,7 @@ export function StatusBadge({ status }: { status: string }) {
 interface PageHeaderProps {
   title: string;
   description?: string;
-  /** Small emoji or label above the title, e.g. "✈️ Flights". */
+  /** Small label above the title, e.g. "Flights". Emojis are removed automatically. */
   eyebrow?: string;
   /** Shows "← Back" so users can always go back (GEN-14). */
   backHref?: string;
@@ -96,8 +97,8 @@ export function PageHeader({ title, description, eyebrow, backHref, backLabel = 
       )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          {eyebrow && <p className="mb-1 text-sm font-semibold text-primary">{eyebrow}</p>}
-          <h1 className="text-3xl font-bold sm:text-4xl">{title}</h1>
+          {eyebrow && stripEmoji(eyebrow) && <p className="mb-1 text-xs font-bold uppercase tracking-wider text-accent">{stripEmoji(eyebrow)}</p>}
+          <h1 className="text-3xl font-extrabold sm:text-4xl">{stripEmoji(title)}</h1>
           {description && <p className="mt-2 max-w-2xl text-muted">{description}</p>}
         </div>
         {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -106,12 +107,16 @@ export function PageHeader({ title, description, eyebrow, backHref, backLabel = 
   );
 }
 
+/** Older pages pass an emoji; we show a matching line icon instead (no emojis in the UI). */
+const EMOJI_ICON: Record<string, IconName> = { "🔍": "search", "🔎": "search", "📝": "pen", "🏷️": "flag", "🚩": "flag", "📜": "file", "🗺️": "map", "✈️": "plane", "🏨": "hotel", "🎫": "ticket", "🔔": "inbox" };
+
 /** Friendly message for empty lists and searches with no results (GEN-04). */
-export function EmptyState({ title, message, emoji = "🧳", action }: { title: string; message?: string; emoji?: string; action?: React.ReactNode }) {
+export function EmptyState({ title, message, icon, emoji, action }: { title: string; message?: string; icon?: IconName; emoji?: string; action?: React.ReactNode }) {
+  const name: IconName = icon ?? (emoji ? EMOJI_ICON[emoji] : undefined) ?? "inbox";
   return (
-    <div className="rounded-3xl border-2 border-dashed border-border bg-surface/70 px-6 py-14 text-center">
-      <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-soft text-3xl" aria-hidden="true">
-        {emoji}
+    <div className="rounded-2xl border border-dashed border-border bg-surface px-6 py-14 text-center">
+      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-soft text-primary">
+        <Icon name={name} className="h-6 w-6" />
       </div>
       <p className="font-display text-lg font-bold">{title}</p>
       {message && <p className="mx-auto mt-1 max-w-md text-sm text-muted">{message}</p>}
@@ -121,10 +126,12 @@ export function EmptyState({ title, message, emoji = "🧳", action }: { title: 
 }
 
 /** Error block with an optional retry button (GEN-16). */
-export function ErrorState({ title = "Oops, something broke", message, action }: { title?: string; message?: string; action?: React.ReactNode }) {
+export function ErrorState({ title = "Something went wrong", message, action }: { title?: string; message?: string; action?: React.ReactNode }) {
   return (
-    <div role="alert" className="rounded-3xl border border-danger/20 bg-danger-soft px-6 py-12 text-center">
-      <div className="mb-3 text-4xl" aria-hidden="true">😵‍💫</div>
+    <div role="alert" className="rounded-2xl border border-danger/20 bg-danger-soft px-6 py-12 text-center">
+      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface text-danger">
+        <Icon name="alert" className="h-6 w-6" />
+      </div>
       <p className="font-display text-lg font-bold text-danger">{title}</p>
       {message && <p className="mx-auto mt-1 max-w-md text-sm text-danger/80">{message}</p>}
       {action && <div className="mt-5 flex justify-center">{action}</div>}

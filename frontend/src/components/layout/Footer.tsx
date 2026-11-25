@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "./Logo";
+import { Icon } from "@/components/ui/Icon";
 
 const columns = [
   {
@@ -47,8 +48,8 @@ export function Footer() {
               Flights, stays and day-by-day trip plans with a real budget — all in one place.
             </p>
             <div className="flex flex-wrap gap-2 pt-1 text-xs">
-              <span className="rounded-full bg-white/10 px-3 py-1">🔒 Secure Stripe payments</span>
-              <span className="rounded-full bg-white/10 px-3 py-1">💱 Multi-currency budgets</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1"><Icon name="lock" className="h-3.5 w-3.5" /> Secure Stripe payments</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1"><Icon name="globe" className="h-3.5 w-3.5" /> Multi-currency budgets</span>
             </div>
           </div>
           {columns.map((col) => (
@@ -68,7 +69,7 @@ export function Footer() {
         </div>
         <div className="mt-10 flex flex-col gap-2 border-t border-white/10 pt-6 text-xs text-white/50 sm:flex-row sm:justify-between">
           <p>© 2026 TravelMate · Software Project I, Winter 2026 · German International University</p>
-          <p>Prices in USD · Card payments processed by Stripe (test mode)</p>
+          <p>Prices in USD · Payments by Stripe (test mode) · Photos from Unsplash</p>
         </div>
       </div>
     </footer>

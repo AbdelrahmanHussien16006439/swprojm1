@@ -7,7 +7,7 @@ import { useState } from "react";
 import { api } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { isSafeNext, roleHome } from "@/lib/auth/routes";
-import { Button, Card, FormErrors, FormField, Input } from "@/components/ui";
+import { Button, Card, FormErrors, FormField, Input, Icon } from "@/components/ui";
 
 export function LoginForm() {
   const router = useRouter();
@@ -41,10 +41,10 @@ export function LoginForm() {
 
   return (
     <Card>
-      <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-2xl shadow-md" aria-hidden="true">👋</div>
-      <h1 className="text-3xl font-bold">Welcome back</h1>
+      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-primary"><Icon name="logIn" className="h-6 w-6" /></div>
+      <h1 className="text-3xl font-extrabold">Welcome back</h1>
       <p className="mt-1 text-sm text-muted">Log in to pick up where you left off.</p>
-      {next && <p className="mt-3 rounded-2xl bg-primary-soft px-4 py-2 text-sm font-medium text-primary">🔒 Log in first to continue.</p>}
+      {next && <p className="mt-3 rounded-2xl bg-primary-soft px-4 py-2 text-sm font-medium text-primary">Please sign in to continue.</p>}
       <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
         <FormErrors error={error} />
         <FormField label="Email" htmlFor="email" required>
@@ -60,7 +60,7 @@ export function LoginForm() {
       <p className="mt-4 text-center text-sm text-muted">
         No account yet?{" "}
         <Link href={next ? `/register?next=${encodeURIComponent(next)}` : "/register"} className="font-semibold text-primary hover:underline">
-          Join free ✨
+          Create an account
         </Link>
       </p>
     </Card>

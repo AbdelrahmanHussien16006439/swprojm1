@@ -32,7 +32,7 @@ export default async function AccountsPage({ searchParams }: PageProps<"/admin/a
   return (
     <>
       <PageHeader
-        eyebrow="👥 Accounts"
+        eyebrow="Accounts"
         title="Users & moderators"
         description={`${result.total} account${result.total === 1 ? "" : "s"}${filtered ? " match your filters" : ""}.`}
         actions={<ButtonLink href="/admin/moderators">+ New moderator</ButtonLink>}
@@ -62,7 +62,7 @@ export default async function AccountsPage({ searchParams }: PageProps<"/admin/a
       </form>
 
       {result.data.length === 0 ? (
-        <EmptyState emoji="🔍" title="No accounts found" message={filtered ? "Try a different search or remove a filter." : "Nobody has signed up yet."} />
+        <EmptyState icon="search" title="No accounts found" message={filtered ? "Try a different search or remove a filter." : "Nobody has signed up yet."} />
       ) : (
         <Table>
           <thead>
