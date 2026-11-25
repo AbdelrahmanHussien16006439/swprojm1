@@ -40,7 +40,7 @@ const columns = [
 export function Footer() {
   return (
     <footer className="mt-auto bg-navy text-white/70">
-      <div className="mx-auto max-w-6xl px-4 py-12">
+      <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10 py-12">
         <div className="grid gap-10 lg:grid-cols-[1.4fr_repeat(4,1fr)]">
           <div className="space-y-3">
             <Logo light />

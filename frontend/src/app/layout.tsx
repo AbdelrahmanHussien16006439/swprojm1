@@ -26,7 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <AuthProvider>
           <ToastProvider>
             <Navbar />
-            <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:py-10">{children}</main>
+            <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 sm:px-6 lg:px-10 py-8 sm:py-10">{children}</main>
             <Footer />
           </ToastProvider>
         </AuthProvider>
