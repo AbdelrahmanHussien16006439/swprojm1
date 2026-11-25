@@ -26,7 +26,7 @@ export default async function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader eyebrow="👤 Account" title={`Hey ${profile.name.split(" ")[0]}!`} description="Your details, your currency, your account." />
+      <PageHeader eyebrow="Account" title={`Hey ${profile.name.split(" ")[0]}!`} description="Your details, your currency, your account." />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_16rem]">
         <Card>
@@ -50,7 +50,7 @@ export default async function ProfilePage() {
             <h2 className="font-bold">Password</h2>
             <p className="mt-1 text-sm text-muted">Change it any time.</p>
             <ButtonLink href="/change-password" variant="secondary" size="sm" className="mt-3">
-              🔐 Change password
+              Change password
             </ButtonLink>
           </Card>
         </div>

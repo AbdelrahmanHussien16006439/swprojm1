@@ -1210,3 +1210,31 @@ Added the admin reports, content moderation, audit-log and provider pages with U
 filters, pagination, confirmation dialogs, backend error display, result toasts and
 refreshes after successful actions.
 ================================================
+### Member 1 — 2026-11-25 — professional redesign + home page search (GEN-14, GEN-15, GEN-16, GEN-17)
+Student: Member 1
+Tool: Claude (Claude Code)
+Related Requirements: GEN-14, GEN-15, GEN-16, GEN-17
+Prompt:
+"Make the frontend look like a professional travel website (inspired by sites like Expedia, but our own
+brand): attention grabbing and very professional. Keep the theme token names so the members' pages follow."
+How the output was used:
+New theme (navy, royal blue, coral, Plus Jakarta Sans), restyled UI kit, white navbar with logo, 4-column
+navy footer. New ISR home page (revalidate 300): full-width hero with a working tabbed search (Stays → /hotels,
+Flights → /flights, Plan a trip → /explore) built from the seeded cities and airports, trust strip, destination
+tiles, trip-planner showcase, latest stories and a closing banner. Tested search validation and URLs, desktop and
+phone widths (no sideways scroll), and that other members' pages picked up the new theme.
+================================================
+### Member 1 — 2026-11-25 — real photos and line icons (GEN-15, GEN-17)
+Student: Member 1
+Tool: Claude (Claude Code)
+Related Requirements: GEN-15, GEN-17
+Prompt:
+"I don't like the emoji destination tiles. Put actual pictures and make the icons look more professional,
+not childish."
+How the output was used:
+Home page now uses free Unsplash photos (hero, 8 seeded cities, planner, banner) loaded at the right size from
+Unsplash's CDN (unoptimized next/image, because Next's optimizer timed out fetching full originals). Added a
+line-icon set (components/ui/Icon.tsx) and removed every emoji from the shared UI: navbar, footer, empty/error
+states, toasts, placeholders, auth and admin pages. PageHeader strips emojis and EmptyState maps old emoji props
+to icons, so other members' pages follow. Tested desktop and phone in the browser.
+================================================

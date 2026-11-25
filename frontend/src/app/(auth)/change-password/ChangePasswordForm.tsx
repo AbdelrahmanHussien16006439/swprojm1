@@ -8,7 +8,7 @@ import { api } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { roleHome } from "@/lib/auth/routes";
 import { isValidPassword, PASSWORD_HINT } from "@/lib/labels";
-import { Button, Card, FormErrors, FormField, Input, fieldError } from "@/components/ui";
+import { Button, Card, FormErrors, FormField, Input, Icon, fieldError } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 
 export function ChangePasswordForm() {
@@ -48,9 +48,7 @@ export function ChangePasswordForm() {
 
   return (
     <Card>
-      <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-2xl shadow-md" aria-hidden="true">
-        🔐
-      </div>
+<div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-primary"><Icon name="key" className="h-6 w-6" /></div>
       <h1 className="text-3xl font-bold">Change password</h1>
       {user?.mustChangePassword ? (
         <p className="mt-3 rounded-2xl bg-warning-soft px-4 py-2 text-sm font-medium text-warning">

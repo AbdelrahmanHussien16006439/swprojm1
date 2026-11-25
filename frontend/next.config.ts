@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  // Destination and hero photos come from Unsplash's image CDN (free Unsplash License).
+  images: {
+    remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com" }],
+  },
   // The browser only talks to this Next.js server. /api and /uploads are forwarded to the
   // backend, so the backend's httpOnly login cookies work without CORS (same origin).
   async rewrites() {

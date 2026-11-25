@@ -9,7 +9,7 @@ import { api } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { isSafeNext, roleHome } from "@/lib/auth/routes";
 import { isValidPassword, PASSWORD_HINT } from "@/lib/labels";
-import { Button, Card, Checkbox, FormErrors, FormField, Input, fieldError } from "@/components/ui";
+import { Button, Card, Checkbox, FormErrors, FormField, Input, Icon, fieldError } from "@/components/ui";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -54,11 +54,9 @@ export function RegisterForm() {
 
   return (
     <Card>
-      <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-2xl shadow-md" aria-hidden="true">
-        🎒
-      </div>
-      <h1 className="text-3xl font-bold">Join TravelMate</h1>
-      <p className="mt-1 text-sm text-muted">Free forever. Book faster, save trips, share stories.</p>
+<div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-primary"><Icon name="userPlus" className="h-6 w-6" /></div>
+      <h1 className="text-3xl font-extrabold">Create your account</h1>
+      <p className="mt-1 text-sm text-muted">Book faster, save your trips and share your stories.</p>
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
         <FormErrors error={error} fields={["name", "email", "password", "acceptTerms"]} />

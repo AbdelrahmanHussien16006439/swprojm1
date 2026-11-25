@@ -8,7 +8,7 @@ export default function ModeratorsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="🧑‍✈️ Moderators"
+        eyebrow="Moderators"
         title="New moderator"
         description="A moderator manages exactly one airline or one hotel. They must change the temporary password at first login."
         backHref="/admin/accounts"

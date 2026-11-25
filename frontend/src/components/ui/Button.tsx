@@ -2,15 +2,16 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { Spinner } from "./Spinner";
 
-type Variant = "primary" | "secondary" | "danger" | "ghost" | "dark";
+type Variant = "primary" | "secondary" | "danger" | "ghost" | "dark" | "accent";
 type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-brand text-white shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-accent/30 hover:-translate-y-0.5",
-  secondary: "bg-surface text-foreground border border-border shadow-sm hover:border-primary/40 hover:-translate-y-0.5",
-  danger: "bg-danger text-white shadow-lg shadow-danger/20 hover:bg-danger-hover hover:-translate-y-0.5",
+  primary: "bg-primary text-white shadow-sm shadow-primary/30 hover:bg-primary-hover hover:shadow-md",
+  secondary: "bg-surface text-foreground border border-border shadow-sm hover:border-primary/40 hover:text-primary",
+  danger: "bg-danger text-white shadow-sm hover:bg-danger-hover",
   ghost: "text-primary hover:bg-primary-soft",
-  dark: "bg-foreground text-white shadow-lg shadow-foreground/20 hover:-translate-y-0.5",
+  dark: "bg-navy text-white shadow-sm hover:bg-navy-light",
+  accent: "bg-accent text-white shadow-sm shadow-accent/30 hover:brightness-95 hover:shadow-md",
 };
 
 const sizes: Record<Size, string> = {
@@ -21,7 +22,7 @@ const sizes: Record<Size, string> = {
 
 function classes(variant: Variant, size: Size, className?: string) {
   return cn(
-    "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-all duration-200 active:scale-[0.97]",
+    "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-all duration-200 active:scale-[0.98]",
     "disabled:pointer-events-none disabled:opacity-50",
     variants[variant],
     sizes[size],
