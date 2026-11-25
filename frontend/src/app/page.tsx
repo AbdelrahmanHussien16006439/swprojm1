@@ -63,7 +63,7 @@ export default async function HomePage() {
         <Image unoptimized src={HERO_PHOTO.photo} alt="" fill priority sizes="100vw" className="object-cover" />
         <div className="absolute inset-0 bg-gradient-to-r from-navy/95 via-navy/75 to-navy/30" aria-hidden="true" />
         <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-navy/60 to-transparent" aria-hidden="true" />
-        <div className="relative mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10 pb-16 pt-16 sm:pb-24 sm:pt-24">
+        <div className="relative mx-auto max-w-none px-4 sm:px-8 lg:px-12 2xl:px-20 pb-16 pt-16 sm:pb-24 sm:pt-24">
           <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-sm font-semibold backdrop-blur">
             <span className="h-1.5 w-1.5 rounded-full bg-accent" /> Flights · Stays · Trip planning
           </p>

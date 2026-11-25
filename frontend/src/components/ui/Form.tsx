@@ -4,13 +4,13 @@ import { cn } from "@/lib/cn";
 import { errorMessages } from "@/lib/api/errors";
 
 const control =
-  "w-full rounded-xl border border-border bg-surface px-4 text-sm text-foreground placeholder:text-muted/70 " +
+  "w-full rounded-xl border border-border bg-surface px-4 text-base text-foreground placeholder:text-muted/70 " +
   "transition focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/12 " +
   "disabled:bg-background disabled:text-muted";
 
 export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
   function Input({ className, ...rest }, ref) {
-    return <input ref={ref} className={cn(control, "h-12", className)} {...rest} />;
+    return <input ref={ref} className={cn(control, "h-13", className)} {...rest} />;
   },
 );
 
@@ -23,7 +23,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttrib
 export const Select = forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(
   function Select({ className, children, ...rest }, ref) {
     return (
-      <select ref={ref} className={cn(control, "h-12", className)} {...rest}>
+      <select ref={ref} className={cn(control, "h-13", className)} {...rest}>
         {children}
       </select>
     );

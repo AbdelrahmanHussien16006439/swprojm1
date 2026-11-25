@@ -6,7 +6,7 @@
 //                                      /explore?q=  (Member 7)
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Button, Input, Select } from "@/components/ui";
+import { Button, Icon, Input, Select } from "@/components/ui";
 import { cn } from "@/lib/cn";
 
 export interface CityOption {
@@ -39,9 +39,31 @@ function isoDate(days: number): string {
 function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <label className={cn("block space-y-1.5", className)}>
-      <span className="text-xs font-bold uppercase tracking-wide text-muted">{label}</span>
+      <span className="text-sm font-semibold text-foreground">{label}</span>
       {children}
     </label>
+  );
+}
+
+/** "2026-12-09" → "Wed, 9 Dec" (read as a calendar date, no time-zone shift). */
+function niceDate(iso: string): string {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(Date.UTC(y, m - 1, d)));
+}
+
+function daysBetween(from: string, to: string): number {
+  if (!from || !to) return 0;
+  return Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000);
+}
+
+/** Plain-English summary under the date fields, e.g. "Wed, 9 Dec → Sat, 12 Dec · 3 nights". */
+function DateSummary({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="flex items-center gap-2 rounded-xl bg-primary-soft px-4 py-2.5 text-sm font-semibold text-primary">
+      <Icon name="calendar" className="h-4 w-4" />
+      {children}
+    </p>
   );
 }
 
@@ -116,12 +138,12 @@ export function HeroSearch({ cities, airports }: { cities: CityOption[]; airport
               setError(null);
             }}
             className={cn(
-              "relative flex items-center gap-2 px-3 py-3 text-sm font-bold transition-colors sm:px-4",
+              "relative flex items-center gap-2 px-3 py-3.5 text-base font-bold transition-colors sm:px-5",
               "after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full",
               tab === t.id ? "text-primary after:bg-primary" : "text-muted hover:text-foreground",
             )}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
               {t.icon}
             </svg>
             {t.label}
@@ -155,6 +177,11 @@ export function HeroSearch({ cities, airports }: { cities: CityOption[]; airport
               <Input type="number" min={1} max={10} value={rooms} onChange={(e) => setRooms(Math.max(1, Number(e.target.value) || 1))} />
             </Field>
           </div>
+        )}
+        {tab === "stays" && checkIn && checkOut && daysBetween(checkIn, checkOut) > 0 && (
+          <DateSummary>
+            {niceDate(checkIn)} → {niceDate(checkOut)} · {daysBetween(checkIn, checkOut)} night{daysBetween(checkIn, checkOut) === 1 ? "" : "s"} · {guests} guest{guests === 1 ? "" : "s"}, {rooms} room{rooms === 1 ? "" : "s"}
+          </DateSummary>
         )}
 
         {tab === "flights" && (
@@ -212,7 +239,7 @@ export function HeroSearch({ cities, airports }: { cities: CityOption[]; airport
               <Field label="Adults">
                 <Input type="number" min={1} max={9} value={adults} onChange={(e) => setAdults(Math.max(1, Number(e.target.value) || 1))} />
               </Field>
-              <Field label="Cabin">
+              <Field label="Cabin class">
                 <Select value={cabinClass} onChange={(e) => setCabinClass(e.target.value)}>
                   <option value="economy">Economy</option>
                   <option value="premium_economy">Premium economy</option>
@@ -222,6 +249,16 @@ export function HeroSearch({ cities, airports }: { cities: CityOption[]; airport
               </Field>
             </div>
           </div>
+        )}
+
+        {tab === "flights" && departDate && (
+          <DateSummary>
+            Departs {niceDate(departDate)}
+            {tripType === "round_trip" && returnDate >= departDate
+              ? ` · returns ${niceDate(returnDate)} (${daysBetween(departDate, returnDate)} days)`
+              : " · one way"}{" "}
+            · {adults} adult{adults === 1 ? "" : "s"}
+          </DateSummary>
         )}
 
         {tab === "plan" && (

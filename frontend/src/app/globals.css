@@ -38,6 +38,11 @@
   --font-display: var(--font-body);
 }
 
+html {
+  /* slightly larger base text (17px) for readability */
+  font-size: 106.25%;
+}
+
 body {
   /* full-width sections (home hero) must never cause sideways scrolling */
   overflow-x: clip;
